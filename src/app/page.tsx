@@ -17,7 +17,6 @@ import {
   Send,
   Upload,
   UserRound,
-  UsersRound,
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
