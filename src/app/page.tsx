@@ -355,6 +355,7 @@ export default function Home() {
           <div className="mode-switch" aria-label="Modo de acceso">
             <button
               className={mode === "lawyer" ? "active" : ""}
+              data-testid="mode-lawyer"
               type="button"
               onClick={() => setMode("lawyer")}
             >
@@ -363,6 +364,7 @@ export default function Home() {
             </button>
             <button
               className={mode === "client" ? "active" : ""}
+              data-testid="mode-client"
               type="button"
               onClick={() => setMode("client")}
             >
@@ -500,7 +502,12 @@ function LawyerWorkspace({
             <h2>{activeClient?.name ?? "Clientes"}</h2>
             <span className="muted">{activeClient?.email ?? "Sin cliente seleccionado"}</span>
           </div>
-          <button className="primary-button" type="button" onClick={() => onDrawer("case")}>
+          <button
+            className="primary-button"
+            data-testid="open-case-drawer"
+            type="button"
+            onClick={() => onDrawer("case")}
+          >
             <Plus size={16} />
             Nuevo caso
           </button>
@@ -603,11 +610,12 @@ function ClientWorkspace({
             <label htmlFor="client-search">Cliente</label>
             <div className="row">
               <Search size={18} />
-              <input
-                className="search-box"
-                id="client-search"
-                onChange={(event) => onClientQuery(event.target.value)}
-                placeholder="Nombre, contacto o correo"
+            <input
+              className="search-box"
+              data-testid="client-search"
+              id="client-search"
+              onChange={(event) => onClientQuery(event.target.value)}
+              placeholder="Nombre, contacto o correo"
                 value={clientQuery}
               />
             </div>
@@ -618,6 +626,7 @@ function ClientWorkspace({
           {clientResults.map((client) => (
             <button
               className="client-entry"
+              data-testid={`client-result-${client.id}`}
               key={client.id}
               type="button"
               onClick={() => onClientEnter(client.id)}
@@ -735,6 +744,7 @@ function CaseDetail({
           <div className="field">
             <label htmlFor="case-status">Estado</label>
             <select
+              data-testid="case-status"
               id="case-status"
               value={legalCase.status}
               onChange={(event) =>
@@ -766,17 +776,19 @@ function CaseDetail({
           <div className="field full">
             <label htmlFor="next-step">Proximo paso</label>
             <textarea
+              data-testid="case-next-step"
               id="next-step"
               onChange={(event) => setNextStep(event.target.value)}
               value={nextStep}
             />
           </div>
           <div className="field full">
-            <button
-              className="secondary-button"
-              type="button"
-              onClick={() => onUpdateCase(legalCase.id, { nextStep })}
-            >
+          <button
+            className="secondary-button"
+            data-testid="save-case"
+            type="button"
+            onClick={() => onUpdateCase(legalCase.id, { nextStep })}
+          >
               <Save size={16} />
               Guardar caso
             </button>
@@ -896,6 +908,7 @@ function UpdateComposer({
         <div className="field full">
           <label htmlFor="update-body">Detalle</label>
           <textarea
+            data-testid="update-body"
             id="update-body"
             onChange={(event) => setBody(event.target.value)}
             required
@@ -905,6 +918,7 @@ function UpdateComposer({
         <div className="field">
           <label htmlFor="update-visibility">Visibilidad</label>
           <select
+            data-testid="update-visibility"
             id="update-visibility"
             onChange={(event) => setVisibility(event.target.value as Visibility)}
             value={visibility}
@@ -915,7 +929,7 @@ function UpdateComposer({
         </div>
         <div className="field">
           <label>&nbsp;</label>
-          <button className="primary-button" type="submit">
+          <button className="primary-button" data-testid="publish-update" type="submit">
             <Send size={16} />
             Publicar
           </button>
@@ -965,6 +979,7 @@ function RequestComposer({
         <div className="field">
           <label htmlFor="request-title">Titulo</label>
           <input
+            data-testid="request-title"
             id="request-title"
             onChange={(event) => setTitle(event.target.value)}
             required
@@ -974,6 +989,7 @@ function RequestComposer({
         <div className="field">
           <label htmlFor="request-owner">Responsable cliente</label>
           <input
+            data-testid="request-owner"
             id="request-owner"
             onChange={(event) => setOwner(event.target.value)}
             required
@@ -983,6 +999,7 @@ function RequestComposer({
         <div className="field">
           <label htmlFor="request-date">Fecha limite</label>
           <input
+            data-testid="request-date"
             id="request-date"
             onChange={(event) => setDueDate(event.target.value)}
             required
@@ -993,6 +1010,7 @@ function RequestComposer({
         <div className="field full">
           <label htmlFor="request-detail">Detalle</label>
           <textarea
+            data-testid="request-detail"
             id="request-detail"
             onChange={(event) => setDetail(event.target.value)}
             required
@@ -1000,7 +1018,7 @@ function RequestComposer({
           />
         </div>
         <div className="field full">
-          <button className="secondary-button" type="submit">
+          <button className="secondary-button" data-testid="create-request" type="submit">
             <Plus size={16} />
             Crear solicitud
           </button>
@@ -1042,6 +1060,7 @@ function DocumentComposer({
         <div className="field full">
           <label htmlFor="document-file">Archivo</label>
           <input
+            data-testid="document-file"
             id="document-file"
             onChange={(event) => setName(event.target.files?.[0]?.name ?? "")}
             type="file"
@@ -1050,6 +1069,7 @@ function DocumentComposer({
         <div className="field">
           <label htmlFor="document-name">Nombre</label>
           <input
+            data-testid="document-name"
             id="document-name"
             onChange={(event) => setName(event.target.value)}
             required
@@ -1059,6 +1079,7 @@ function DocumentComposer({
         <div className="field">
           <label htmlFor="document-category">Categoria</label>
           <input
+            data-testid="document-category"
             id="document-category"
             onChange={(event) => setCategory(event.target.value)}
             required
@@ -1068,6 +1089,7 @@ function DocumentComposer({
         <div className="field">
           <label htmlFor="document-visibility">Visibilidad</label>
           <select
+            data-testid="document-visibility"
             id="document-visibility"
             onChange={(event) => setVisibility(event.target.value as Visibility)}
             value={visibility}
@@ -1078,7 +1100,7 @@ function DocumentComposer({
         </div>
         <div className="field">
           <label>&nbsp;</label>
-          <button className="secondary-button" type="submit">
+          <button className="secondary-button" data-testid="register-document" type="submit">
             <Upload size={16} />
             Registrar
           </button>
@@ -1254,7 +1276,7 @@ function CaseDrawer({
           />
         </div>
         <div className="field full">
-          <button className="primary-button" type="submit">
+          <button className="primary-button" data-testid="create-case" type="submit">
             <Save size={16} />
             Guardar caso
           </button>
@@ -1300,7 +1322,12 @@ function CaseCard({
   onSelect: () => void;
 }) {
   return (
-    <button className={`case-card ${active ? "active" : ""}`} type="button" onClick={onSelect}>
+    <button
+      className={`case-card ${active ? "active" : ""}`}
+      data-testid={`case-card-${legalCase.id}`}
+      type="button"
+      onClick={onSelect}
+    >
       <div className="case-card-header">
         <div>
           <strong>{legalCase.title}</strong>

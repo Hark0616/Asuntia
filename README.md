@@ -16,6 +16,17 @@ npm install
 npm run dev
 ```
 
+## Verificar
+
+```bash
+npm run typecheck
+npm run lint
+npm run build
+npm run test:e2e
+```
+
+Las pruebas e2e levantan o reutilizan el servidor local en `http://localhost:3000` y validan los flujos principales de firma y cliente.
+
 La primera version funciona como demo local sin base de datos externa. El objetivo es validar el flujo principal antes de conectar Supabase/Auth/Storage.
 
 ## Flujo MVP
