@@ -64,6 +64,7 @@ Tablas base:
 - `profiles`
 - `clients`
 - `cases`
+- `case_milestones`
 - `case_updates`
 - `requests`
 - `documents`
@@ -75,6 +76,7 @@ Relaciones base:
 - `profiles.firm_id -> firms.id`
 - `cases.client_id -> clients.id`
 - `cases.firm_id -> firms.id`
+- `case_milestones.case_id -> cases.id`
 - `case_updates.case_id -> cases.id`
 - `requests.case_id -> cases.id`
 - `documents.case_id -> cases.id`
@@ -89,10 +91,10 @@ Reglas minimas:
 - Un usuario solo puede leer datos de su firma.
 - Un cliente solo puede leer sus casos autorizados.
 - Avances internos no deben ser visibles para clientes.
+- Hitos internos no deben ser visibles para clientes si en el futuro se agrega visibilidad por hito.
 - Documentos internos no deben ser visibles para clientes.
 - Auditoria no debe ser editable desde cliente.
 
 ## Pendiente
 
 Este MVP aun usa `localStorage` para validar UX. La siguiente fase tecnica debe reemplazar esa persistencia por Supabase local/remoto usando migraciones.
-

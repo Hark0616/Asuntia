@@ -15,6 +15,27 @@ export function cloneSeed(): WorkspaceData {
   return JSON.parse(JSON.stringify(seedData)) as WorkspaceData;
 }
 
+function normalizeWorkspace(data: WorkspaceData): WorkspaceData {
+  const seeded = cloneSeed();
+  const seedCasesById = new Map(seeded.cases.map((legalCase) => [legalCase.id, legalCase]));
+  const existingMilestoneIds = new Set((data.milestones ?? []).map((milestone) => milestone.id));
+
+  return {
+    ...data,
+    cases: data.cases.map((legalCase, index) => ({
+      ...legalCase,
+      trackingCode:
+        legalCase.trackingCode ??
+        seedCasesById.get(legalCase.id)?.trackingCode ??
+        `AS-DEMO-${String(index + 1).padStart(3, "0")}`,
+    })),
+    milestones: [
+      ...(data.milestones ?? []),
+      ...seeded.milestones.filter((milestone) => !existingMilestoneIds.has(milestone.id)),
+    ],
+  };
+}
+
 export function loadWorkspace(): WorkspaceData {
   if (typeof window === "undefined") {
     return cloneSeed();
@@ -28,7 +49,10 @@ export function loadWorkspace(): WorkspaceData {
   }
 
   try {
-    return JSON.parse(raw) as WorkspaceData;
+    const parsed = JSON.parse(raw) as WorkspaceData;
+    const normalized = normalizeWorkspace(parsed);
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+    return normalized;
   } catch {
     const seeded = cloneSeed();
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(seeded));

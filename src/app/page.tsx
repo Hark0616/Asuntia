@@ -4,6 +4,8 @@ import {
   BriefcaseBusiness,
   CalendarClock,
   CheckCircle2,
+  ChevronDown,
+  ChevronRight,
   Clock3,
   Eye,
   EyeOff,
@@ -32,6 +34,7 @@ import {
 } from "@/lib/storage";
 import type {
   CaseDocument,
+  CaseMilestone,
   CaseStatus,
   CaseUpdate,
   Client,
@@ -68,8 +71,9 @@ export default function Home() {
   const [mode, setMode] = useState<Mode>("lawyer");
   const [selectedClientId, setSelectedClientId] = useState("client-1");
   const [selectedCaseId, setSelectedCaseId] = useState("case-1");
-  const [activeClientId, setActiveClientId] = useState<string | null>(null);
-  const [clientQuery, setClientQuery] = useState("");
+  const [trackingCode, setTrackingCode] = useState("");
+  const [activeTrackingCaseId, setActiveTrackingCaseId] = useState<string | null>(null);
+  const [trackingError, setTrackingError] = useState("");
   const [drawer, setDrawer] = useState<DrawerKind>(null);
 
   useEffect(() => {
@@ -89,7 +93,12 @@ export default function Home() {
     data.cases.find((legalCase) => legalCase.clientId === selectedClient?.id) ??
     data.cases[0];
 
-  const activeClient = activeClientId ? clientsById.get(activeClientId) : null;
+  const activeTrackingCase = activeTrackingCaseId
+    ? data.cases.find((legalCase) => legalCase.id === activeTrackingCaseId)
+    : undefined;
+  const activeClient = activeTrackingCase
+    ? clientsById.get(activeTrackingCase.clientId)
+    : undefined;
 
   const selectedClientCases = useMemo(() => {
     if (!selectedClient) {
@@ -100,29 +109,6 @@ export default function Home() {
       .filter((legalCase) => legalCase.clientId === selectedClient.id)
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   }, [data.cases, selectedClient]);
-
-  const activeClientCases = useMemo(() => {
-    if (!activeClient) {
-      return [];
-    }
-
-    return data.cases
-      .filter((legalCase) => legalCase.clientId === activeClient.id)
-      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-  }, [activeClient, data.cases]);
-
-  const clientResults = useMemo(() => {
-    const query = clientQuery.trim().toLowerCase();
-    if (!query) {
-      return data.clients;
-    }
-
-    return data.clients.filter((client) => {
-      return [client.name, client.contactName, client.email].some((value) =>
-        value.toLowerCase().includes(query),
-      );
-    });
-  }, [clientQuery, data.clients]);
 
   const metrics = useMemo(() => {
     const openCases = data.cases.filter((legalCase) => legalCase.status !== "finalizado");
@@ -151,8 +137,9 @@ export default function Home() {
     commit(next);
     setSelectedClientId(next.clients[0]?.id ?? "");
     setSelectedCaseId(next.cases[0]?.id ?? "");
-    setActiveClientId(null);
-    setClientQuery("");
+    setActiveTrackingCaseId(null);
+    setTrackingCode("");
+    setTrackingError("");
   }
 
   function handleClientSelect(clientId: string) {
@@ -189,6 +176,7 @@ export default function Home() {
     const legalCase: LegalCase = {
       ...input,
       id: createId("case"),
+      trackingCode: `AS-${new Date().getFullYear()}-${String(data.cases.length + 1).padStart(3, "0")}`,
       status: "nuevo",
       createdAt: now,
       updatedAt: now,
@@ -202,10 +190,21 @@ export default function Home() {
       visibility: "client",
       createdAt: now,
     };
+    const initialMilestone: CaseMilestone = {
+      id: createId("milestone"),
+      caseId: legalCase.id,
+      title: "Apertura del asunto",
+      description: "La firma registro el asunto y definio el primer paso.",
+      detail: input.nextStep,
+      date: now.slice(0, 10),
+      status: "current",
+      evidenceEnabled: false,
+    };
 
     commit({
       ...data,
       cases: [legalCase, ...data.cases],
+      milestones: [initialMilestone, ...data.milestones],
       updates: [initialUpdate, ...data.updates],
       audit: [audit("Firma", "Creo caso", legalCase.title), ...data.audit],
     });
@@ -294,6 +293,23 @@ export default function Home() {
     });
   }
 
+  function openTrackingPortal(code: string) {
+    const normalizedCode = code.trim().toUpperCase();
+    const legalCase = data.cases.find((item) => {
+      return item.trackingCode.toUpperCase() === normalizedCode;
+    });
+
+    if (!legalCase) {
+      setTrackingError("No encontramos un asunto con ese codigo.");
+      setActiveTrackingCaseId(null);
+      return;
+    }
+
+    setTrackingCode(legalCase.trackingCode);
+    setActiveTrackingCaseId(legalCase.id);
+    setTrackingError("");
+  }
+
   function addDocument(caseId: string, input: Pick<CaseDocument, "name" | "category" | "visibility">) {
     const legalCase = data.cases.find((item) => item.id === caseId);
     if (!legalCase || !input.name.trim()) {
@@ -316,6 +332,31 @@ export default function Home() {
     });
   }
 
+  function addClientEvidence(caseId: string, milestoneId: string, fileName: string) {
+    const legalCase = data.cases.find((item) => item.id === caseId);
+    const milestone = data.milestones.find((item) => item.id === milestoneId);
+    if (!legalCase || !milestone || !fileName.trim()) {
+      return;
+    }
+
+    const document: CaseDocument = {
+      id: createId("doc"),
+      caseId,
+      milestoneId,
+      name: fileName.trim(),
+      category: "Evidencia cliente",
+      visibility: "client",
+      status: "recibido",
+      uploadedAt: getTodayIso(),
+    };
+
+    commit({
+      ...data,
+      documents: [document, ...data.documents],
+      audit: [audit("Cliente", "Cargo evidencia", milestone.title), ...data.audit],
+    });
+  }
+
   function visibleUpdates(caseId: string, visibility?: Visibility) {
     return data.updates
       .filter((update) => update.caseId === caseId)
@@ -334,6 +375,12 @@ export default function Home() {
       .filter((document) => document.caseId === caseId)
       .filter((document) => (visibility ? document.visibility === visibility : true))
       .sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt));
+  }
+
+  function caseMilestones(caseId: string) {
+    return data.milestones
+      .filter((milestone) => milestone.caseId === caseId)
+      .sort((a, b) => a.date.localeCompare(b.date));
   }
 
   return (
@@ -398,14 +445,16 @@ export default function Home() {
       ) : (
         <ClientWorkspace
           activeClient={activeClient}
-          activeClientCases={activeClientCases}
+          activeCase={activeTrackingCase}
+          caseMilestones={caseMilestones}
           caseDocuments={caseDocuments}
           caseRequests={caseRequests}
-          clientQuery={clientQuery}
-          clientResults={clientResults}
-          onClientEnter={setActiveClientId}
-          onClientQuery={setClientQuery}
-          onExit={() => setActiveClientId(null)}
+          trackingCode={trackingCode}
+          trackingError={trackingError}
+          onAddEvidence={addClientEvidence}
+          onExit={() => setActiveTrackingCaseId(null)}
+          onOpenTracking={openTrackingPortal}
+          onTrackingCode={setTrackingCode}
           updates={visibleUpdates}
         />
       )}
@@ -563,131 +612,103 @@ function LawyerWorkspace({
 
 function ClientWorkspace({
   activeClient,
-  activeClientCases,
+  activeCase,
+  caseMilestones,
   caseDocuments,
   caseRequests,
-  clientQuery,
-  clientResults,
-  onClientEnter,
-  onClientQuery,
+  trackingCode,
+  trackingError,
+  onAddEvidence,
   onExit,
+  onOpenTracking,
+  onTrackingCode,
   updates,
 }: {
   activeClient: Client | null | undefined;
-  activeClientCases: LegalCase[];
+  activeCase: LegalCase | undefined;
+  caseMilestones: (caseId: string) => CaseMilestone[];
   caseDocuments: (caseId: string, visibility?: Visibility) => CaseDocument[];
   caseRequests: (caseId: string) => InfoRequest[];
-  clientQuery: string;
-  clientResults: Client[];
-  onClientEnter: (clientId: string) => void;
-  onClientQuery: (query: string) => void;
+  trackingCode: string;
+  trackingError: string;
+  onAddEvidence: (caseId: string, milestoneId: string, fileName: string) => void;
   onExit: () => void;
+  onOpenTracking: (code: string) => void;
+  onTrackingCode: (code: string) => void;
   updates: (caseId: string, visibility?: Visibility) => CaseUpdate[];
 }) {
-  const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
-
-  useEffect(() => {
-    setSelectedCaseId(activeClientCases[0]?.id ?? null);
-  }, [activeClientCases]);
-
-  const selectedCase =
-    activeClientCases.find((legalCase) => legalCase.id === selectedCaseId) ??
-    activeClientCases[0];
-
-  if (!activeClient) {
+  if (!activeCase || !activeClient) {
     return (
-      <section className="main client-login">
-        <div className="toolbar">
+      <section className="client-gate">
+        <div className="client-gate-panel">
           <div>
-            <h2>Portal cliente</h2>
-            <span className="muted">Ingreso demo por nombre o correo</span>
+            <span className="badge neutral">Portal cliente</span>
+            <h2>Consulta el estado de tu asunto</h2>
+            <p className="muted">
+              Ingresa el codigo de seguimiento o radicado compartido por la firma.
+            </p>
           </div>
-        </div>
 
-        <div className="panel">
-          <div className="field">
-            <label htmlFor="client-search">Cliente</label>
-            <div className="row">
+          <form
+            className="tracking-form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              onOpenTracking(trackingCode);
+            }}
+          >
+            <label htmlFor="tracking-code">Codigo de seguimiento</label>
+            <div className="tracking-input-row">
               <Search size={18} />
               <input
-                className="search-box"
-                data-testid="client-search"
-                id="client-search"
-                onChange={(event) => onClientQuery(event.target.value)}
-                placeholder="Nombre, contacto o correo"
-                value={clientQuery}
+                data-testid="tracking-code"
+                id="tracking-code"
+                onChange={(event) => onTrackingCode(event.target.value)}
+                placeholder="AS-2026-001"
+                value={trackingCode}
               />
+              <button className="primary-button" data-testid="open-tracking" type="submit">
+                <LogIn size={16} />
+                Consultar
+              </button>
             </div>
-          </div>
-        </div>
+            {trackingError ? <span className="small error-text">{trackingError}</span> : null}
+          </form>
 
-        <div className="client-results">
-          {clientResults.map((client) => (
+          <div className="demo-codes">
+            <span className="muted small">Codigos demo</span>
             <button
-              className="client-entry"
-              data-testid={`client-result-${client.id}`}
-              key={client.id}
+              className="ghost-button"
+              data-testid="demo-code-case-1"
               type="button"
-              onClick={() => onClientEnter(client.id)}
+              onClick={() => onTrackingCode("AS-2026-001")}
             >
-              <div className="row between">
-                <div>
-                  <strong>{client.name}</strong>
-                  <span className="muted small">{client.contactName}</span>
-                </div>
-                <LogIn size={17} />
-              </div>
+              AS-2026-001
             </button>
-          ))}
+            <button
+              className="ghost-button"
+              type="button"
+              onClick={() => onTrackingCode("AS-2026-003")}
+            >
+              AS-2026-003
+            </button>
+          </div>
         </div>
       </section>
     );
   }
 
   return (
-    <section className="main">
-      <div className="toolbar">
-        <div>
-          <h2>{activeClient.name}</h2>
-          <span className="muted">{activeClient.contactName}</span>
-        </div>
-        <button className="secondary-button" type="button" onClick={onExit}>
-          <X size={16} />
-          Salir
-        </button>
-      </div>
-
-      <div className="workspace-flow">
-        <section className="panel case-nav-panel">
-          <div className="section-title">
-            <h3>Mis casos</h3>
-            <span className="muted small">{activeClientCases.length} asociados</span>
-          </div>
-          <div className="case-list">
-            {activeClientCases.map((legalCase) => (
-              <CaseCard
-                active={selectedCase?.id === legalCase.id}
-                key={legalCase.id}
-                legalCase={legalCase}
-                onSelect={() => setSelectedCaseId(legalCase.id)}
-              />
-            ))}
-          </div>
-        </section>
-
-        {selectedCase ? (
-          <ClientCaseDetail
-            documents={caseDocuments(selectedCase.id, "client")}
-            legalCase={selectedCase}
-            requests={caseRequests(selectedCase.id)}
-            updates={updates(selectedCase.id, "client")}
-          />
-        ) : (
-          <div className="empty-state">
-            <span className="muted">Sin casos visibles</span>
-          </div>
-        )}
-      </div>
+    <section className="main tracking-shell">
+      <ClientTrackingDetail
+        client={activeClient}
+        documents={caseDocuments(activeCase.id, "client")}
+        legalCase={activeCase}
+        milestones={caseMilestones(activeCase.id)}
+        requests={caseRequests(activeCase.id)}
+        updates={updates(activeCase.id, "client")}
+        onAddEvidence={onAddEvidence}
+        onExit={onExit}
+      />
     </section>
   );
 }
@@ -825,59 +846,253 @@ function CaseDetail({
   );
 }
 
-function ClientCaseDetail({
+function ClientTrackingDetail({
+  client,
   documents,
   legalCase,
+  milestones,
   requests,
   updates,
+  onAddEvidence,
+  onExit,
+}: {
+  client: Client;
+  documents: CaseDocument[];
+  legalCase: LegalCase;
+  milestones: CaseMilestone[];
+  requests: InfoRequest[];
+  updates: CaseUpdate[];
+  onAddEvidence: (caseId: string, milestoneId: string, fileName: string) => void;
+  onExit: () => void;
+}) {
+  return (
+    <>
+      <div className="tracking-header">
+        <div>
+          <span className="badge neutral">{legalCase.trackingCode}</span>
+          <h2>{legalCase.title}</h2>
+          <p className="muted">
+            {client.name} · Responsable: {legalCase.responsible}
+          </p>
+        </div>
+        <button className="secondary-button" type="button" onClick={onExit}>
+          <X size={16} />
+          Consultar otro
+        </button>
+      </div>
+
+      <section className="tracking-grid">
+        <div className="panel tracking-main">
+          <div>
+            <div className="row between">
+              <h3>Estado del asunto</h3>
+              <StatusBadge status={legalCase.status} />
+            </div>
+            <p className="muted">{legalCase.description}</p>
+          </div>
+
+          <MilestoneTracker
+            documents={documents}
+            legalCase={legalCase}
+            milestones={milestones}
+            onAddEvidence={onAddEvidence}
+          />
+        </div>
+
+        <aside className="tracking-side">
+          <div className="panel">
+            <div className="section-title">
+              <h3>Proximo paso</h3>
+              <CalendarClock size={17} />
+            </div>
+            <div className="list-card" data-testid="client-next-step">
+              <strong>{legalCase.nextStep}</strong>
+            </div>
+          </div>
+
+          <div className="panel">
+            <div className="section-title">
+              <h3>Solicitudes</h3>
+              <CalendarClock size={17} />
+            </div>
+            <RequestList requests={requests} />
+          </div>
+
+          <div className="panel">
+            <div className="section-title">
+              <h3>Documentos</h3>
+              <FileText size={17} />
+            </div>
+            <DocumentList documents={documents} />
+          </div>
+
+          <div className="panel">
+            <div className="section-title">
+              <h3>Avances publicados</h3>
+              <History size={17} />
+            </div>
+            <Timeline updates={updates} />
+          </div>
+        </aside>
+      </section>
+    </>
+  );
+}
+
+function MilestoneTracker({
+  documents,
+  legalCase,
+  milestones,
+  onAddEvidence,
 }: {
   documents: CaseDocument[];
   legalCase: LegalCase;
-  requests: InfoRequest[];
-  updates: CaseUpdate[];
+  milestones: CaseMilestone[];
+  onAddEvidence: (caseId: string, milestoneId: string, fileName: string) => void;
 }) {
-  return (
-    <section>
-      <div className="panel">
-        <div className="row between">
-          <div>
-            <h3>{legalCase.title}</h3>
-            <span className="muted small">Responsable: {legalCase.responsible}</span>
-          </div>
-          <StatusBadge status={legalCase.status} />
-        </div>
-        <p>{legalCase.description}</p>
-        <div className="list-card" data-testid="client-next-step">
-          <strong>Proximo paso</strong>
-          <span className="muted">{legalCase.nextStep}</span>
-        </div>
-      </div>
-
-      <div className="panel">
-        <div className="section-title">
-          <h3>Avances</h3>
-          <History size={17} />
-        </div>
-        <Timeline updates={updates} />
-      </div>
-
-      <div className="panel">
-        <div className="section-title">
-          <h3>Acciones pendientes</h3>
-          <CalendarClock size={17} />
-        </div>
-        <RequestList requests={requests} />
-      </div>
-
-      <div className="panel">
-        <div className="section-title">
-          <h3>Documentos</h3>
-          <FileText size={17} />
-        </div>
-        <DocumentList documents={documents} />
-      </div>
-    </section>
+  const currentMilestone = milestones.find((milestone) => milestone.status === "current");
+  const currentMilestoneId = currentMilestone?.id;
+  const [expanded, setExpanded] = useState<string[]>(() =>
+    currentMilestoneId ? [currentMilestoneId] : [],
   );
+
+  useEffect(() => {
+    setExpanded(currentMilestoneId ? [currentMilestoneId] : []);
+  }, [currentMilestoneId]);
+
+  function toggleMilestone(milestoneId: string) {
+    setExpanded((current) =>
+      current.includes(milestoneId)
+        ? current.filter((item) => item !== milestoneId)
+        : [...current, milestoneId],
+    );
+  }
+
+  if (milestones.length === 0) {
+    return (
+      <div className="empty-state">
+        <span className="muted">Sin hitos configurados</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="milestone-list" data-testid="milestone-list">
+      {milestones.map((milestone, index) => {
+        const isExpanded = expanded.includes(milestone.id);
+        const milestoneDocuments = documents.filter(
+          (document) => document.milestoneId === milestone.id,
+        );
+
+        return (
+          <article
+            className={`milestone-item milestone-${milestone.status}`}
+            data-testid={`milestone-${milestone.id}`}
+            key={milestone.id}
+          >
+            <div className="milestone-rail">
+              <div className="milestone-marker">
+                {milestone.status === "completed" ? <CheckCircle2 size={16} /> : index + 1}
+              </div>
+              {index < milestones.length - 1 ? <div className="milestone-line" /> : null}
+            </div>
+
+            <div className="milestone-card">
+              <button
+                className="milestone-head"
+                type="button"
+                onClick={() => toggleMilestone(milestone.id)}
+              >
+                <div>
+                  <span className="muted small">{formatDate(milestone.date)}</span>
+                  <strong>{milestone.title}</strong>
+                </div>
+                <div className="row">
+                  <MilestoneStatusBadge status={milestone.status} />
+                  {isExpanded ? <ChevronDown size={17} /> : <ChevronRight size={17} />}
+                </div>
+              </button>
+
+              {isExpanded ? (
+                <div className="milestone-detail">
+                  <p>{milestone.description}</p>
+                  <span className="muted">{milestone.detail}</span>
+
+                  {milestone.evidenceEnabled && milestone.status === "current" ? (
+                    <EvidenceUpload
+                      documents={milestoneDocuments}
+                      legalCase={legalCase}
+                      milestone={milestone}
+                      onAddEvidence={onAddEvidence}
+                    />
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          </article>
+        );
+      })}
+    </div>
+  );
+}
+
+function EvidenceUpload({
+  documents,
+  legalCase,
+  milestone,
+  onAddEvidence,
+}: {
+  documents: CaseDocument[];
+  legalCase: LegalCase;
+  milestone: CaseMilestone;
+  onAddEvidence: (caseId: string, milestoneId: string, fileName: string) => void;
+}) {
+  const [fileName, setFileName] = useState("");
+
+  return (
+    <div className="evidence-box">
+      <div>
+        <strong>La firma habilito carga para esta etapa</strong>
+        <p className="muted">Adjunta evidencia o informacion relacionada con este hito.</p>
+      </div>
+      <div className="tracking-input-row">
+        <input
+          data-testid="client-evidence-file"
+          onChange={(event) => {
+            const file = event.target.files?.[0]?.name ?? "";
+            setFileName(file);
+            if (file) {
+              onAddEvidence(legalCase.id, milestone.id, file);
+            }
+          }}
+          type="file"
+        />
+        {fileName ? <span className="badge">{fileName}</span> : null}
+      </div>
+      {documents.length > 0 ? (
+        <div className="stack">
+          {documents.map((document) => (
+            <div className="list-card" key={document.id}>
+              <strong>{document.name}</strong>
+              <span className="muted small">Recibido {formatDate(document.uploadedAt)}</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function MilestoneStatusBadge({ status }: { status: CaseMilestone["status"] }) {
+  if (status === "completed") {
+    return <span className="badge neutral">Completado</span>;
+  }
+
+  if (status === "current") {
+    return <span className="badge">Actual</span>;
+  }
+
+  return <span className="badge neutral">Siguiente</span>;
 }
 
 function UpdateComposer({
@@ -1473,6 +1688,11 @@ function StatusBadge({ status }: { status: CaseStatus }) {
 }
 
 function formatDate(value: string) {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [year, month, day] = value.split("-").map(Number);
+    return dateFormatter.format(new Date(year, month - 1, day));
+  }
+
   return dateFormatter.format(new Date(value));
 }
 

@@ -15,6 +15,8 @@ export type RequestStatus =
 
 export type Visibility = "internal" | "client";
 
+export type MilestoneStatus = "completed" | "current" | "upcoming";
+
 export type Client = {
   id: string;
   name: string;
@@ -28,6 +30,7 @@ export type Client = {
 export type LegalCase = {
   id: string;
   clientId: string;
+  trackingCode: string;
   title: string;
   description: string;
   status: CaseStatus;
@@ -36,6 +39,17 @@ export type LegalCase = {
   nextStep: string;
   createdAt: string;
   updatedAt: string;
+};
+
+export type CaseMilestone = {
+  id: string;
+  caseId: string;
+  title: string;
+  description: string;
+  detail: string;
+  date: string;
+  status: MilestoneStatus;
+  evidenceEnabled: boolean;
 };
 
 export type CaseUpdate = {
@@ -61,6 +75,7 @@ export type InfoRequest = {
 export type CaseDocument = {
   id: string;
   caseId: string;
+  milestoneId?: string;
   name: string;
   category: string;
   visibility: Visibility;
@@ -79,6 +94,7 @@ export type AuditEvent = {
 export type WorkspaceData = {
   clients: Client[];
   cases: LegalCase[];
+  milestones: CaseMilestone[];
   updates: CaseUpdate[];
   requests: InfoRequest[];
   documents: CaseDocument[];

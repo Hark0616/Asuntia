@@ -9,22 +9,27 @@ test.beforeEach(async ({ page }) => {
   await page.goto("/");
 });
 
-test("cliente entra por busqueda y ve sus casos asociados", async ({ page }) => {
+test("cliente entra por codigo y ve tracking vertical del asunto", async ({ page }) => {
   await page.getByTestId("mode-client").click();
 
-  await expect(page.getByRole("heading", { name: "Portal cliente" })).toBeVisible();
-  await page.getByTestId("client-search").fill("Laura");
-  await page.getByTestId("client-result-client-1").click();
+  await expect(page.getByRole("heading", { name: "Consulta el estado de tu asunto" })).toBeVisible();
+  await page.getByTestId("tracking-code").fill("AS-2026-001");
+  await page.getByTestId("open-tracking").click();
 
-  await expect(page.getByRole("heading", { name: "Constructora Norte S.A.S." })).toBeVisible();
-  await expect(page.getByText("Mis casos")).toBeVisible();
-  await expect(page.getByTestId("case-card-case-1")).toContainText(
-    "Licitacion municipal 2026",
-  );
-  await expect(page.getByTestId("case-card-case-2")).toContainText(
-    "Contrato de obra con proveedor",
-  );
-  await expect(page.getByText("Proximo paso")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Licitacion municipal 2026" })).toBeVisible();
+  await expect(page.getByTestId("milestone-list")).toBeVisible();
+  await expect(page.getByTestId("milestone-milestone-1")).toHaveClass(/milestone-completed/);
+  await expect(page.getByTestId("milestone-milestone-3")).toHaveClass(/milestone-current/);
+  await expect(page.getByText("Recoleccion de evidencia")).toBeVisible();
+  await expect(
+    page.getByText("Estamos esperando el certificado de experiencia actualizado"),
+  ).toBeVisible();
+  await expect(page.getByText("La firma habilito carga para esta etapa")).toBeVisible();
+
+  await expect(page.getByText("Se valido la informacion inicial")).not.toBeVisible();
+  await page.getByTestId("milestone-milestone-1").getByRole("button").click();
+  await expect(page.getByText("Se valido la informacion inicial")).toBeVisible();
+
   await expect(
     page.getByText("Se revisaron los requisitos habilitantes y se identifico un documento pendiente."),
   ).toBeVisible();
@@ -60,11 +65,23 @@ test("firma publica avance, solicitud y documento visibles para el cliente", asy
   await expect(page.getByText("Camara_comercio_actualizada.pdf")).toBeVisible();
 
   await page.getByTestId("mode-client").click();
-  await page.getByTestId("client-result-client-1").click();
+  await page.getByTestId("tracking-code").fill("AS-2026-001");
+  await page.getByTestId("open-tracking").click();
 
   await expect(page.getByText("Avance visible de prueba para el cliente.")).toBeVisible();
   await expect(page.getByText("Camara de comercio actualizada")).toBeVisible();
   await expect(page.getByText("Camara_comercio_actualizada.pdf")).toBeVisible();
+
+  await page.getByTestId("client-evidence-file").setInputFiles({
+    name: "certificado_experiencia_cliente.pdf",
+    mimeType: "application/pdf",
+    buffer: Buffer.from("demo"),
+  });
+  await expect(
+    page.locator(".evidence-box .list-card").filter({
+      hasText: "certificado_experiencia_cliente.pdf",
+    }),
+  ).toBeVisible();
 });
 
 test("cambio de estado y proximo paso se reflejan en el portal cliente", async ({ page }) => {
@@ -76,9 +93,10 @@ test("cambio de estado y proximo paso se reflejan en el portal cliente", async (
   await page.getByTestId("save-case").click();
 
   await page.getByTestId("mode-client").click();
-  await page.getByTestId("client-result-client-1").click();
+  await page.getByTestId("tracking-code").fill("AS-2026-001");
+  await page.getByTestId("open-tracking").click();
 
-  await expect(page.getByTestId("case-card-case-1")).toContainText("En espera");
+  await expect(page.getByText("En espera")).toBeVisible();
   await expect(page.getByTestId("client-next-step")).toContainText(
     "Esperar respuesta de la entidad antes de radicar observaciones.",
   );

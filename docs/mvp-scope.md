@@ -4,7 +4,7 @@
 
 Validar el flujo principal del producto:
 
-> Un cliente entra, ve sus casos asociados, entiende el estado actual y consulta lo que se ha hecho.
+> Un cliente entra con un codigo de seguimiento, ve el tracking de su asunto, entiende el estado actual y consulta lo que se ha hecho.
 
 La version actual es una demo funcional con persistencia en `localStorage`. No usa aun autenticacion real, base de datos externa ni almacenamiento real de archivos.
 
@@ -16,6 +16,8 @@ La version actual es una demo funcional con persistencia en `localStorage`. No u
 - Creacion de casos.
 - Estados de caso.
 - Proximo paso visible para cliente.
+- Hitos verticales del asunto.
+- Carga de evidencia cuando la firma la habilita para el hito actual.
 - Timeline con avances internos o visibles al cliente.
 - Solicitudes de informacion.
 - Cambio de estado de solicitudes.
@@ -52,16 +54,18 @@ La version actual es una demo funcional con persistencia en `localStorage`. No u
 ## Flujo De Cliente
 
 1. Entrar en modo `Cliente`.
-2. Buscar por nombre, contacto o correo.
-3. Abrir portal demo.
-4. Ver lista de casos.
-5. Abrir detalle.
-6. Revisar estado, proximo paso, timeline, solicitudes y documentos visibles.
+2. Ingresar codigo de seguimiento, por ejemplo `AS-2026-001`.
+3. Abrir tracking del asunto.
+4. Revisar hito actual, hitos completados y proximos hitos.
+5. Desplegar hitos completados para ver detalle.
+6. Subir evidencia si el hito actual lo permite.
+7. Revisar solicitudes, documentos y avances publicados.
 
 ## Modelo De Datos Inicial
 
 - `clients`: clientes de la firma.
 - `cases`: asuntos legales asociados a clientes.
+- `milestones`: hitos asociados a casos.
 - `updates`: eventos de timeline.
 - `requests`: solicitudes de informacion.
 - `documents`: documentos registrados.
@@ -76,6 +80,7 @@ Conectar Supabase:
 - Tabla `profiles`.
 - Tabla `clients`.
 - Tabla `cases`.
+- Tabla `case_milestones`.
 - Tabla `case_updates`.
 - Tabla `requests`.
 - Tabla `documents`.
@@ -91,5 +96,5 @@ La demo se considera suficiente para mostrar a una firma pequena cuando:
 - El abogado puede crear un caso.
 - El abogado puede publicar avances.
 - El abogado puede crear solicitudes.
-- El cliente puede entrar y ver solo sus casos.
+- El cliente puede entrar con codigo y ver solo el asunto asociado.
 - El cliente puede entender el estado del caso sin explicacion adicional.
