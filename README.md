@@ -41,3 +41,9 @@ La primera version funciona como demo local sin base de datos externa. El objeti
 - Supabase Storage o Cloudflare R2 para documentos.
 - Auditoria persistente.
 - Deploy en Vercel.
+
+## Documentacion De Producto Y Tecnologia
+
+- [Alcance MVP](docs/mvp-scope.md)
+- [Principios de ingenieria](docs/engineering-principles.md)
+- [Estrategia de base de datos](docs/database-strategy.md)

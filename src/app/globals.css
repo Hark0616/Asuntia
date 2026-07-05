@@ -243,6 +243,12 @@ button {
   grid-template-columns: minmax(0, 1fr) 380px;
 }
 
+.workspace-flow {
+  display: grid;
+  gap: 16px;
+  margin-top: 16px;
+}
+
 .metric,
 .panel,
 .list-card,
@@ -371,15 +377,30 @@ button {
   margin-bottom: 4px;
 }
 
+.case-nav-panel {
+  box-shadow: none;
+}
+
 .case-list {
   display: grid;
-  gap: 12px;
+  grid-auto-columns: minmax(250px, 320px);
+  grid-auto-flow: column;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scroll-snap-type: x proximity;
 }
 
 .case-card {
+  display: grid;
+  align-content: start;
+  gap: 6px;
   width: 100%;
-  padding: 14px;
+  min-height: 92px;
+  padding: 10px;
   text-align: left;
+  box-shadow: none;
+  scroll-snap-align: start;
 }
 
 .case-card.active {
@@ -389,9 +410,20 @@ button {
 
 .case-card-header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+.case-card-header > div:first-child {
+  min-width: 0;
+}
+
+.case-card-badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
 }
 
 .badge {

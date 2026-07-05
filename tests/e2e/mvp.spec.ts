@@ -79,7 +79,7 @@ test("cambio de estado y proximo paso se reflejan en el portal cliente", async (
   await page.getByTestId("client-result-client-1").click();
 
   await expect(page.getByTestId("case-card-case-1")).toContainText("En espera");
-  await expect(page.getByTestId("case-card-case-1")).toContainText(
+  await expect(page.getByTestId("client-next-step")).toContainText(
     "Esperar respuesta de la entidad antes de radicar observaciones.",
   );
 });

@@ -520,8 +520,8 @@ function LawyerWorkspace({
           <Metric label="Solicitudes" value={metrics.pendingRequests} />
         </div>
 
-        <div className="grid two" style={{ marginTop: 16 }}>
-          <section className="panel">
+        <div className="workspace-flow">
+          <section className="panel case-nav-panel">
             <div className="section-title">
               <h3>Casos</h3>
               <span className="muted small">{selectedClientCases.length} activos</span>
@@ -530,7 +530,6 @@ function LawyerWorkspace({
               {selectedClientCases.map((legalCase) => (
                 <CaseCard
                   active={activeCase?.id === legalCase.id}
-                  client={activeClient}
                   key={legalCase.id}
                   legalCase={legalCase}
                   onSelect={() => onCaseSelect(legalCase.id)}
@@ -610,12 +609,12 @@ function ClientWorkspace({
             <label htmlFor="client-search">Cliente</label>
             <div className="row">
               <Search size={18} />
-            <input
-              className="search-box"
-              data-testid="client-search"
-              id="client-search"
-              onChange={(event) => onClientQuery(event.target.value)}
-              placeholder="Nombre, contacto o correo"
+              <input
+                className="search-box"
+                data-testid="client-search"
+                id="client-search"
+                onChange={(event) => onClientQuery(event.target.value)}
+                placeholder="Nombre, contacto o correo"
                 value={clientQuery}
               />
             </div>
@@ -658,8 +657,8 @@ function ClientWorkspace({
         </button>
       </div>
 
-      <div className="grid two">
-        <section className="panel">
+      <div className="workspace-flow">
+        <section className="panel case-nav-panel">
           <div className="section-title">
             <h3>Mis casos</h3>
             <span className="muted small">{activeClientCases.length} asociados</span>
@@ -668,7 +667,6 @@ function ClientWorkspace({
             {activeClientCases.map((legalCase) => (
               <CaseCard
                 active={selectedCase?.id === legalCase.id}
-                client={activeClient}
                 key={legalCase.id}
                 legalCase={legalCase}
                 onSelect={() => setSelectedCaseId(legalCase.id)}
@@ -849,7 +847,7 @@ function ClientCaseDetail({
           <StatusBadge status={legalCase.status} />
         </div>
         <p>{legalCase.description}</p>
-        <div className="list-card">
+        <div className="list-card" data-testid="client-next-step">
           <strong>Proximo paso</strong>
           <span className="muted">{legalCase.nextStep}</span>
         </div>
@@ -1312,12 +1310,10 @@ function Modal({
 
 function CaseCard({
   active,
-  client,
   legalCase,
   onSelect,
 }: {
   active: boolean;
-  client?: Client;
   legalCase: LegalCase;
   onSelect: () => void;
 }) {
@@ -1331,14 +1327,12 @@ function CaseCard({
       <div className="case-card-header">
         <div>
           <strong>{legalCase.title}</strong>
-          <span className="muted small">{client?.name}</span>
+          <span className="muted small">Actualizado {formatDate(legalCase.updatedAt)}</span>
         </div>
-        <StatusBadge status={legalCase.status} />
-      </div>
-      <p className="muted">{legalCase.nextStep}</p>
-      <div className="row between">
-        <span className="muted small">Actualizado {formatDate(legalCase.updatedAt)}</span>
-        {legalCase.priority === "alta" ? <span className="badge danger">Alta</span> : null}
+        <div className="case-card-badges">
+          <StatusBadge status={legalCase.status} />
+          {legalCase.priority === "alta" ? <span className="badge danger">Alta</span> : null}
+        </div>
       </div>
     </button>
   );
