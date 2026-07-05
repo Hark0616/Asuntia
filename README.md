@@ -31,10 +31,11 @@ La primera version funciona como demo local sin base de datos externa. El objeti
 
 ## Flujo MVP
 
-- `/firma`: crear clientes, crear casos, cambiar estados, agregar avances, registrar solicitudes y documentos.
-- `/cliente`: ingresar por codigo/radicado, ver tracking del asunto, hitos, solicitudes y documentos publicados.
+- `/`: entrada principal con consulta por codigo/radicado, captcha MVP y acceso interno de firma.
+- `/cliente`: portal aislado de seguimiento del asunto, hitos, solicitudes y documentos publicados.
+- `/firma`: espacio interno aislado para crear clientes, crear casos, cambiar estados, agregar avances, registrar solicitudes y documentos.
 
-`/` redirige a `/cliente`.
+El captcha actual es de demo y se valida en cliente. En produccion debe reemplazarse por Turnstile/hCaptcha con verificacion del lado servidor.
 
 ## Siguiente fase tecnica
 
@@ -49,3 +50,4 @@ La primera version funciona como demo local sin base de datos externa. El objeti
 - [Alcance MVP](docs/mvp-scope.md)
 - [Principios de ingenieria](docs/engineering-principles.md)
 - [Estrategia de base de datos](docs/database-strategy.md)
+- [Handoff de sesion 2026-07-05](docs/session-handoff-2026-07-05.md)

@@ -7,11 +7,10 @@ import {
   ChevronRight,
   FileText,
   History,
-  LogIn,
-  Search,
   X,
 } from "lucide-react";
-import { FormEvent, useEffect, useState } from "react";
+import Link from "next/link";
+import { useEffect, useState } from "react";
 import { AppHeader } from "@/components/app-header";
 import {
   DocumentList,
@@ -39,7 +38,27 @@ export function ClientPortal() {
   const [trackingError, setTrackingError] = useState("");
 
   useEffect(() => {
-    setData(loadWorkspace());
+    const loaded = loadWorkspace();
+    const params = new URLSearchParams(window.location.search);
+    const initialCode =
+      params.get("codigo") ?? window.sessionStorage.getItem("asuntia.trackingCode") ?? "";
+
+    setData(loaded);
+    if (initialCode) {
+      const normalizedCode = initialCode.trim().toUpperCase();
+      const legalCase = loaded.cases.find(
+        (item) => item.trackingCode.toUpperCase() === normalizedCode,
+      );
+
+      if (legalCase) {
+        setTrackingCode(legalCase.trackingCode);
+        setActiveTrackingCaseId(legalCase.id);
+        setTrackingError("");
+      } else {
+        setTrackingCode(initialCode);
+        setTrackingError("No encontramos un asunto con ese codigo.");
+      }
+    }
   }, []);
 
   const activeTrackingCase = activeTrackingCaseId
@@ -52,29 +71,6 @@ export function ClientPortal() {
   function commit(next: WorkspaceData) {
     setData(next);
     saveWorkspace(next);
-  }
-
-  function resetDemo() {
-    const next = cloneSeed();
-    commit(next);
-    setActiveTrackingCaseId(null);
-    setTrackingCode("");
-    setTrackingError("");
-  }
-
-  function openTrackingPortal(code: string) {
-    const normalizedCode = code.trim().toUpperCase();
-    const legalCase = data.cases.find((item) => item.trackingCode.toUpperCase() === normalizedCode);
-
-    if (!legalCase) {
-      setTrackingError("No encontramos un asunto con ese codigo.");
-      setActiveTrackingCaseId(null);
-      return;
-    }
-
-    setTrackingCode(legalCase.trackingCode);
-    setActiveTrackingCaseId(legalCase.id);
-    setTrackingError("");
   }
 
   function addClientEvidence(caseId: string, milestoneId: string, fileName: string) {
@@ -130,15 +126,10 @@ export function ClientPortal() {
 
   return (
     <main className="app-shell">
-      <AppHeader active="cliente" onReset={resetDemo} />
+      <AppHeader exitLabel="Cerrar consulta" />
 
       {!activeTrackingCase || !activeClient ? (
-        <TrackingGate
-          trackingCode={trackingCode}
-          trackingError={trackingError}
-          onOpenTracking={openTrackingPortal}
-          onTrackingCode={setTrackingCode}
-        />
+        <ClientAccessNotice trackingCode={trackingCode} trackingError={trackingError} />
       ) : (
         <section className="main tracking-shell">
           <ClientTrackingDetail
@@ -157,66 +148,29 @@ export function ClientPortal() {
   );
 }
 
-function TrackingGate({
+function ClientAccessNotice({
   trackingCode,
   trackingError,
-  onOpenTracking,
-  onTrackingCode,
 }: {
   trackingCode: string;
   trackingError: string;
-  onOpenTracking: (code: string) => void;
-  onTrackingCode: (code: string) => void;
 }) {
-  function handleSubmit(event: FormEvent) {
-    event.preventDefault();
-    onOpenTracking(trackingCode);
-  }
-
   return (
     <section className="client-gate">
       <div className="client-gate-panel">
         <div>
-          <span className="badge neutral">Portal cliente</span>
-          <h2>Consulta el estado de tu asunto</h2>
-          <p className="muted">
-            Ingresa el codigo de seguimiento o radicado compartido por la firma.
-          </p>
+          <h2>Consulta no abierta</h2>
         </div>
 
-        <form className="tracking-form" onSubmit={handleSubmit}>
-          <label htmlFor="tracking-code">Codigo de seguimiento</label>
-          <div className="tracking-input-row">
-            <Search size={18} />
-            <input
-              data-testid="tracking-code"
-              id="tracking-code"
-              onChange={(event) => onTrackingCode(event.target.value)}
-              placeholder="AS-2026-001"
-              value={trackingCode}
-            />
-            <button className="primary-button" data-testid="open-tracking" type="submit">
-              <LogIn size={16} />
-              Consultar
-            </button>
-          </div>
-          {trackingError ? <span className="small error-text">{trackingError}</span> : null}
-        </form>
+        {trackingCode || trackingError ? (
+          <span className="small error-text">
+            {trackingError || `No fue posible abrir ${trackingCode}.`}
+          </span>
+        ) : null}
 
-        <div className="demo-codes">
-          <span className="muted small">Codigos demo</span>
-          <button
-            className="ghost-button"
-            data-testid="demo-code-case-1"
-            type="button"
-            onClick={() => onTrackingCode("AS-2026-001")}
-          >
-            AS-2026-001
-          </button>
-          <button className="ghost-button" type="button" onClick={() => onTrackingCode("AS-2026-003")}>
-            AS-2026-003
-          </button>
-        </div>
+        <Link className="primary-button" href="/">
+          Consultar asunto
+        </Link>
       </div>
     </section>
   );
@@ -432,17 +386,21 @@ function EvidenceUpload({
         <p className="muted">Adjunta evidencia o informacion relacionada con este hito.</p>
       </div>
       <div className="tracking-input-row">
-        <input
-          data-testid="client-evidence-file"
-          onChange={(event) => {
-            const file = event.target.files?.[0]?.name ?? "";
-            setFileName(file);
-            if (file) {
-              onAddEvidence(legalCase.id, milestone.id, file);
-            }
-          }}
-          type="file"
-        />
+        <label className="file-picker">
+          <FileText size={16} />
+          <span>{fileName || "Seleccionar archivo"}</span>
+          <input
+            data-testid="client-evidence-file"
+            onChange={(event) => {
+              const file = event.target.files?.[0]?.name ?? "";
+              setFileName(file);
+              if (file) {
+                onAddEvidence(legalCase.id, milestone.id, file);
+              }
+            }}
+            type="file"
+          />
+        </label>
         {fileName ? <span className="badge">{fileName}</span> : null}
       </div>
       {documents.length > 0 ? (

@@ -10,9 +10,10 @@ La version actual es una demo funcional con persistencia en `localStorage`. No u
 
 ## Incluido
 
-- Vista de firma.
-- Vista de firma en `/firma`.
-- Vista de cliente en `/cliente`.
+- Entrada principal en `/`.
+- Acceso cliente por codigo/radicado con captcha MVP.
+- Portal de seguimiento en `/cliente`.
+- Espacio interno de firma en `/firma`.
 - Creacion de clientes.
 - Creacion de casos.
 - Estados de caso.
@@ -30,6 +31,7 @@ La version actual es una demo funcional con persistencia en `localStorage`. No u
 ## No Incluido Todavia
 
 - Login real.
+- Captcha validado en servidor.
 - Base de datos remota.
 - Multi-tenant real.
 - Subida real de documentos a storage.
@@ -43,7 +45,7 @@ La version actual es una demo funcional con persistencia en `localStorage`. No u
 
 ## Flujo De Firma
 
-1. Entrar en modo `Firma`.
+1. Entrar desde `/` con el acceso interno de firma.
 2. Seleccionar cliente.
 3. Crear caso o abrir uno existente.
 4. Cambiar estado.
@@ -54,13 +56,14 @@ La version actual es una demo funcional con persistencia en `localStorage`. No u
 
 ## Flujo De Cliente
 
-1. Entrar en modo `Cliente`.
+1. Entrar a `/`.
 2. Ingresar codigo de seguimiento, por ejemplo `AS-2026-001`.
-3. Abrir tracking del asunto.
-4. Revisar hito actual, hitos completados y proximos hitos.
-5. Desplegar hitos completados para ver detalle.
-6. Subir evidencia si el hito actual lo permite.
-7. Revisar solicitudes, documentos y avances publicados.
+3. Completar captcha MVP.
+4. Abrir tracking del asunto en `/cliente`.
+5. Revisar hito actual, hitos completados y proximos hitos.
+6. Desplegar hitos completados para ver detalle.
+7. Subir evidencia si el hito actual lo permite.
+8. Revisar solicitudes, documentos y avances publicados.
 
 ## Modelo De Datos Inicial
 

@@ -3,20 +3,24 @@ import { expect, test } from "@playwright/test";
 const storageKey = "asuntia.mvp.workspace";
 
 test.beforeEach(async ({ page }) => {
-  await page.goto("/cliente");
+  await page.goto("/");
   await page.evaluate((key) => {
     window.localStorage.removeItem(key);
+    window.sessionStorage.clear();
   }, storageKey);
 });
 
-test("cliente entra por codigo y ve tracking vertical del asunto", async ({ page }) => {
-  await page.goto("/cliente");
+test("cliente entra desde la pagina principal con codigo y captcha", async ({ page }) => {
+  await page.goto("/");
 
-  await expect(page.getByRole("heading", { name: "Consulta el estado de tu asunto" })).toBeVisible();
-  await page.getByTestId("tracking-code").fill("AS-2026-001");
-  await page.getByTestId("open-tracking").click();
+  await expect(page.getByRole("heading", { name: "Consultar asunto" })).toBeVisible();
+  await expect(page.getByTestId("home-login")).toContainText("Iniciar sesión");
+  await page.getByTestId("public-tracking-code").fill("AS-2026-001");
+  await page.getByTestId("captcha-answer").fill("10");
+  await page.getByTestId("public-search").click();
 
   await expect(page.getByRole("heading", { name: "Licitacion municipal 2026" })).toBeVisible();
+  await expect(page).toHaveURL(/\/cliente\?codigo=AS-2026-001/);
   await expect(page.getByTestId("milestone-list")).toBeVisible();
   await expect(page.getByTestId("milestone-milestone-1")).toHaveClass(/milestone-completed/);
   await expect(page.getByTestId("milestone-milestone-3")).toHaveClass(/milestone-current/);
@@ -65,9 +69,10 @@ test("firma publica avance, solicitud y documento visibles para el cliente", asy
   await page.getByTestId("register-document").click();
   await expect(page.getByText("Camara_comercio_actualizada.pdf")).toBeVisible();
 
-  await page.goto("/cliente");
-  await page.getByTestId("tracking-code").fill("AS-2026-001");
-  await page.getByTestId("open-tracking").click();
+  await page.goto("/");
+  await page.getByTestId("public-tracking-code").fill("AS-2026-001");
+  await page.getByTestId("captcha-answer").fill("10");
+  await page.getByTestId("public-search").click();
 
   await expect(page.getByText("Avance visible de prueba para el cliente.")).toBeVisible();
   await expect(page.getByText("Camara de comercio actualizada")).toBeVisible();
@@ -94,9 +99,10 @@ test("cambio de estado y proximo paso se reflejan en el portal cliente", async (
     .fill("Esperar respuesta de la entidad antes de radicar observaciones.");
   await page.getByTestId("save-case").click();
 
-  await page.goto("/cliente");
-  await page.getByTestId("tracking-code").fill("AS-2026-001");
-  await page.getByTestId("open-tracking").click();
+  await page.goto("/");
+  await page.getByTestId("public-tracking-code").fill("AS-2026-001");
+  await page.getByTestId("captcha-answer").fill("10");
+  await page.getByTestId("public-search").click();
 
   await expect(page.getByText("En espera")).toBeVisible();
   await expect(page.getByTestId("client-next-step")).toContainText(

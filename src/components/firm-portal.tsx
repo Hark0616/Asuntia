@@ -94,13 +94,6 @@ export function FirmPortal() {
     saveWorkspace(next);
   }
 
-  function resetDemo() {
-    const next = cloneSeed();
-    commit(next);
-    setSelectedClientId(next.clients[0]?.id ?? "");
-    setSelectedCaseId(next.cases[0]?.id ?? "");
-  }
-
   function handleClientSelect(clientId: string) {
     setSelectedClientId(clientId);
     const firstCase = data.cases.find((legalCase) => legalCase.clientId === clientId);
@@ -298,7 +291,7 @@ export function FirmPortal() {
 
   return (
     <main className="app-shell">
-      <AppHeader active="firma" onReset={resetDemo} />
+      <AppHeader areaLabel="Firma" exitLabel="Salir" />
       <div className="layout">
         <aside className="sidebar">
           <div className="sidebar-inner">
@@ -716,12 +709,16 @@ function DocumentComposer({
       <div className="form-grid">
         <div className="field full">
           <label htmlFor="document-file">Archivo</label>
-          <input
-            data-testid="document-file"
-            id="document-file"
-            onChange={(event) => setName(event.target.files?.[0]?.name ?? "")}
-            type="file"
-          />
+          <label className="file-picker">
+            <Upload size={16} />
+            <span>{name || "Seleccionar archivo"}</span>
+            <input
+              data-testid="document-file"
+              id="document-file"
+              onChange={(event) => setName(event.target.files?.[0]?.name ?? "")}
+              type="file"
+            />
+          </label>
         </div>
         <div className="field">
           <label htmlFor="document-name">Nombre</label>
