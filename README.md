@@ -31,8 +31,10 @@ La primera version funciona como demo local sin base de datos externa. El objeti
 
 ## Flujo MVP
 
-- Vista firma: crear clientes, crear casos, cambiar estados, agregar avances, registrar solicitudes y documentos.
-- Vista cliente: ingresar por nombre/correo demo, ver casos asociados, estado actual, timeline visible, solicitudes y documentos publicados.
+- `/firma`: crear clientes, crear casos, cambiar estados, agregar avances, registrar solicitudes y documentos.
+- `/cliente`: ingresar por codigo/radicado, ver tracking del asunto, hitos, solicitudes y documentos publicados.
+
+`/` redirige a `/cliente`.
 
 ## Siguiente fase tecnica
 

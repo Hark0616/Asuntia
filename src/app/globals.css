@@ -99,6 +99,7 @@ button {
 }
 
 .mode-switch button,
+.mode-switch a,
 .icon-button,
 .primary-button,
 .secondary-button,
@@ -116,14 +117,17 @@ button {
     background 120ms ease;
 }
 
-.mode-switch button {
+.mode-switch button,
+.mode-switch a {
   min-width: 116px;
   padding: 8px 12px;
   color: var(--muted);
   background: transparent;
+  text-decoration: none;
 }
 
-.mode-switch button.active {
+.mode-switch button.active,
+.mode-switch a.active {
   color: #fff;
   background: var(--brand);
 }

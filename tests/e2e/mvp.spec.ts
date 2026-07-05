@@ -3,14 +3,14 @@ import { expect, test } from "@playwright/test";
 const storageKey = "asuntia.mvp.workspace";
 
 test.beforeEach(async ({ page }) => {
-  await page.addInitScript((key) => {
+  await page.goto("/cliente");
+  await page.evaluate((key) => {
     window.localStorage.removeItem(key);
   }, storageKey);
-  await page.goto("/");
 });
 
 test("cliente entra por codigo y ve tracking vertical del asunto", async ({ page }) => {
-  await page.getByTestId("mode-client").click();
+  await page.goto("/cliente");
 
   await expect(page.getByRole("heading", { name: "Consulta el estado de tu asunto" })).toBeVisible();
   await page.getByTestId("tracking-code").fill("AS-2026-001");
@@ -41,6 +41,7 @@ test("cliente entra por codigo y ve tracking vertical del asunto", async ({ page
 });
 
 test("firma publica avance, solicitud y documento visibles para el cliente", async ({ page }) => {
+  await page.goto("/firma");
   await expect(page.getByRole("heading", { name: "Constructora Norte S.A.S." })).toBeVisible();
   await page.getByTestId("case-card-case-1").click();
 
@@ -64,7 +65,7 @@ test("firma publica avance, solicitud y documento visibles para el cliente", asy
   await page.getByTestId("register-document").click();
   await expect(page.getByText("Camara_comercio_actualizada.pdf")).toBeVisible();
 
-  await page.getByTestId("mode-client").click();
+  await page.goto("/cliente");
   await page.getByTestId("tracking-code").fill("AS-2026-001");
   await page.getByTestId("open-tracking").click();
 
@@ -85,6 +86,7 @@ test("firma publica avance, solicitud y documento visibles para el cliente", asy
 });
 
 test("cambio de estado y proximo paso se reflejan en el portal cliente", async ({ page }) => {
+  await page.goto("/firma");
   await page.getByTestId("case-card-case-1").click();
   await page.getByTestId("case-status").selectOption("en_espera");
   await page
@@ -92,7 +94,7 @@ test("cambio de estado y proximo paso se reflejan en el portal cliente", async (
     .fill("Esperar respuesta de la entidad antes de radicar observaciones.");
   await page.getByTestId("save-case").click();
 
-  await page.getByTestId("mode-client").click();
+  await page.goto("/cliente");
   await page.getByTestId("tracking-code").fill("AS-2026-001");
   await page.getByTestId("open-tracking").click();
 

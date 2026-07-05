@@ -11,7 +11,8 @@ La version actual es una demo funcional con persistencia en `localStorage`. No u
 ## Incluido
 
 - Vista de firma.
-- Vista de cliente.
+- Vista de firma en `/firma`.
+- Vista de cliente en `/cliente`.
 - Creacion de clientes.
 - Creacion de casos.
 - Estados de caso.
