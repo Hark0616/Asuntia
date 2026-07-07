@@ -6,12 +6,13 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test:e2e": "playwright test",
-    "test:e2e:headed": "playwright test --headed",
+    "test:e2e": "node scripts/run-e2e.mjs",
+    "test:e2e:headed": "node scripts/run-e2e.mjs --headed",
     "lint": "eslint .",
     "typecheck": "next typegen && tsc --noEmit"
   },
   "dependencies": {
+    "@electric-sql/pglite": "^0.5.4",
     "lucide-react": "^0.475.0",
     "next": "^16.2.10",
     "react": "^19.0.0",

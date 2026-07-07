@@ -9,7 +9,7 @@ import {
   History,
   X,
 } from "lucide-react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AppHeader } from "@/components/app-header";
 import {
@@ -19,7 +19,14 @@ import {
   Timeline,
   formatDate,
 } from "@/components/shared-ui";
-import { audit, cloneSeed, createId, getTodayIso, loadWorkspace, saveWorkspace } from "@/lib/storage";
+import {
+  audit,
+  cloneSeed,
+  createId,
+  getTodayIso,
+  loadWorkspaceData,
+  saveWorkspaceData,
+} from "@/lib/storage";
 import type {
   CaseDocument,
   CaseMilestone,
@@ -32,34 +39,55 @@ import type {
 } from "@/lib/types";
 
 export function ClientPortal() {
+  const router = useRouter();
   const [data, setData] = useState<WorkspaceData>(() => cloneSeed());
   const [trackingCode, setTrackingCode] = useState("");
   const [activeTrackingCaseId, setActiveTrackingCaseId] = useState<string | null>(null);
-  const [trackingError, setTrackingError] = useState("");
+  const [isResolvingTracking, setIsResolvingTracking] = useState(true);
 
   useEffect(() => {
-    const loaded = loadWorkspace();
-    const params = new URLSearchParams(window.location.search);
-    const initialCode =
-      params.get("codigo") ?? window.sessionStorage.getItem("asuntia.trackingCode") ?? "";
+    let isActive = true;
 
-    setData(loaded);
-    if (initialCode) {
+    async function resolveTracking() {
+      const loaded = await loadWorkspaceData();
+      if (!isActive) {
+        return;
+      }
+
+      const params = new URLSearchParams(window.location.search);
+      const initialCode =
+        params.get("codigo") ?? window.sessionStorage.getItem("asuntia.trackingCode") ?? "";
+
+      setData(loaded);
+
+      if (!initialCode) {
+        window.sessionStorage.removeItem("asuntia.trackingCode");
+        router.replace("/");
+        return;
+      }
+
       const normalizedCode = initialCode.trim().toUpperCase();
       const legalCase = loaded.cases.find(
         (item) => item.trackingCode.toUpperCase() === normalizedCode,
       );
 
-      if (legalCase) {
-        setTrackingCode(legalCase.trackingCode);
-        setActiveTrackingCaseId(legalCase.id);
-        setTrackingError("");
-      } else {
-        setTrackingCode(initialCode);
-        setTrackingError("No encontramos un asunto con ese codigo.");
+      if (!legalCase) {
+        window.sessionStorage.removeItem("asuntia.trackingCode");
+        router.replace("/");
+        return;
       }
+
+      setTrackingCode(legalCase.trackingCode);
+      setActiveTrackingCaseId(legalCase.id);
+      setIsResolvingTracking(false);
     }
-  }, []);
+
+    void resolveTracking();
+
+    return () => {
+      isActive = false;
+    };
+  }, [router]);
 
   const activeTrackingCase = activeTrackingCaseId
     ? data.cases.find((legalCase) => legalCase.id === activeTrackingCaseId)
@@ -70,7 +98,9 @@ export function ClientPortal() {
 
   function commit(next: WorkspaceData) {
     setData(next);
-    saveWorkspace(next);
+    void saveWorkspaceData(next).catch((error) => {
+      console.error("Failed to save client workspace", error);
+    });
   }
 
   function addClientEvidence(caseId: string, milestoneId: string, fileName: string) {
@@ -124,55 +154,36 @@ export function ClientPortal() {
       .sort((a, b) => a.date.localeCompare(b.date));
   }
 
+  function closeTracking() {
+    window.sessionStorage.removeItem("asuntia.trackingCode");
+    router.push("/");
+  }
+
+  if (isResolvingTracking || !activeTrackingCase || !activeClient) {
+    return null;
+  }
+
   return (
     <main className="app-shell">
-      <AppHeader exitLabel="Cerrar consulta" />
+      <AppHeader
+        contextLabel={trackingCode}
+        exitLabel="Cerrar consulta"
+        onExit={closeTracking}
+      />
 
-      {!activeTrackingCase || !activeClient ? (
-        <ClientAccessNotice trackingCode={trackingCode} trackingError={trackingError} />
-      ) : (
-        <section className="main tracking-shell">
-          <ClientTrackingDetail
-            client={activeClient}
-            documents={caseDocuments(activeTrackingCase.id, "client")}
-            legalCase={activeTrackingCase}
-            milestones={caseMilestones(activeTrackingCase.id)}
-            requests={caseRequests(activeTrackingCase.id)}
-            updates={visibleUpdates(activeTrackingCase.id, "client")}
-            onAddEvidence={addClientEvidence}
-            onExit={() => setActiveTrackingCaseId(null)}
-          />
-        </section>
-      )}
+      <section className="main tracking-shell">
+        <ClientTrackingDetail
+          client={activeClient}
+          documents={caseDocuments(activeTrackingCase.id, "client")}
+          legalCase={activeTrackingCase}
+          milestones={caseMilestones(activeTrackingCase.id)}
+          requests={caseRequests(activeTrackingCase.id)}
+          updates={visibleUpdates(activeTrackingCase.id, "client")}
+          onAddEvidence={addClientEvidence}
+          onExit={closeTracking}
+        />
+      </section>
     </main>
-  );
-}
-
-function ClientAccessNotice({
-  trackingCode,
-  trackingError,
-}: {
-  trackingCode: string;
-  trackingError: string;
-}) {
-  return (
-    <section className="client-gate">
-      <div className="client-gate-panel">
-        <div>
-          <h2>Consulta no abierta</h2>
-        </div>
-
-        {trackingCode || trackingError ? (
-          <span className="small error-text">
-            {trackingError || `No fue posible abrir ${trackingCode}.`}
-          </span>
-        ) : null}
-
-        <Link className="primary-button" href="/">
-          Consultar asunto
-        </Link>
-      </div>
-    </section>
   );
 }
 
@@ -195,6 +206,15 @@ function ClientTrackingDetail({
   onAddEvidence: (caseId: string, milestoneId: string, fileName: string) => void;
   onExit: () => void;
 }) {
+  const currentMilestone = milestones.find((milestone) => milestone.status === "current");
+  const pendingRequest = requests.find((request) =>
+    !["aceptada", "recibida"].includes(request.status),
+  );
+  const showActionCard =
+    legalCase.status === "requiere_cliente" ||
+    Boolean(pendingRequest) ||
+    Boolean(currentMilestone?.evidenceEnabled);
+
   return (
     <>
       <div className="tracking-header">
@@ -210,6 +230,14 @@ function ClientTrackingDetail({
           Consultar otro
         </button>
       </div>
+
+      {showActionCard ? (
+        <ClientActionCard
+          currentMilestone={currentMilestone}
+          legalCase={legalCase}
+          request={pendingRequest}
+        />
+      ) : null}
 
       <section className="tracking-grid">
         <div className="panel tracking-main">
@@ -266,6 +294,38 @@ function ClientTrackingDetail({
         </aside>
       </section>
     </>
+  );
+}
+
+function ClientActionCard({
+  currentMilestone,
+  legalCase,
+  request,
+}: {
+  currentMilestone?: CaseMilestone;
+  legalCase: LegalCase;
+  request?: InfoRequest;
+}) {
+  const hasUpload = currentMilestone?.status === "current" && currentMilestone.evidenceEnabled;
+  const title = request?.title ?? currentMilestone?.title ?? "Informacion pendiente";
+  const detail = request?.detail ?? currentMilestone?.description ?? legalCase.nextStep;
+  const dueDate = request?.dueDate ?? currentMilestone?.date;
+
+  return (
+    <section className="client-action-card" data-testid="client-action-card">
+      <div>
+        <span className="badge warning">Requiere cliente</span>
+        <h3>{title}</h3>
+        <p>{detail}</p>
+        {dueDate ? <span className="muted small">Fecha limite: {formatDate(dueDate)}</span> : null}
+      </div>
+      {hasUpload ? (
+        <a className="primary-button" href="#client-evidence">
+          <FileText size={16} />
+          Subir documento
+        </a>
+      ) : null}
+    </section>
   );
 }
 
@@ -377,32 +437,54 @@ function EvidenceUpload({
   milestone: CaseMilestone;
   onAddEvidence: (caseId: string, milestoneId: string, fileName: string) => void;
 }) {
-  const [fileName, setFileName] = useState("");
+  const [selectedFileName, setSelectedFileName] = useState("");
+  const [sentFileName, setSentFileName] = useState("");
+
+  function sendEvidence() {
+    if (!selectedFileName) {
+      return;
+    }
+
+    onAddEvidence(legalCase.id, milestone.id, selectedFileName);
+    setSentFileName(selectedFileName);
+    setSelectedFileName("");
+  }
+
+  const sentDocument = sentFileName
+    ? documents.find((document) => document.name === sentFileName)
+    : undefined;
 
   return (
-    <div className="evidence-box">
+    <div className="evidence-box" id="client-evidence">
       <div>
-        <strong>La firma habilito carga para esta etapa</strong>
-        <p className="muted">Adjunta evidencia o informacion relacionada con este hito.</p>
+        <strong>Sube el documento solicitado</strong>
+        <p className="muted">Selecciona el archivo y confirma el envio a la firma.</p>
       </div>
       <div className="tracking-input-row">
         <label className="file-picker">
           <FileText size={16} />
-          <span>{fileName || "Seleccionar archivo"}</span>
+          <span>{selectedFileName || "Seleccionar archivo"}</span>
           <input
             data-testid="client-evidence-file"
             onChange={(event) => {
               const file = event.target.files?.[0]?.name ?? "";
-              setFileName(file);
-              if (file) {
-                onAddEvidence(legalCase.id, milestone.id, file);
-              }
+              setSelectedFileName(file);
             }}
             type="file"
           />
         </label>
-        {fileName ? <span className="badge">{fileName}</span> : null}
+        <button
+          className="primary-button"
+          data-testid="send-evidence"
+          disabled={!selectedFileName}
+          type="button"
+          onClick={sendEvidence}
+        >
+          Enviar documento
+        </button>
       </div>
+      {selectedFileName ? <span className="badge neutral">{selectedFileName}</span> : null}
+      {sentDocument ? <span className="badge">Recibido por la firma</span> : null}
       {documents.length > 0 ? (
         <div className="stack">
           {documents.map((document) => (

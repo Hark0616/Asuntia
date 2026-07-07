@@ -18,8 +18,8 @@ import {
   cloneSeed,
   createId,
   getTodayIso,
-  loadWorkspace,
-  saveWorkspace,
+  loadWorkspaceData,
+  saveWorkspaceData,
 } from "@/lib/storage";
 import type {
   CaseDocument,
@@ -44,12 +44,28 @@ export function FirmPortal() {
   const [selectedClientId, setSelectedClientId] = useState("client-1");
   const [selectedCaseId, setSelectedCaseId] = useState("case-1");
   const [drawer, setDrawer] = useState<DrawerKind>(null);
+  const [isWorkspaceLoading, setIsWorkspaceLoading] = useState(true);
 
   useEffect(() => {
-    const loaded = loadWorkspace();
-    setData(loaded);
-    setSelectedClientId(loaded.clients[0]?.id ?? "");
-    setSelectedCaseId(loaded.cases[0]?.id ?? "");
+    let isActive = true;
+
+    async function loadWorkspace() {
+      const loaded = await loadWorkspaceData();
+      if (!isActive) {
+        return;
+      }
+
+      setData(loaded);
+      setSelectedClientId(loaded.clients[0]?.id ?? "");
+      setSelectedCaseId(loaded.cases[0]?.id ?? "");
+      setIsWorkspaceLoading(false);
+    }
+
+    void loadWorkspace();
+
+    return () => {
+      isActive = false;
+    };
   }, []);
 
   const clientsById = useMemo(() => {
@@ -91,7 +107,9 @@ export function FirmPortal() {
 
   function commit(next: WorkspaceData) {
     setData(next);
-    saveWorkspace(next);
+    void saveWorkspaceData(next).catch((error) => {
+      console.error("Failed to save firm workspace", error);
+    });
   }
 
   function handleClientSelect(clientId: string) {
@@ -165,17 +183,25 @@ export function FirmPortal() {
   }
 
   function updateCaseFields(caseId: string, patch: Partial<LegalCase>) {
-    const legalCase = data.cases.find((item) => item.id === caseId);
-    if (!legalCase) {
-      return;
-    }
+    setData((current) => {
+      const legalCase = current.cases.find((item) => item.id === caseId);
+      if (!legalCase) {
+        return current;
+      }
 
-    commit({
-      ...data,
-      cases: data.cases.map((item) =>
-        item.id === caseId ? { ...item, ...patch, updatedAt: getTodayIso() } : item,
-      ),
-      audit: [audit("Firma", "Actualizo caso", legalCase.title), ...data.audit],
+      const next = {
+        ...current,
+        cases: current.cases.map((item) =>
+          item.id === caseId ? { ...item, ...patch, updatedAt: getTodayIso() } : item,
+        ),
+        audit: [audit("Firma", "Actualizo caso", legalCase.title), ...current.audit],
+      };
+
+      void saveWorkspaceData(next).catch((error) => {
+        console.error("Failed to save firm workspace", error);
+      });
+
+      return next;
     });
   }
 
@@ -287,6 +313,10 @@ export function FirmPortal() {
       .filter((document) => document.caseId === caseId)
       .filter((document) => (visibility ? document.visibility === visibility : true))
       .sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt));
+  }
+
+  if (isWorkspaceLoading) {
+    return null;
   }
 
   return (

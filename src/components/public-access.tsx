@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { loadWorkspace } from "@/lib/storage";
+import { loadWorkspaceData } from "@/lib/storage";
 
 type Challenge = {
   left: number;
@@ -33,6 +33,7 @@ export function PublicAccess() {
   const [captchaAnswer, setCaptchaAnswer] = useState("");
   const [challenge, setChallenge] = useState<Challenge>(initialChallenge);
   const [trackingError, setTrackingError] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
 
   function refreshCaptcha() {
     setChallenge((current) => {
@@ -43,8 +44,9 @@ export function PublicAccess() {
     setCaptchaAnswer("");
   }
 
-  function handleTrackingSubmit(event: FormEvent) {
+  async function handleTrackingSubmit(event: FormEvent) {
     event.preventDefault();
+    setTrackingError("");
 
     const expectedAnswer = challenge.left + challenge.right;
     if (Number(captchaAnswer.trim()) !== expectedAnswer) {
@@ -54,7 +56,9 @@ export function PublicAccess() {
     }
 
     const normalizedCode = trackingCode.trim().toUpperCase();
-    const workspace = loadWorkspace();
+    setIsSearching(true);
+    const workspace = await loadWorkspaceData();
+    setIsSearching(false);
     const legalCase = workspace.cases.find(
       (item) => item.trackingCode.toUpperCase() === normalizedCode,
     );
@@ -134,9 +138,14 @@ export function PublicAccess() {
 
             {trackingError ? <span className="small error-text">{trackingError}</span> : null}
 
-            <button className="primary-button" data-testid="public-search" type="submit">
+            <button
+              className="primary-button"
+              data-testid="public-search"
+              disabled={isSearching}
+              type="submit"
+            >
               <CheckCircle2 size={16} />
-              Consultar asunto
+              {isSearching ? "Consultando" : "Consultar asunto"}
             </button>
           </form>
         </section>

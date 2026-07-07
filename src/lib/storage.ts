@@ -64,6 +64,45 @@ export function saveWorkspace(data: WorkspaceData) {
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 }
 
+export async function loadWorkspaceData(): Promise<WorkspaceData> {
+  if (typeof window === "undefined") {
+    return cloneSeed();
+  }
+
+  try {
+    const response = await fetch("/api/workspace", { cache: "no-store" });
+    if (!response.ok) {
+      throw new Error("Workspace request failed");
+    }
+
+    const data = normalizeWorkspace((await response.json()) as WorkspaceData);
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    return data;
+  } catch {
+    return loadWorkspace();
+  }
+}
+
+export async function saveWorkspaceData(data: WorkspaceData): Promise<void> {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+
+  const response = await fetch("/api/workspace", {
+    body: JSON.stringify(data),
+    headers: {
+      "Content-Type": "application/json",
+    },
+    method: "PUT",
+  });
+
+  if (!response.ok) {
+    throw new Error("Workspace save failed");
+  }
+}
+
 export function audit(actor: string, action: string, target: string): AuditEvent {
   return {
     id: createId("audit"),
