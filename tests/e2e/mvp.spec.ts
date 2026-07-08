@@ -66,6 +66,31 @@ test("cliente sin codigo vuelve a la entrada principal", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Consultar asunto" })).toBeVisible();
 });
 
+test("cliente entra con correo y cambia entre sus casos activos", async ({ page }) => {
+  await page.goto("/");
+
+  await page.getByTestId("public-tracking-code").fill("laura@constructoranorte.co");
+  await page.getByTestId("captcha-answer").fill("10");
+  await page.getByTestId("public-search").click();
+
+  await expect(page).toHaveURL(/\/cliente\?consulta=laura%40constructoranorte.co/);
+  await expect(page.getByTestId("client-case-switcher")).toContainText("2 asuntos");
+  await expect(page.getByTestId("client-case-option-case-1")).toContainText(
+    "Licitacion municipal 2026",
+  );
+  await expect(page.getByTestId("client-case-option-case-2")).toContainText(
+    "Contrato de obra con proveedor",
+  );
+  await expect(page.getByRole("heading", { name: "Licitacion municipal 2026" })).toBeVisible();
+
+  await page.getByTestId("client-case-option-case-2").click();
+
+  await expect(page.getByRole("heading", { name: "Contrato de obra con proveedor" })).toBeVisible();
+  await expect(page.getByTestId("client-next-step")).toContainText(
+    "Enviar version marcada al cliente.",
+  );
+});
+
 test("firma usa la bandeja de trabajo para abrir asuntos pendientes", async ({ page }) => {
   await page.goto("/firma");
 
@@ -160,7 +185,7 @@ test("cambio de estado y proximo paso se reflejan en el portal cliente", async (
   await page.getByTestId("captcha-answer").fill("10");
   await page.getByTestId("public-search").click();
 
-  await expect(page.getByText("En espera")).toBeVisible();
+  await expect(page.locator(".tracking-main").getByText("En espera")).toBeVisible();
   await expect(page.getByTestId("client-next-step")).toContainText(
     "Esperar respuesta de la entidad antes de radicar observaciones.",
   );

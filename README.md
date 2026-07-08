@@ -35,8 +35,8 @@ La primera version funciona como demo local sin base de datos externa. PGlite ej
 
 ## Flujo MVP
 
-- `/`: entrada principal con consulta por codigo/radicado, captcha MVP y acceso interno de firma.
-- `/cliente`: portal aislado de seguimiento del asunto, hitos, solicitudes y documentos publicados.
+- `/`: entrada principal con consulta por codigo, radicado, correo, telefono o id de cliente, captcha MVP y acceso interno de firma.
+- `/cliente`: portal aislado con casos activos del cliente, seguimiento del asunto, hitos, solicitudes y documentos publicados.
 - `/firma`: espacio interno aislado con bandeja de trabajo para priorizar pendientes, crear clientes, crear casos, gestionar hitos, cambiar estados, agregar avances, registrar solicitudes y documentos.
 
 El captcha actual es de demo y se valida en cliente. En produccion debe reemplazarse por Turnstile/hCaptcha con verificacion del lado servidor.

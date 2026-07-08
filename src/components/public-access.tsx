@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { loadWorkspaceData } from "@/lib/storage";
+import { resolvePublicAccess } from "@/lib/workspace-selectors";
 
 type Challenge = {
   left: number;
@@ -29,7 +30,7 @@ const challengePairs = [
 
 export function PublicAccess() {
   const router = useRouter();
-  const [trackingCode, setTrackingCode] = useState("");
+  const [accessQuery, setAccessQuery] = useState("");
   const [captchaAnswer, setCaptchaAnswer] = useState("");
   const [challenge, setChallenge] = useState<Challenge>(initialChallenge);
   const [trackingError, setTrackingError] = useState("");
@@ -55,21 +56,24 @@ export function PublicAccess() {
       return;
     }
 
-    const normalizedCode = trackingCode.trim().toUpperCase();
     setIsSearching(true);
     const workspace = await loadWorkspaceData();
     setIsSearching(false);
-    const legalCase = workspace.cases.find(
-      (item) => item.trackingCode.toUpperCase() === normalizedCode,
-    );
+    const target = resolvePublicAccess(workspace, accessQuery);
 
-    if (!legalCase) {
-      setTrackingError("No encontramos un asunto asociado a ese código o radicado.");
+    if (!target) {
+      setTrackingError("No encontramos un asunto asociado a ese dato.");
       return;
     }
 
-    window.sessionStorage.setItem("asuntia.trackingCode", legalCase.trackingCode);
-    router.push(`/cliente?codigo=${encodeURIComponent(legalCase.trackingCode)}`);
+    if (target.kind === "case") {
+      window.sessionStorage.setItem("asuntia.accessQuery", target.legalCase.trackingCode);
+      router.push(`/cliente?codigo=${encodeURIComponent(target.legalCase.trackingCode)}`);
+      return;
+    }
+
+    window.sessionStorage.setItem("asuntia.accessQuery", accessQuery.trim());
+    router.push(`/cliente?consulta=${encodeURIComponent(accessQuery.trim())}`);
   }
 
   return (
@@ -98,15 +102,15 @@ export function PublicAccess() {
 
           <form className="access-form" onSubmit={handleTrackingSubmit}>
             <div className="field full">
-              <label htmlFor="public-tracking-code">Código o radicado</label>
+              <label htmlFor="public-tracking-code">Código, radicado, correo o teléfono</label>
               <input
                 autoComplete="off"
                 data-testid="public-tracking-code"
                 id="public-tracking-code"
-                onChange={(event) => setTrackingCode(event.target.value)}
-                placeholder="AS-2026-001"
+                onChange={(event) => setAccessQuery(event.target.value)}
+                placeholder="AS-2026-001 o correo"
                 required
-                value={trackingCode}
+                value={accessQuery}
               />
             </div>
 
@@ -145,7 +149,7 @@ export function PublicAccess() {
               type="submit"
             >
               <CheckCircle2 size={16} />
-              {isSearching ? "Consultando" : "Consultar asunto"}
+              {isSearching ? "Consultando" : "Consultar"}
             </button>
           </form>
         </section>

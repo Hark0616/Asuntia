@@ -11,8 +11,8 @@ La version actual es una demo funcional con persistencia en `localStorage`. No u
 ## Incluido
 
 - Entrada principal en `/`.
-- Acceso cliente por codigo/radicado con captcha MVP.
-- Portal de seguimiento en `/cliente`.
+- Acceso cliente por codigo, radicado, correo, telefono o id con captcha MVP.
+- Portal de seguimiento en `/cliente` con lista de casos activos.
 - Espacio interno de firma en `/firma`.
 - Bandeja de trabajo priorizada para solicitudes, hitos y casos que requieren accion.
 - Creacion de clientes.
@@ -62,13 +62,14 @@ La version actual es una demo funcional con persistencia en `localStorage`. No u
 ## Flujo De Cliente
 
 1. Entrar a `/`.
-2. Ingresar codigo de seguimiento, por ejemplo `AS-2026-001`.
+2. Ingresar codigo de seguimiento, correo, telefono o id de cliente, por ejemplo `AS-2026-001` o `laura@constructoranorte.co`.
 3. Completar captcha MVP.
 4. Abrir tracking del asunto en `/cliente`.
-5. Revisar hito actual, hitos completados y proximos hitos.
-6. Desplegar hitos completados para ver detalle.
-7. Subir evidencia si el hito actual lo permite.
-8. Revisar solicitudes, documentos y avances publicados.
+5. Cambiar entre casos activos cuando el dato identifica un cliente.
+6. Revisar hito actual, hitos completados y proximos hitos.
+7. Desplegar hitos completados para ver detalle.
+8. Subir evidencia si el hito actual lo permite.
+9. Revisar solicitudes, documentos y avances publicados.
 
 ## Modelo De Datos Inicial
 
@@ -107,5 +108,6 @@ La demo se considera suficiente para mostrar a una firma pequena cuando:
 - El abogado puede crear y ajustar hitos.
 - El abogado puede publicar avances.
 - El abogado puede crear solicitudes.
-- El cliente puede entrar con codigo y ver solo el asunto asociado.
+- El cliente puede entrar con codigo y ver el asunto asociado.
+- El cliente puede entrar con un dato propio y ver sus casos activos.
 - El cliente puede entender el estado del caso sin explicacion adicional.

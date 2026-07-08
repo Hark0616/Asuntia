@@ -32,10 +32,11 @@ import {
   getCaseMilestones,
   getCaseRequests,
   getCaseUpdates,
+  getClientActiveCases,
   getClientForCase,
   getCurrentMilestone,
   getPendingClientRequest,
-  resolveClientTracking,
+  resolvePublicAccess,
 } from "@/lib/workspace-selectors";
 import type {
   CaseDocument,
@@ -50,8 +51,9 @@ import type {
 export function ClientPortal() {
   const router = useRouter();
   const [data, setData] = useState<WorkspaceData>(() => cloneSeed());
-  const [trackingCode, setTrackingCode] = useState("");
-  const [activeTrackingCaseId, setActiveTrackingCaseId] = useState<string | null>(null);
+  const [accessLabel, setAccessLabel] = useState("");
+  const [activeClientId, setActiveClientId] = useState<string | null>(null);
+  const [activeCaseId, setActiveCaseId] = useState<string | null>(null);
   const [isResolvingTracking, setIsResolvingTracking] = useState(true);
 
   useEffect(() => {
@@ -64,27 +66,43 @@ export function ClientPortal() {
       }
 
       const params = new URLSearchParams(window.location.search);
-      const initialCode =
-        params.get("codigo") ?? window.sessionStorage.getItem("asuntia.trackingCode") ?? "";
+      const initialQuery =
+        params.get("codigo") ??
+        params.get("consulta") ??
+        window.sessionStorage.getItem("asuntia.accessQuery") ??
+        window.sessionStorage.getItem("asuntia.trackingCode") ??
+        "";
 
       setData(loaded);
 
-      if (!initialCode) {
-        window.sessionStorage.removeItem("asuntia.trackingCode");
+      if (!initialQuery) {
+        window.sessionStorage.removeItem("asuntia.accessQuery");
         router.replace("/");
         return;
       }
 
-      const tracking = resolveClientTracking(loaded, initialCode);
+      const target = resolvePublicAccess(loaded, initialQuery);
 
-      if (!tracking) {
-        window.sessionStorage.removeItem("asuntia.trackingCode");
+      if (!target) {
+        window.sessionStorage.removeItem("asuntia.accessQuery");
         router.replace("/");
         return;
       }
 
-      setTrackingCode(tracking.legalCase.trackingCode);
-      setActiveTrackingCaseId(tracking.legalCase.id);
+      window.sessionStorage.setItem("asuntia.accessQuery", initialQuery);
+
+      if (target.kind === "case") {
+        setAccessLabel(target.legalCase.trackingCode);
+        setActiveClientId(target.client.id);
+        setActiveCaseId(target.legalCase.id);
+        setIsResolvingTracking(false);
+        return;
+      }
+
+      const activeCases = getClientActiveCases(loaded, target.client.id);
+      setAccessLabel(target.client.email);
+      setActiveClientId(target.client.id);
+      setActiveCaseId(activeCases[0]?.id ?? null);
       setIsResolvingTracking(false);
     }
 
@@ -95,10 +113,14 @@ export function ClientPortal() {
     };
   }, [router]);
 
-  const activeTrackingCase = activeTrackingCaseId
-    ? data.cases.find((legalCase) => legalCase.id === activeTrackingCaseId)
+  const activeClient = activeClientId
+    ? data.clients.find((client) => client.id === activeClientId)
     : undefined;
-  const activeClient = activeTrackingCase ? getClientForCase(data, activeTrackingCase) : undefined;
+  const activeClientCases = activeClient ? getClientActiveCases(data, activeClient.id) : [];
+  const activeTrackingCase = activeCaseId
+    ? data.cases.find((legalCase) => legalCase.id === activeCaseId)
+    : undefined;
+  const activeCaseClient = activeTrackingCase ? getClientForCase(data, activeTrackingCase) : undefined;
 
   function commit(next: WorkspaceData) {
     setData(next);
@@ -133,35 +155,101 @@ export function ClientPortal() {
   }
 
   function closeTracking() {
+    window.sessionStorage.removeItem("asuntia.accessQuery");
     window.sessionStorage.removeItem("asuntia.trackingCode");
     router.push("/");
   }
 
-  if (isResolvingTracking || !activeTrackingCase || !activeClient) {
+  if (isResolvingTracking || !activeClient) {
     return null;
   }
 
   return (
     <main className="app-shell">
       <AppHeader
-        contextLabel={trackingCode}
+        contextLabel={accessLabel}
         exitLabel="Cerrar consulta"
         onExit={closeTracking}
       />
 
       <section className="main tracking-shell">
-        <ClientTrackingDetail
+        <ClientCaseSwitcher
+          activeCaseId={activeCaseId}
+          cases={activeClientCases}
           client={activeClient}
-          documents={getCaseDocuments(data, activeTrackingCase.id, "client")}
-          legalCase={activeTrackingCase}
-          milestones={getCaseMilestones(data, activeTrackingCase.id)}
-          requests={getCaseRequests(data, activeTrackingCase.id)}
-          updates={getCaseUpdates(data, activeTrackingCase.id, "client")}
-          onAddEvidence={addClientEvidence}
-          onExit={closeTracking}
+          onSelect={setActiveCaseId}
         />
+
+        {activeTrackingCase && activeCaseClient ? (
+          <ClientTrackingDetail
+            client={activeCaseClient}
+            documents={getCaseDocuments(data, activeTrackingCase.id, "client")}
+            legalCase={activeTrackingCase}
+            milestones={getCaseMilestones(data, activeTrackingCase.id)}
+            requests={getCaseRequests(data, activeTrackingCase.id)}
+            updates={getCaseUpdates(data, activeTrackingCase.id, "client")}
+            onAddEvidence={addClientEvidence}
+            onExit={closeTracking}
+          />
+        ) : (
+          <div className="empty-state">
+            <span className="muted">No hay asuntos activos para este cliente.</span>
+          </div>
+        )}
       </section>
     </main>
+  );
+}
+
+function ClientCaseSwitcher({
+  activeCaseId,
+  cases,
+  client,
+  onSelect,
+}: {
+  activeCaseId: string | null;
+  cases: LegalCase[];
+  client: Client;
+  onSelect: (caseId: string) => void;
+}) {
+  return (
+    <section className="panel client-case-switcher" data-testid="client-case-switcher">
+      <div className="section-title">
+        <div>
+          <h3>Casos activos</h3>
+          <span className="muted small">
+            {client.name} · {cases.length} asuntos
+          </span>
+        </div>
+        <FileText size={17} />
+      </div>
+
+      {cases.length > 0 ? (
+        <div className="client-case-list">
+          {cases.map((legalCase) => (
+            <button
+              className={`client-case-option ${legalCase.id === activeCaseId ? "active" : ""}`}
+              data-testid={`client-case-option-${legalCase.id}`}
+              key={legalCase.id}
+              type="button"
+              onClick={() => onSelect(legalCase.id)}
+            >
+              <div>
+                <strong>{legalCase.title}</strong>
+                <span className="muted small">
+                  {legalCase.trackingCode} · Responsable: {legalCase.responsible}
+                </span>
+              </div>
+              <StatusBadge status={legalCase.status} />
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="empty-state compact">
+          <span className="muted">Sin asuntos activos</span>
+        </div>
+      )}
+    </section>
   );
 }
 

@@ -37,8 +37,27 @@ export type ClientTrackingModel = {
   updates: CaseUpdate[];
 };
 
+export type PublicAccessTarget =
+  | {
+      client: Client;
+      kind: "client";
+    }
+  | {
+      client: Client;
+      kind: "case";
+      legalCase: LegalCase;
+    };
+
 export function normalizeTrackingCode(value: string) {
   return value.trim().toUpperCase();
+}
+
+function normalizeLookupValue(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function normalizePhoneValue(value?: string) {
+  return value?.replace(/\D/g, "") ?? "";
 }
 
 export function findCaseByTrackingCode(data: WorkspaceData, trackingCode: string) {
@@ -48,6 +67,30 @@ export function findCaseByTrackingCode(data: WorkspaceData, trackingCode: string
 
 export function getClientForCase(data: WorkspaceData, legalCase: LegalCase) {
   return data.clients.find((client) => client.id === legalCase.clientId);
+}
+
+export function findClientByIdentifier(data: WorkspaceData, value: string) {
+  const normalizedValue = normalizeLookupValue(value);
+  const normalizedPhone = normalizePhoneValue(value);
+
+  if (!normalizedValue) {
+    return undefined;
+  }
+
+  return data.clients.find((client) => {
+    return (
+      normalizeLookupValue(client.id) === normalizedValue ||
+      normalizeLookupValue(client.email) === normalizedValue ||
+      (normalizedPhone.length >= 4 && normalizePhoneValue(client.phone) === normalizedPhone)
+    );
+  });
+}
+
+export function getClientActiveCases(data: WorkspaceData, clientId: string) {
+  return data.cases
+    .filter((legalCase) => legalCase.clientId === clientId)
+    .filter((legalCase) => legalCase.status !== "finalizado")
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
 export function getCaseMilestones(data: WorkspaceData, caseId: string) {
@@ -212,6 +255,36 @@ export function getFirmWorkQueue(
 
     return (a.dueDate ?? "9999-12-31").localeCompare(b.dueDate ?? "9999-12-31");
   });
+}
+
+export function resolvePublicAccess(
+  data: WorkspaceData,
+  value: string,
+): PublicAccessTarget | null {
+  const legalCase = findCaseByTrackingCode(data, value);
+
+  if (legalCase) {
+    const client = getClientForCase(data, legalCase);
+    if (!client) {
+      return null;
+    }
+
+    return {
+      client,
+      kind: "case",
+      legalCase,
+    };
+  }
+
+  const client = findClientByIdentifier(data, value);
+  if (!client) {
+    return null;
+  }
+
+  return {
+    client,
+    kind: "client",
+  };
 }
 
 export function resolveClientTracking(

@@ -3,11 +3,14 @@ import { seedData } from "../../src/lib/seed";
 import type { WorkspaceData } from "../../src/lib/types";
 import {
   findCaseByTrackingCode,
+  findClientByIdentifier,
   getCaseDocuments,
+  getClientActiveCases,
   getFirmWorkQueue,
   getCaseMilestones,
   getCaseUpdates,
   getCurrentMilestone,
+  resolvePublicAccess,
   resolveClientTracking,
 } from "../../src/lib/workspace-selectors";
 
@@ -21,6 +24,40 @@ describe("workspace selectors", () => {
 
     expect(legalCase?.id).toBe("case-1");
     expect(legalCase?.title).toBe("Licitacion municipal 2026");
+  });
+
+  test("resolves public access by case code, client email or phone", () => {
+    const workspace = cloneWorkspace();
+
+    expect(resolvePublicAccess(workspace, "as-2026-001")?.kind).toBe("case");
+    expect(resolvePublicAccess(workspace, "laura@constructoranorte.co")?.kind).toBe("client");
+    expect(resolvePublicAccess(workspace, "300 123 4567")?.kind).toBe("client");
+    expect(findClientByIdentifier(workspace, "client-1")?.name).toBe(
+      "Constructora Norte S.A.S.",
+    );
+    expect(resolvePublicAccess(workspace, "sin-coincidencia")).toBeNull();
+  });
+
+  test("returns only active cases for a client ordered by recent activity", () => {
+    const workspace = cloneWorkspace();
+    workspace.cases.push({
+      id: "case-closed",
+      clientId: "client-1",
+      trackingCode: "AS-2026-099",
+      title: "Asunto cerrado",
+      description: "No debe aparecer como activo.",
+      status: "finalizado",
+      priority: "normal",
+      responsible: "Daniela Torres",
+      nextStep: "Archivado.",
+      createdAt: "2026-07-01T10:00:00.000Z",
+      updatedAt: "2026-07-09T10:00:00.000Z",
+    });
+
+    const activeCases = getClientActiveCases(workspace, "client-1");
+
+    expect(activeCases.map((legalCase) => legalCase.id)).toEqual(["case-1", "case-2"]);
+    expect(activeCases.map((legalCase) => legalCase.id)).not.toContain("case-closed");
   });
 
   test("resolves the client tracking model without leaking internal updates or documents", () => {
