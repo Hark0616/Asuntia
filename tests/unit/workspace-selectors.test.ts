@@ -4,6 +4,7 @@ import type { WorkspaceData } from "../../src/lib/types";
 import {
   findCaseByTrackingCode,
   getCaseDocuments,
+  getFirmWorkQueue,
   getCaseMilestones,
   getCaseUpdates,
   getCurrentMilestone,
@@ -78,6 +79,39 @@ describe("workspace selectors", () => {
     expect(getCurrentMilestone(milestones)?.id).toBe("milestone-3");
     expect(documents[0]?.id).toBe("doc-newer");
     expect(updates[0]?.id).toBe("update-1");
+  });
+
+  test("builds a firm work queue from requests, client actions and active milestones", () => {
+    const workspace = cloneWorkspace();
+    workspace.requests.push({
+      id: "request-closed",
+      caseId: "case-1",
+      title: "Solicitud cerrada",
+      detail: "No debe aparecer.",
+      owner: "Laura Mejia",
+      dueDate: "2026-07-06",
+      status: "aceptada",
+      createdAt: "2026-07-05T10:00:00.000Z",
+    });
+
+    const queue = getFirmWorkQueue(workspace, "2026-07-07");
+
+    expect(queue.map((item) => item.id)).toEqual(
+      expect.arrayContaining([
+        "case-case-1",
+        "request-request-1",
+        "request-request-2",
+        "milestone-milestone-3",
+        "milestone-milestone-7",
+        "milestone-milestone-8",
+        "milestone-milestone-9",
+      ]),
+    );
+    expect(queue.map((item) => item.id)).not.toContain("request-request-closed");
+    expect(queue[0]?.severity).toBe("high");
+    expect(queue.find((item) => item.id === "case-case-1")?.clientName).toBe(
+      "Constructora Norte S.A.S.",
+    );
   });
 
   test("resolves a larger workspace within an interactive processing budget", () => {

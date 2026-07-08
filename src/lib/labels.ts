@@ -1,3 +1,4 @@
+import type { FirmWorkQueueKind, FirmWorkQueueSeverity } from "./workspace-selectors";
 import type { CaseStatus, MilestoneStatus, RequestStatus, Visibility } from "./types";
 
 export const caseStatusLabels: Record<CaseStatus, string> = {
@@ -26,4 +27,16 @@ export const milestoneStatusLabels: Record<MilestoneStatus, string> = {
 export const visibilityLabels: Record<Visibility, string> = {
   internal: "Interno",
   client: "Cliente",
+};
+
+export const workQueueKindLabels: Record<FirmWorkQueueKind, string> = {
+  case_attention: "Accion cliente",
+  request_due: "Solicitud",
+  milestone_due: "Hito",
+};
+
+export const workQueueSeverityLabels: Record<FirmWorkQueueSeverity, string> = {
+  high: "Alta",
+  medium: "Media",
+  normal: "Normal",
 };

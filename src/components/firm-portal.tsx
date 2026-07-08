@@ -13,7 +13,12 @@ import {
   StatusBadge,
   Timeline,
 } from "@/components/shared-ui";
-import { caseStatusLabels, milestoneStatusLabels } from "@/lib/labels";
+import {
+  caseStatusLabels,
+  milestoneStatusLabels,
+  workQueueKindLabels,
+  workQueueSeverityLabels,
+} from "@/lib/labels";
 import {
   audit,
   cloneSeed,
@@ -24,11 +29,13 @@ import {
 } from "@/lib/storage";
 import { insertCaseMilestone, updateCaseMilestone } from "@/lib/workspace-mutators";
 import {
+  getFirmWorkQueue,
   getCaseDocuments,
   getCaseMilestones,
   getCaseRequests,
   getCaseUpdates,
 } from "@/lib/workspace-selectors";
+import type { FirmWorkQueueItem } from "@/lib/workspace-selectors";
 import type {
   CaseDocument,
   CaseMilestone,
@@ -55,6 +62,7 @@ export function FirmPortal() {
   const [selectedCaseId, setSelectedCaseId] = useState("case-1");
   const [drawer, setDrawer] = useState<DrawerKind>(null);
   const [isWorkspaceLoading, setIsWorkspaceLoading] = useState(true);
+  const referenceDate = useMemo(() => getTodayIso().slice(0, 10), []);
 
   useEffect(() => {
     let isActive = true;
@@ -114,6 +122,10 @@ export function FirmPortal() {
       pendingRequests: pendingRequests.length,
     };
   }, [data]);
+
+  const workQueue = useMemo(() => {
+    return getFirmWorkQueue(data, referenceDate);
+  }, [data, referenceDate]);
 
   function commit(next: WorkspaceData) {
     setData(next);
@@ -213,6 +225,11 @@ export function FirmPortal() {
 
       return next;
     });
+  }
+
+  function handleWorkQueueSelect(item: FirmWorkQueueItem) {
+    setSelectedClientId(item.clientId);
+    setSelectedCaseId(item.caseId);
   }
 
   function addMilestone(
@@ -413,6 +430,12 @@ export function FirmPortal() {
             </button>
           </div>
 
+          <WorkQueuePanel
+            items={workQueue}
+            selectedCaseId={selectedCase?.id}
+            onSelect={handleWorkQueueSelect}
+          />
+
           <div className="grid metrics">
             <Metric label="Clientes" value={metrics.clients} />
             <Metric label="Casos abiertos" value={metrics.openCases} />
@@ -475,6 +498,69 @@ export function FirmPortal() {
         />
       ) : null}
     </main>
+  );
+}
+
+function WorkQueuePanel({
+  items,
+  onSelect,
+  selectedCaseId,
+}: {
+  items: FirmWorkQueueItem[];
+  onSelect: (item: FirmWorkQueueItem) => void;
+  selectedCaseId?: string;
+}) {
+  const visibleItems = items.slice(0, 6);
+
+  return (
+    <section className="panel work-queue-panel" data-testid="firm-work-queue">
+      <div className="section-title">
+        <div>
+          <h3>Bandeja de trabajo</h3>
+          <span className="muted small">
+            {visibleItems.length === items.length
+              ? `${items.length} pendientes priorizados`
+              : `${visibleItems.length} de ${items.length} pendientes priorizados`}
+          </span>
+        </div>
+        <CalendarClock size={17} />
+      </div>
+
+      {visibleItems.length > 0 ? (
+        <div className="work-queue-list">
+          {visibleItems.map((item) => (
+            <button
+              className={`work-queue-item severity-${item.severity} ${
+                item.caseId === selectedCaseId ? "active" : ""
+              }`}
+              data-testid={`work-queue-item-${item.id}`}
+              key={item.id}
+              type="button"
+              onClick={() => onSelect(item)}
+            >
+              <div className="work-queue-main">
+                <div className="row wrap">
+                  <span className="badge neutral">{workQueueKindLabels[item.kind]}</span>
+                  <span className={`badge queue-${item.severity}`}>
+                    {workQueueSeverityLabels[item.severity]}
+                  </span>
+                  {item.dueDate ? (
+                    <span className="muted small">Vence {formatDate(item.dueDate)}</span>
+                  ) : null}
+                </div>
+                <strong>{item.title}</strong>
+                <span className="muted small">{item.detail}</span>
+              </div>
+              <span className="work-queue-client">{item.clientName}</span>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="empty-state compact">
+          <span className="muted">Sin pendientes operativos</span>
+        </div>
+      )}
+    </section>
   );
 }
 

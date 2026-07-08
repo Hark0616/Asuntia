@@ -14,6 +14,7 @@ La version actual es una demo funcional con persistencia en `localStorage`. No u
 - Acceso cliente por codigo/radicado con captcha MVP.
 - Portal de seguimiento en `/cliente`.
 - Espacio interno de firma en `/firma`.
+- Bandeja de trabajo priorizada para solicitudes, hitos y casos que requieren accion.
 - Creacion de clientes.
 - Creacion de casos.
 - Estados de caso.
@@ -47,15 +48,16 @@ La version actual es una demo funcional con persistencia en `localStorage`. No u
 ## Flujo De Firma
 
 1. Entrar desde `/` con el acceso interno de firma.
-2. Seleccionar cliente.
-3. Crear caso o abrir uno existente.
-4. Cambiar estado.
-5. Actualizar proximo paso.
-6. Crear o actualizar hitos del proceso.
-7. Habilitar evidencia de cliente para el hito que lo requiera.
-8. Publicar avance visible al cliente o interno.
-9. Crear solicitud.
-10. Registrar documento.
+2. Revisar la bandeja de trabajo.
+3. Abrir un asunto pendiente desde la bandeja o seleccionar cliente.
+4. Crear caso o abrir uno existente.
+5. Cambiar estado.
+6. Actualizar proximo paso.
+7. Crear o actualizar hitos del proceso.
+8. Habilitar evidencia de cliente para el hito que lo requiera.
+9. Publicar avance visible al cliente o interno.
+10. Crear solicitud.
+11. Registrar documento.
 
 ## Flujo De Cliente
 
@@ -101,6 +103,7 @@ La demo se considera suficiente para mostrar a una firma pequena cuando:
 
 - El abogado puede crear un cliente.
 - El abogado puede crear un caso.
+- El abogado puede abrir asuntos pendientes desde una bandeja priorizada.
 - El abogado puede crear y ajustar hitos.
 - El abogado puede publicar avances.
 - El abogado puede crear solicitudes.

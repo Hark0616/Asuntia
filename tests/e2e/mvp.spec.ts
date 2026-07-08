@@ -66,6 +66,21 @@ test("cliente sin codigo vuelve a la entrada principal", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Consultar asunto" })).toBeVisible();
 });
 
+test("firma usa la bandeja de trabajo para abrir asuntos pendientes", async ({ page }) => {
+  await page.goto("/firma");
+
+  await expect(page.getByTestId("firm-work-queue")).toContainText("Bandeja de trabajo");
+  await expect(page.getByTestId("work-queue-item-milestone-milestone-9")).toContainText(
+    "Solicitud de informacion laboral",
+  );
+
+  await page.getByTestId("work-queue-item-milestone-milestone-9").click();
+
+  await expect(page.getByRole("heading", { name: "Andes Foods" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Concepto laboral sobre turnos" })).toBeVisible();
+  await expect(page.getByText("Reporte de turnos")).toBeVisible();
+});
+
 test("firma publica avance, solicitud y documento visibles para el cliente", async ({ page }) => {
   await page.goto("/firma");
   await expect(page.getByRole("heading", { name: "Constructora Norte S.A.S." })).toBeVisible();
