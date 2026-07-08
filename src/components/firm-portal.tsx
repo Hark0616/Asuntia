@@ -1,6 +1,18 @@
 "use client";
 
-import { CalendarClock, Eye, EyeOff, FileText, History, Plus, Save, Send, Upload } from "lucide-react";
+import {
+  CalendarClock,
+  Eye,
+  EyeOff,
+  FileText,
+  Globe2,
+  History,
+  Plus,
+  Save,
+  Send,
+  Upload,
+} from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AppHeader } from "@/components/app-header";
@@ -15,6 +27,7 @@ import {
   Timeline,
 } from "@/components/shared-ui";
 import {
+  DEFAULT_FIRM_ID,
   FIRM_SESSION_KEY,
   getCaseResponsibleProfiles,
   getRoleCapabilities,
@@ -37,13 +50,14 @@ import {
 } from "@/lib/storage";
 import { insertCaseMilestone, updateCaseMilestone } from "@/lib/workspace-mutators";
 import {
+  getFirmPublicSiteModel,
   getFirmWorkQueue,
   getCaseDocuments,
   getCaseMilestones,
   getCaseRequests,
   getCaseUpdates,
 } from "@/lib/workspace-selectors";
-import type { FirmWorkQueueItem } from "@/lib/workspace-selectors";
+import type { FirmPublicSiteModel, FirmWorkQueueItem } from "@/lib/workspace-selectors";
 import type {
   CaseDocument,
   CaseMilestone,
@@ -156,6 +170,10 @@ export function FirmPortal() {
   const workQueue = useMemo(() => {
     return getFirmWorkQueue(data, referenceDate);
   }, [data, referenceDate]);
+
+  const publicSiteModel = useMemo(() => {
+    return getFirmPublicSiteModel(data, DEFAULT_FIRM_ID);
+  }, [data]);
 
   const capabilities = useMemo(() => {
     return sessionUser ? getRoleCapabilities(sessionUser.role) : getRoleCapabilities("client");
@@ -521,6 +539,8 @@ export function FirmPortal() {
             onSelect={handleWorkQueueSelect}
           />
 
+          {publicSiteModel ? <PublicSitePanel model={publicSiteModel} /> : null}
+
           <div className="grid metrics">
             <Metric label="Clientes" value={metrics.clients} />
             <Metric label="Casos abiertos" value={metrics.openCases} />
@@ -647,6 +667,57 @@ function WorkQueuePanel({
           <span className="muted">Sin pendientes operativos</span>
         </div>
       )}
+    </section>
+  );
+}
+
+function PublicSitePanel({ model }: { model: FirmPublicSiteModel }) {
+  const publishedGuides = model.guides.filter((guide) => guide.status === "published");
+
+  return (
+    <section className="panel public-site-panel" data-testid="firm-public-site">
+      <div className="section-title">
+        <div>
+          <h3>Sitio publico</h3>
+          <span className="muted small">
+            {model.firm.name} · {model.firm.subdomain}.asuntia.com
+          </span>
+        </div>
+        <Globe2 size={17} />
+      </div>
+
+      <div className="public-site-status">
+        <div>
+          <span className="badge">Publicado</span>
+          <strong>{model.site.headline}</strong>
+        </div>
+        <div className="public-site-links">
+          <Link className="secondary-button" href="/">
+            Landing
+          </Link>
+          <Link className="primary-button" href="/consulta">
+            Consulta
+          </Link>
+        </div>
+      </div>
+
+      <div className="public-site-counts" aria-label="Estado de contenido publico">
+        <span>
+          <strong>{model.practiceAreas.length}</strong>
+          {" "}
+          areas
+        </span>
+        <span>
+          <strong>{publishedGuides.length}</strong>
+          {" "}
+          guias publicadas
+        </span>
+        <span>
+          <strong>{model.caseStudies.length}</strong>
+          {" "}
+          casos ejemplo
+        </span>
+      </div>
     </section>
   );
 }

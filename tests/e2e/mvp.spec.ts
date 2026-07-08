@@ -195,6 +195,31 @@ test("asistente entra al workspace en modo lectura", async ({ page }) => {
   await expect(page.getByTestId("save-case")).toBeDisabled();
   await expect(page.getByTestId("create-milestone")).toHaveCount(0);
   await expect(page.getByTestId("publish-update")).toHaveCount(0);
+  await expect(page.getByTestId("firm-public-site")).toContainText("Sitio publico");
+});
+
+test("roles internos ven estado del sitio publico y rutas publicas", async ({ page }) => {
+  for (const email of [
+    "socia@asuntia.local",
+    "admin@asuntia.local",
+    "daniela@asuntia.local",
+    "asistente@asuntia.local",
+  ]) {
+    await page.goto("/");
+    await page.evaluate(() => window.sessionStorage.clear());
+    await loginFirm(page, email);
+
+    const panel = page.getByTestId("firm-public-site");
+    await expect(panel).toContainText("Publicado");
+    await expect(panel).toContainText("5 guias publicadas");
+    await expect(panel).toContainText("4 areas");
+    await expect(panel).toContainText("3 casos ejemplo");
+    await expect(panel.getByRole("link", { name: "Landing" })).toHaveAttribute("href", "/");
+    await expect(panel.getByRole("link", { name: "Consulta" })).toHaveAttribute(
+      "href",
+      "/consulta",
+    );
+  }
 });
 
 test("firma publica avance, solicitud y documento visibles para el cliente", async ({ page }) => {
