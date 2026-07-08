@@ -69,6 +69,8 @@ Esto mantiene una sola estructura de base de datos:
 
 La prueba `tests/unit/database-schema.test.ts` aplica las migraciones en PGlite y valida tablas, restricciones e indices base. La migracion `20260707000000_milestone_current_guard.sql` protege que cada caso tenga como maximo un hito `current`, una regla que debe mantenerse al promover el schema a Supabase.
 
+La migracion `20260708000000_profiles_roles.sql` prepara roles de usuario para Supabase Auth: `profiles.role`, `profiles.status`, `profiles.client_id` y unicidad de correo por firma. El script `npm run seed:supabase-users` crea usuarios de Auth con service role y sincroniza `public.profiles`.
+
 ## Modelo Inicial Esperado
 
 Tablas base:
@@ -87,6 +89,7 @@ Relaciones base:
 
 - `clients.firm_id -> firms.id`
 - `profiles.firm_id -> firms.id`
+- `profiles.client_id -> clients.id`
 - `cases.client_id -> clients.id`
 - `cases.firm_id -> firms.id`
 - `case_milestones.case_id -> cases.id`
@@ -103,6 +106,7 @@ Reglas minimas:
 
 - Un usuario solo puede leer datos de su firma.
 - Un cliente solo puede leer sus casos autorizados.
+- Un asistente interno puede leer workspace, pero no escribir casos, hitos, solicitudes ni documentos.
 - Avances internos no deben ser visibles para clientes.
 - Hitos internos no deben ser visibles para clientes si en el futuro se agrega visibilidad por hito.
 - Documentos internos no deben ser visibles para clientes.

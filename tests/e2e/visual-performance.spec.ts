@@ -1,8 +1,16 @@
-import { expect, test, type APIRequestContext } from "@playwright/test";
+import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 
 async function resetWorkspace(request: APIRequestContext) {
   const reset = await request.delete("/api/workspace");
   expect(reset.ok()).toBeTruthy();
+}
+
+async function loginFirm(page: Page) {
+  await page.goto("/firma/login");
+  await page.getByTestId("firm-email").fill("socia@asuntia.local");
+  await page.getByTestId("firm-password").fill("AsuntiaDemo2026!");
+  await page.getByTestId("firm-login").click();
+  await expect(page).toHaveURL("/firma");
 }
 
 test.beforeEach(async ({ request }) => {
@@ -57,7 +65,7 @@ test.describe("visual regression", () => {
       maxDiffPixelRatio: 0.01,
     });
 
-    await page.goto("/firma");
+    await loginFirm(page);
     await expect(page.getByRole("heading", { name: "Constructora Norte S.A.S." })).toBeVisible();
     await expect(page).toHaveScreenshot("firm-workspace-desktop.png", {
       animations: "disabled",

@@ -1,6 +1,8 @@
+import { demoProfiles } from "./auth";
 import type { WorkspaceData } from "./types";
 
 export const seedData: WorkspaceData = {
+  profiles: demoProfiles,
   clients: [
     {
       id: "client-1",

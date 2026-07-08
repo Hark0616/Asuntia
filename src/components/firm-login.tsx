@@ -1,25 +1,44 @@
 "use client";
 
-import { BriefcaseBusiness, LockKeyhole, ShieldCheck } from "lucide-react";
+import { BriefcaseBusiness, LockKeyhole, ShieldCheck, UsersRound } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { FormEvent } from "react";
+import {
+  authenticateDemoUser,
+  authenticateFirmUser,
+  DEMO_PASSWORD,
+  demoUsers,
+  FIRM_SESSION_KEY,
+  roleLabels,
+  serializeSessionUser,
+} from "@/lib/auth";
+
+const firmDemoUsers = demoUsers.filter((user) => user.role !== "client");
 
 export function FirmLoginForm({ buttonLabel = "Iniciar sesión" }: { buttonLabel?: string }) {
   const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState(firmDemoUsers[0]?.email ?? "");
+  const [password, setPassword] = useState(DEMO_PASSWORD);
   const [error, setError] = useState("");
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
 
-    if (!email.trim() || password.length < 4) {
-      setError("Ingresa correo y clave interna.");
+    const demoUser = authenticateDemoUser(email, password);
+
+    if (demoUser?.role === "client") {
+      setError("Este usuario solo puede entrar al portal cliente.");
       return;
     }
 
-    window.sessionStorage.setItem("asuntia.firmSession", email.trim());
+    const firmUser = authenticateFirmUser(email, password);
+    if (!firmUser) {
+      setError("Credenciales internas no validas.");
+      return;
+    }
+
+    window.sessionStorage.setItem(FIRM_SESSION_KEY, serializeSessionUser(firmUser));
     router.push("/firma");
   }
 
@@ -55,6 +74,31 @@ export function FirmLoginForm({ buttonLabel = "Iniciar sesión" }: { buttonLabel
         <BriefcaseBusiness size={16} />
         {buttonLabel}
       </button>
+
+      <div className="demo-users" data-testid="firm-demo-users">
+        <div className="row between">
+          <span className="muted small">Usuarios de prueba</span>
+          <span className="badge neutral">Clave unica</span>
+        </div>
+        {firmDemoUsers.map((user) => (
+          <button
+            className="demo-user-option"
+            key={user.id}
+            type="button"
+            onClick={() => {
+              setEmail(user.email);
+              setPassword(DEMO_PASSWORD);
+              setError("");
+            }}
+          >
+            <span>
+              <strong>{user.name}</strong>
+              <small>{user.email}</small>
+            </span>
+            <span className="badge neutral">{roleLabels[user.role]}</span>
+          </button>
+        ))}
+      </div>
     </form>
   );
 }
@@ -86,6 +130,27 @@ export function FirmLogin() {
           </div>
 
           <FirmLoginForm />
+        </section>
+
+        <section className="access-panel secondary-access">
+          <div className="section-title">
+            <div>
+              <span className="badge neutral">Roles</span>
+              <h2>Perfiles demo</h2>
+            </div>
+            <UsersRound size={18} />
+          </div>
+          <div className="stack">
+            {demoUsers.map((user) => (
+              <div className="list-card" key={user.id}>
+                <div className="row between">
+                  <strong>{user.name}</strong>
+                  <span className="badge neutral">{roleLabels[user.role]}</span>
+                </div>
+                <span className="muted small">{user.email}</span>
+              </div>
+            ))}
+          </div>
         </section>
       </section>
     </main>

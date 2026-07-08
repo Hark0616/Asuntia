@@ -13,7 +13,10 @@ La version actual es una demo funcional con persistencia en `localStorage`. No u
 - Entrada principal en `/`.
 - Acceso cliente por codigo, radicado, correo, telefono o id con captcha MVP.
 - Portal de seguimiento en `/cliente` con lista de casos activos.
+- Login demo de firma en `/firma/login`.
 - Espacio interno de firma en `/firma`.
+- Roles demo para socia, administracion, abogada, asistente y cliente.
+- Workspace de solo lectura para asistente.
 - Bandeja de trabajo priorizada para solicitudes, hitos y casos que requieren accion.
 - Creacion de clientes.
 - Creacion de casos.
@@ -39,7 +42,7 @@ La version actual es una demo funcional con persistencia en `localStorage`. No u
 - Subida real de documentos a storage.
 - Notificaciones por correo.
 - Supabase/Auth/Storage.
-- Roles avanzados.
+- RLS y permisos avanzados en servidor.
 - Auditoria inmutable.
 - Firma electronica.
 - Integraciones externas.
@@ -74,6 +77,7 @@ La version actual es una demo funcional con persistencia en `localStorage`. No u
 ## Modelo De Datos Inicial
 
 - `clients`: clientes de la firma.
+- `profiles`: usuarios, roles y vinculo opcional con cliente.
 - `cases`: asuntos legales asociados a clientes.
 - `milestones`: hitos asociados a casos.
 - `updates`: eventos de timeline.

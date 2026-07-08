@@ -17,6 +17,21 @@ export type Visibility = "internal" | "client";
 
 export type MilestoneStatus = "completed" | "current" | "upcoming";
 
+export type UserRole = "owner" | "admin" | "lawyer" | "assistant" | "client";
+
+export type ProfileStatus = "active" | "inactive";
+
+export type Profile = {
+  id: string;
+  firmId: string;
+  clientId?: string;
+  email: string;
+  name: string;
+  role: UserRole;
+  status: ProfileStatus;
+  createdAt: string;
+};
+
 export type Client = {
   id: string;
   name: string;
@@ -92,6 +107,7 @@ export type AuditEvent = {
 };
 
 export type WorkspaceData = {
+  profiles: Profile[];
   clients: Client[];
   cases: LegalCase[];
   milestones: CaseMilestone[];

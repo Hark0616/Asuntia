@@ -22,6 +22,7 @@ function normalizeWorkspace(data: WorkspaceData): WorkspaceData {
 
   return {
     ...data,
+    profiles: data.profiles ?? seeded.profiles,
     cases: data.cases.map((legalCase, index) => ({
       ...legalCase,
       trackingCode:

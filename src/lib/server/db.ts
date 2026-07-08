@@ -83,7 +83,9 @@ export async function getDatabase() {
   })();
   const db = await globalThis.asuntiaDatabase;
 
-  globalThis.asuntiaMigrations ??= runMigrations(db);
+  globalThis.asuntiaMigrations ??= runMigrations(db).finally(() => {
+    globalThis.asuntiaMigrations = undefined;
+  });
   await globalThis.asuntiaMigrations;
 
   return db;

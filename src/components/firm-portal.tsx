@@ -1,6 +1,7 @@
 "use client";
 
 import { CalendarClock, Eye, EyeOff, FileText, History, Plus, Save, Send, Upload } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AppHeader } from "@/components/app-header";
 import {
@@ -13,6 +14,13 @@ import {
   StatusBadge,
   Timeline,
 } from "@/components/shared-ui";
+import {
+  FIRM_SESSION_KEY,
+  getCaseResponsibleProfiles,
+  getRoleCapabilities,
+  parseSessionUser,
+  roleLabels,
+} from "@/lib/auth";
 import {
   caseStatusLabels,
   milestoneStatusLabels,
@@ -45,6 +53,7 @@ import type {
   InfoRequest,
   LegalCase,
   MilestoneStatus,
+  Profile,
   RequestStatus,
   Visibility,
   WorkspaceData,
@@ -52,19 +61,40 @@ import type {
 
 type DrawerKind = "client" | "case" | null;
 
-const lawyers = ["Daniela Torres", "Martin Acosta", "Sofia Bernal"];
+const caseResponsibleProfiles = getCaseResponsibleProfiles();
+const lawyers = caseResponsibleProfiles.map((profile) => profile.name);
 const caseStatuses = Object.keys(caseStatusLabels) as CaseStatus[];
 const milestoneStatuses = Object.keys(milestoneStatusLabels) as MilestoneStatus[];
 
 export function FirmPortal() {
+  const router = useRouter();
   const [data, setData] = useState<WorkspaceData>(() => cloneSeed());
   const [selectedClientId, setSelectedClientId] = useState("client-1");
   const [selectedCaseId, setSelectedCaseId] = useState("case-1");
   const [drawer, setDrawer] = useState<DrawerKind>(null);
+  const [sessionUser, setSessionUser] = useState<Profile | null>(null);
+  const [isSessionLoading, setIsSessionLoading] = useState(true);
   const [isWorkspaceLoading, setIsWorkspaceLoading] = useState(true);
   const referenceDate = useMemo(() => getTodayIso().slice(0, 10), []);
 
   useEffect(() => {
+    const user = parseSessionUser(window.sessionStorage.getItem(FIRM_SESSION_KEY));
+
+    if (!user || !getRoleCapabilities(user.role).canUseFirmWorkspace) {
+      window.sessionStorage.removeItem(FIRM_SESSION_KEY);
+      router.replace("/firma/login");
+      return;
+    }
+
+    setSessionUser(user);
+    setIsSessionLoading(false);
+  }, [router]);
+
+  useEffect(() => {
+    if (!sessionUser) {
+      return;
+    }
+
     let isActive = true;
 
     async function loadWorkspace() {
@@ -84,7 +114,7 @@ export function FirmPortal() {
     return () => {
       isActive = false;
     };
-  }, []);
+  }, [sessionUser]);
 
   const clientsById = useMemo(() => {
     return new Map(data.clients.map((client) => [client.id, client]));
@@ -127,6 +157,12 @@ export function FirmPortal() {
     return getFirmWorkQueue(data, referenceDate);
   }, [data, referenceDate]);
 
+  const capabilities = useMemo(() => {
+    return sessionUser ? getRoleCapabilities(sessionUser.role) : getRoleCapabilities("client");
+  }, [sessionUser]);
+
+  const auditActor = sessionUser?.name ?? "Firma";
+
   function commit(next: WorkspaceData) {
     setData(next);
     void saveWorkspaceData(next).catch((error) => {
@@ -143,6 +179,10 @@ export function FirmPortal() {
   }
 
   function addClient(input: Pick<Client, "name" | "contactName" | "email" | "phone">) {
+    if (!capabilities.canCreateClients) {
+      return;
+    }
+
     const client: Client = {
       ...input,
       id: createId("client"),
@@ -152,7 +192,7 @@ export function FirmPortal() {
     commit({
       ...data,
       clients: [client, ...data.clients],
-      audit: [audit("Firma", "Creo cliente", client.name), ...data.audit],
+      audit: [audit(auditActor, "Creo cliente", client.name), ...data.audit],
     });
     setSelectedClientId(client.id);
     setDrawer(null);
@@ -164,6 +204,10 @@ export function FirmPortal() {
       "clientId" | "title" | "description" | "responsible" | "nextStep" | "priority"
     >,
   ) {
+    if (!capabilities.canCreateCases) {
+      return;
+    }
+
     const now = getTodayIso();
     const legalCase: LegalCase = {
       ...input,
@@ -197,7 +241,7 @@ export function FirmPortal() {
       cases: [legalCase, ...data.cases],
       milestones: [initialMilestone, ...data.milestones],
       updates: [initialUpdate, ...data.updates],
-      audit: [audit("Firma", "Creo caso", legalCase.title), ...data.audit],
+      audit: [audit(auditActor, "Creo caso", legalCase.title), ...data.audit],
     });
     setSelectedClientId(input.clientId);
     setSelectedCaseId(legalCase.id);
@@ -205,6 +249,10 @@ export function FirmPortal() {
   }
 
   function updateCaseFields(caseId: string, patch: Partial<LegalCase>) {
+    if (!capabilities.canManageCases) {
+      return;
+    }
+
     setData((current) => {
       const legalCase = current.cases.find((item) => item.id === caseId);
       if (!legalCase) {
@@ -216,7 +264,7 @@ export function FirmPortal() {
         cases: current.cases.map((item) =>
           item.id === caseId ? { ...item, ...patch, updatedAt: getTodayIso() } : item,
         ),
-        audit: [audit("Firma", "Actualizo caso", legalCase.title), ...current.audit],
+        audit: [audit(auditActor, "Actualizo caso", legalCase.title), ...current.audit],
       };
 
       void saveWorkspaceData(next).catch((error) => {
@@ -236,6 +284,10 @@ export function FirmPortal() {
     caseId: string,
     input: Omit<CaseMilestone, "id" | "caseId">,
   ) {
+    if (!capabilities.canManageCases) {
+      return;
+    }
+
     const legalCase = data.cases.find((item) => item.id === caseId);
     if (
       !legalCase ||
@@ -263,7 +315,7 @@ export function FirmPortal() {
       cases: data.cases.map((item) =>
         item.id === caseId ? { ...item, updatedAt: now } : item,
       ),
-      audit: [audit(legalCase.responsible, "Creo hito", milestone.title), ...data.audit],
+      audit: [audit(auditActor, "Creo hito", milestone.title), ...data.audit],
     });
   }
 
@@ -272,6 +324,10 @@ export function FirmPortal() {
     milestoneId: string,
     patch: Partial<CaseMilestone>,
   ) {
+    if (!capabilities.canManageCases) {
+      return;
+    }
+
     const legalCase = data.cases.find((item) => item.id === caseId);
     const milestone = data.milestones.find((item) => item.id === milestoneId);
     if (!legalCase || !milestone) {
@@ -286,11 +342,15 @@ export function FirmPortal() {
       cases: data.cases.map((item) =>
         item.id === caseId ? { ...item, updatedAt: now } : item,
       ),
-      audit: [audit(legalCase.responsible, "Actualizo hito", milestone.title), ...data.audit],
+      audit: [audit(auditActor, "Actualizo hito", milestone.title), ...data.audit],
     });
   }
 
   function addUpdate(caseId: string, body: string, visibility: Visibility) {
+    if (!capabilities.canManageCases) {
+      return;
+    }
+
     const legalCase = data.cases.find((item) => item.id === caseId);
     if (!legalCase || !body.trim()) {
       return;
@@ -299,7 +359,7 @@ export function FirmPortal() {
     const newUpdate: CaseUpdate = {
       id: createId("update"),
       caseId,
-      author: legalCase.responsible,
+      author: auditActor,
       body: body.trim(),
       visibility,
       createdAt: getTodayIso(),
@@ -311,11 +371,15 @@ export function FirmPortal() {
       cases: data.cases.map((item) =>
         item.id === caseId ? { ...item, updatedAt: newUpdate.createdAt } : item,
       ),
-      audit: [audit(legalCase.responsible, "Agrego avance", legalCase.title), ...data.audit],
+      audit: [audit(auditActor, "Agrego avance", legalCase.title), ...data.audit],
     });
   }
 
   function addRequest(caseId: string, input: Omit<InfoRequest, "id" | "caseId" | "createdAt">) {
+    if (!capabilities.canManageCases) {
+      return;
+    }
+
     const legalCase = data.cases.find((item) => item.id === caseId);
     if (!legalCase) {
       return;
@@ -336,11 +400,15 @@ export function FirmPortal() {
           ? { ...item, status: "requiere_cliente", updatedAt: request.createdAt }
           : item,
       ),
-      audit: [audit(legalCase.responsible, "Creo solicitud", request.title), ...data.audit],
+      audit: [audit(auditActor, "Creo solicitud", request.title), ...data.audit],
     });
   }
 
   function updateRequestStatus(requestId: string, status: RequestStatus) {
+    if (!capabilities.canManageCases) {
+      return;
+    }
+
     const request = data.requests.find((item) => item.id === requestId);
     if (!request) {
       return;
@@ -351,7 +419,7 @@ export function FirmPortal() {
       requests: data.requests.map((item) =>
         item.id === requestId ? { ...item, status } : item,
       ),
-      audit: [audit("Firma", "Cambio solicitud", request.title), ...data.audit],
+      audit: [audit(auditActor, "Cambio solicitud", request.title), ...data.audit],
     });
   }
 
@@ -359,6 +427,10 @@ export function FirmPortal() {
     caseId: string,
     input: Pick<CaseDocument, "name" | "category" | "visibility">,
   ) {
+    if (!capabilities.canManageCases) {
+      return;
+    }
+
     const legalCase = data.cases.find((item) => item.id === caseId);
     if (!legalCase || !input.name.trim()) {
       return;
@@ -376,25 +448,36 @@ export function FirmPortal() {
     commit({
       ...data,
       documents: [document, ...data.documents],
-      audit: [audit(legalCase.responsible, "Cargo documento", document.name), ...data.audit],
+      audit: [audit(auditActor, "Cargo documento", document.name), ...data.audit],
     });
   }
 
-  if (isWorkspaceLoading) {
+  function closeFirmSession() {
+    window.sessionStorage.removeItem(FIRM_SESSION_KEY);
+    router.push("/firma/login");
+  }
+
+  if (isSessionLoading || isWorkspaceLoading || !sessionUser) {
     return null;
   }
 
   return (
     <main className="app-shell">
-      <AppHeader areaLabel="Firma" exitLabel="Salir" />
+      <AppHeader
+        contextLabel={`${sessionUser.name} · ${roleLabels[sessionUser.role]}`}
+        exitLabel="Salir"
+        onExit={closeFirmSession}
+      />
       <div className="layout">
         <aside className="sidebar">
           <div className="sidebar-inner">
             <div className="section-title">
               <h3>Clientes</h3>
-              <button className="icon-button" type="button" onClick={() => setDrawer("client")}>
-                <Plus size={16} />
-              </button>
+              {capabilities.canCreateClients ? (
+                <button className="icon-button" type="button" onClick={() => setDrawer("client")}>
+                  <Plus size={16} />
+                </button>
+              ) : null}
             </div>
 
             <div className="stack">
@@ -419,15 +502,17 @@ export function FirmPortal() {
               <h2>{selectedClient?.name ?? "Clientes"}</h2>
               <span className="muted">{selectedClient?.email ?? "Sin cliente seleccionado"}</span>
             </div>
-            <button
-              className="primary-button"
-              data-testid="open-case-drawer"
-              type="button"
-              onClick={() => setDrawer("case")}
-            >
-              <Plus size={16} />
-              Nuevo caso
-            </button>
+            {capabilities.canCreateCases ? (
+              <button
+                className="primary-button"
+                data-testid="open-case-drawer"
+                type="button"
+                onClick={() => setDrawer("case")}
+              >
+                <Plus size={16} />
+                Nuevo caso
+              </button>
+            ) : null}
           </div>
 
           <WorkQueuePanel
@@ -464,6 +549,7 @@ export function FirmPortal() {
             {selectedCase ? (
               <CaseDetail
                 documents={getCaseDocuments(data, selectedCase.id)}
+                canEdit={capabilities.canManageCases}
                 legalCase={selectedCase}
                 milestones={getCaseMilestones(data, selectedCase.id)}
                 requests={getCaseRequests(data, selectedCase.id)}
@@ -485,14 +571,15 @@ export function FirmPortal() {
         </section>
       </div>
 
-      {drawer === "client" ? (
+      {drawer === "client" && capabilities.canCreateClients ? (
         <ClientDrawer onClose={() => setDrawer(null)} onSubmit={addClient} />
       ) : null}
 
-      {drawer === "case" ? (
+      {drawer === "case" && capabilities.canCreateCases ? (
         <CaseDrawer
           clients={data.clients}
           defaultClientId={selectedClient?.id ?? data.clients[0]?.id ?? ""}
+          responsibleProfiles={caseResponsibleProfiles}
           onClose={() => setDrawer(null)}
           onSubmit={addCase}
         />
@@ -565,6 +652,7 @@ function WorkQueuePanel({
 }
 
 function CaseDetail({
+  canEdit,
   documents,
   legalCase,
   milestones,
@@ -578,6 +666,7 @@ function CaseDetail({
   onUpdateCase,
   onUpdateMilestone,
 }: {
+  canEdit: boolean;
   documents: CaseDocument[];
   legalCase: LegalCase;
   milestones: CaseMilestone[];
@@ -630,6 +719,7 @@ function CaseDetail({
             <label htmlFor="case-status">Estado</label>
             <select
               data-testid="case-status"
+              disabled={!canEdit}
               id="case-status"
               value={legalCase.status}
               onChange={(event) =>
@@ -646,6 +736,7 @@ function CaseDetail({
           <div className="field">
             <label htmlFor="case-priority">Prioridad</label>
             <select
+              disabled={!canEdit}
               id="case-priority"
               value={legalCase.priority}
               onChange={(event) =>
@@ -662,6 +753,7 @@ function CaseDetail({
             <label htmlFor="next-step">Proximo paso</label>
             <textarea
               data-testid="case-next-step"
+              disabled={!canEdit}
               id="next-step"
               onChange={(event) => setNextStep(event.target.value)}
               value={nextStep}
@@ -671,6 +763,7 @@ function CaseDetail({
             <button
               className="secondary-button"
               data-testid="save-case"
+              disabled={!canEdit}
               type="button"
               onClick={() => onUpdateCase(legalCase.id, { nextStep })}
             >
@@ -684,12 +777,13 @@ function CaseDetail({
       <div className="case-workbench">
         <div className="case-workbench-main">
           <MilestonePlanner
+            canEdit={canEdit}
             legalCase={legalCase}
             milestones={milestones}
             onAddMilestone={onAddMilestone}
             onUpdateMilestone={onUpdateMilestone}
           />
-          <UpdateComposer caseId={legalCase.id} onSubmit={onAddUpdate} />
+          {canEdit ? <UpdateComposer caseId={legalCase.id} onSubmit={onAddUpdate} /> : null}
 
           <div className="panel">
             <div className="section-title">
@@ -701,15 +795,15 @@ function CaseDetail({
         </div>
 
         <aside className="case-workbench-side">
-          <RequestComposer caseId={legalCase.id} onSubmit={onAddRequest} />
-          <DocumentComposer caseId={legalCase.id} onSubmit={onAddDocument} />
+          {canEdit ? <RequestComposer caseId={legalCase.id} onSubmit={onAddRequest} /> : null}
+          {canEdit ? <DocumentComposer caseId={legalCase.id} onSubmit={onAddDocument} /> : null}
 
           <div className="panel">
             <div className="section-title">
               <h3>Solicitudes</h3>
               <CalendarClock size={17} />
             </div>
-            <RequestList requests={requests} editable onStatus={onRequestStatus} />
+            <RequestList requests={requests} editable={canEdit} onStatus={onRequestStatus} />
           </div>
 
           <div className="panel">
@@ -726,11 +820,13 @@ function CaseDetail({
 }
 
 function MilestonePlanner({
+  canEdit,
   legalCase,
   milestones,
   onAddMilestone,
   onUpdateMilestone,
 }: {
+  canEdit: boolean;
   legalCase: LegalCase;
   milestones: CaseMilestone[];
   onAddMilestone: (
@@ -780,6 +876,7 @@ function MilestonePlanner({
                   <select
                     aria-label={`Estado de ${milestone.title}`}
                     data-testid={`milestone-status-${milestone.id}`}
+                    disabled={!canEdit}
                     value={milestone.status}
                     onChange={(event) =>
                       onUpdateMilestone(legalCase.id, milestone.id, {
@@ -798,6 +895,7 @@ function MilestonePlanner({
                   <input
                     checked={milestone.evidenceEnabled}
                     data-testid={`milestone-evidence-${milestone.id}`}
+                    disabled={!canEdit}
                     type="checkbox"
                     onChange={(event) =>
                       onUpdateMilestone(legalCase.id, milestone.id, {
@@ -817,7 +915,7 @@ function MilestonePlanner({
         </div>
       )}
 
-      <MilestoneComposer caseId={legalCase.id} onSubmit={onAddMilestone} />
+      {canEdit ? <MilestoneComposer caseId={legalCase.id} onSubmit={onAddMilestone} /> : null}
     </section>
   );
 }
@@ -1247,11 +1345,13 @@ function ClientDrawer({
 function CaseDrawer({
   clients,
   defaultClientId,
+  responsibleProfiles,
   onClose,
   onSubmit,
 }: {
   clients: Client[];
   defaultClientId: string;
+  responsibleProfiles: Profile[];
   onClose: () => void;
   onSubmit: (
     input: Pick<
@@ -1263,7 +1363,7 @@ function CaseDrawer({
   const [clientId, setClientId] = useState(defaultClientId);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [responsible, setResponsible] = useState(lawyers[0]);
+  const [responsible, setResponsible] = useState(responsibleProfiles[0]?.name ?? lawyers[0] ?? "");
   const [nextStep, setNextStep] = useState("");
   const [priority, setPriority] = useState<LegalCase["priority"]>("normal");
 
@@ -1295,11 +1395,12 @@ function CaseDrawer({
           <select
             id="case-responsible"
             onChange={(event) => setResponsible(event.target.value)}
+            required
             value={responsible}
           >
-            {lawyers.map((lawyer) => (
-              <option key={lawyer} value={lawyer}>
-                {lawyer}
+            {responsibleProfiles.map((profile) => (
+              <option key={profile.id} value={profile.name}>
+                {profile.name}
               </option>
             ))}
           </select>

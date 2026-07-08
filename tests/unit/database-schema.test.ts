@@ -103,6 +103,82 @@ describe("Supabase migrations on PGlite", () => {
     ).rejects.toThrow();
   });
 
+  test("keeps profile roles, status and firm email uniqueness as database-level constraints", async () => {
+    const database = await applySupabaseMigrations();
+
+    await database.query(
+      `
+        INSERT INTO firms (id, name, created_at)
+        VALUES ('firm-test', 'Firma Test', '2026-07-01T00:00:00.000Z')
+      `,
+    );
+    await database.query(
+      `
+        INSERT INTO profiles (id, firm_id, email, name, role, status, created_at)
+        VALUES (
+          'profile-admin',
+          'firm-test',
+          'admin@example.com',
+          'Admin Test',
+          'admin',
+          'active',
+          '2026-07-01T00:00:00.000Z'
+        )
+      `,
+    );
+
+    await expect(
+      database.query(
+        `
+          INSERT INTO profiles (id, firm_id, email, name, role, status, created_at)
+          VALUES (
+            'profile-invalid-role',
+            'firm-test',
+            'rol@example.com',
+            'Rol Invalido',
+            'superuser',
+            'active',
+            '2026-07-01T00:00:00.000Z'
+          )
+        `,
+      ),
+    ).rejects.toThrow();
+
+    await expect(
+      database.query(
+        `
+          INSERT INTO profiles (id, firm_id, email, name, role, status, created_at)
+          VALUES (
+            'profile-invalid-status',
+            'firm-test',
+            'estado@example.com',
+            'Estado Invalido',
+            'lawyer',
+            'pending',
+            '2026-07-01T00:00:00.000Z'
+          )
+        `,
+      ),
+    ).rejects.toThrow();
+
+    await expect(
+      database.query(
+        `
+          INSERT INTO profiles (id, firm_id, email, name, role, status, created_at)
+          VALUES (
+            'profile-duplicate-email',
+            'firm-test',
+            'ADMIN@example.com',
+            'Admin Duplicado',
+            'lawyer',
+            'active',
+            '2026-07-01T00:00:00.000Z'
+          )
+        `,
+      ),
+    ).rejects.toThrow();
+  });
+
   test("prevents more than one current milestone per case", async () => {
     const database = await applySupabaseMigrations();
 
@@ -223,6 +299,10 @@ describe("Supabase migrations on PGlite", () => {
         "cases_firm_id_idx",
         "clients_firm_id_idx",
         "documents_case_id_idx",
+        "profiles_client_id_idx",
+        "profiles_firm_email_idx",
+        "profiles_firm_id_idx",
+        "profiles_role_idx",
         "requests_case_id_idx",
       ]),
     );

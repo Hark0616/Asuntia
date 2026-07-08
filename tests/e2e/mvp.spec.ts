@@ -1,6 +1,16 @@
 import { expect, test, type Page } from "@playwright/test";
 
 const storageKey = "asuntia.mvp.workspace";
+const firmPassword = "AsuntiaDemo2026!";
+
+async function loginFirm(page: Page, email = "socia@asuntia.local") {
+  await page.goto("/firma/login");
+  await page.getByTestId("firm-email").fill(email);
+  await page.getByTestId("firm-password").fill(firmPassword);
+  await page.getByTestId("firm-login").click();
+  await expect(page).toHaveURL("/firma");
+  await expect(page.getByRole("heading", { name: "Constructora Norte S.A.S." })).toBeVisible();
+}
 
 async function waitForWorkspaceSave(page: Page) {
   return page.waitForResponse(
@@ -91,8 +101,16 @@ test("cliente entra con correo y cambia entre sus casos activos", async ({ page 
   );
 });
 
-test("firma usa la bandeja de trabajo para abrir asuntos pendientes", async ({ page }) => {
+test("firma redirige a login cuando no hay sesion interna", async ({ page }) => {
   await page.goto("/firma");
+
+  await expect(page).toHaveURL("/firma/login");
+  await expect(page.getByRole("heading", { name: "Iniciar sesión" })).toBeVisible();
+  await expect(page.getByTestId("firm-demo-users")).toContainText("socia@asuntia.local");
+});
+
+test("firma usa la bandeja de trabajo para abrir asuntos pendientes", async ({ page }) => {
+  await loginFirm(page);
 
   await expect(page.getByTestId("firm-work-queue")).toContainText("Bandeja de trabajo");
   await expect(page.getByTestId("work-queue-item-milestone-milestone-9")).toContainText(
@@ -106,8 +124,17 @@ test("firma usa la bandeja de trabajo para abrir asuntos pendientes", async ({ p
   await expect(page.getByText("Reporte de turnos")).toBeVisible();
 });
 
+test("asistente entra al workspace en modo lectura", async ({ page }) => {
+  await loginFirm(page, "asistente@asuntia.local");
+
+  await expect(page.getByTestId("open-case-drawer")).toHaveCount(0);
+  await expect(page.getByTestId("save-case")).toBeDisabled();
+  await expect(page.getByTestId("create-milestone")).toHaveCount(0);
+  await expect(page.getByTestId("publish-update")).toHaveCount(0);
+});
+
 test("firma publica avance, solicitud y documento visibles para el cliente", async ({ page }) => {
-  await page.goto("/firma");
+  await loginFirm(page);
   await expect(page.getByRole("heading", { name: "Constructora Norte S.A.S." })).toBeVisible();
   await page.getByTestId("case-card-case-1").click();
 
@@ -168,7 +195,7 @@ test("firma publica avance, solicitud y documento visibles para el cliente", asy
 });
 
 test("cambio de estado y proximo paso se reflejan en el portal cliente", async ({ page }) => {
-  await page.goto("/firma");
+  await loginFirm(page);
   await page.getByTestId("case-card-case-1").click();
   const statusSaved = waitForWorkspaceSave(page);
   await page.getByTestId("case-status").selectOption("en_espera");
@@ -192,7 +219,7 @@ test("cambio de estado y proximo paso se reflejan en el portal cliente", async (
 });
 
 test("firma gestiona hitos y el cliente ve el nuevo punto actual del proceso", async ({ page }) => {
-  await page.goto("/firma");
+  await loginFirm(page);
   await page.getByTestId("case-card-case-1").click();
 
   await page.getByTestId("milestone-title").fill("Radicacion confirmada");
