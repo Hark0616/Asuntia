@@ -18,10 +18,14 @@ test.beforeEach(async ({ request }) => {
 });
 
 test.describe("visual regression", () => {
-  test("public access stays visually stable on desktop and mobile", async ({ page }) => {
+  test("firm landing stays visually stable on desktop and mobile", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/");
-    await expect(page.getByRole("heading", { name: "Consulta el estado de tu proceso" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", {
+        name: "Insolvencia con estrategia, orden y seguimiento claro",
+      }),
+    ).toBeVisible();
     await expect(page).toHaveScreenshot("home-desktop.png", {
       animations: "disabled",
       caret: "initial",
@@ -31,8 +35,24 @@ test.describe("visual regression", () => {
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/");
-    await expect(page.getByRole("heading", { name: "Consulta el estado de tu proceso" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", {
+        name: "Insolvencia con estrategia, orden y seguimiento claro",
+      }),
+    ).toBeVisible();
     await expect(page).toHaveScreenshot("home-mobile.png", {
+      animations: "disabled",
+      caret: "initial",
+      fullPage: true,
+      maxDiffPixelRatio: 0.01,
+    });
+  });
+
+  test("public consultation stays visually stable", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/consulta");
+    await expect(page.getByRole("heading", { name: "Consulta el estado de tu proceso" })).toBeVisible();
+    await expect(page).toHaveScreenshot("consultation-desktop.png", {
       animations: "disabled",
       caret: "initial",
       fullPage: true,
@@ -77,14 +97,22 @@ test.describe("visual regression", () => {
 });
 
 test.describe("local performance budgets", () => {
-  test("public access route loads within a local interaction budget after warmup", async ({ page }) => {
+  test("firm landing route loads within a local interaction budget after warmup", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByRole("heading", { name: "Consulta el estado de tu proceso" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", {
+        name: "Insolvencia con estrategia, orden y seguimiento claro",
+      }),
+    ).toBeVisible();
 
     await page.goto("about:blank");
     const startedAt = Date.now();
     await page.goto("/", { waitUntil: "load" });
-    await expect(page.getByRole("heading", { name: "Consulta el estado de tu proceso" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", {
+        name: "Insolvencia con estrategia, orden y seguimiento claro",
+      }),
+    ).toBeVisible();
     const wallTimeMs = Date.now() - startedAt;
 
     const metrics = await page.evaluate(() => {
@@ -119,6 +147,9 @@ test.describe("local performance budgets", () => {
     expect(response.ok()).toBeTruthy();
     expect(durationMs).toBeLessThan(1500);
     expect(data.cases).toHaveLength(3);
+    expect(data.guides.filter((guide: { status: string }) => guide.status === "published")).toHaveLength(4);
+    expect(data.practiceAreas).toHaveLength(4);
+    expect(data.caseStudies).toHaveLength(3);
     expect(data.documents.every((document: { visibility: string }) => document.visibility)).toBe(
       true,
     );

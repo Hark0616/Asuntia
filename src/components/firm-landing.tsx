@@ -10,6 +10,19 @@ type FirmLandingProps = {
 export function FirmLanding({ model }: FirmLandingProps) {
   const { caseStudies, firm, guides, practiceAreas, site, valueProps } = model;
   const featuredCaseStudy = caseStudies[0];
+  const practiceAreasById = new Map(practiceAreas.map((area) => [area.id, area]));
+  const guidesByPracticeArea = new Map(
+    practiceAreas.map((area) => [
+      area.id,
+      guides.filter((guide) => guide.practiceAreaId === area.id),
+    ]),
+  );
+  const caseStudiesByPracticeArea = new Map(
+    practiceAreas.map((area) => [
+      area.id,
+      caseStudies.filter((caseStudy) => caseStudy.practiceAreaId === area.id),
+    ]),
+  );
 
   return (
     <main className="firm-landing-shell">
@@ -102,6 +115,18 @@ export function FirmLanding({ model }: FirmLandingProps) {
               <span>{area.audience}</span>
               <h3>{area.title}</h3>
               <p>{area.summary}</p>
+              <div className="practice-related">
+                {guidesByPracticeArea.get(area.id)?.[0] ? (
+                  <Link href={`/guias/${guidesByPracticeArea.get(area.id)?.[0]?.slug}`}>
+                    Guia: {guidesByPracticeArea.get(area.id)?.[0]?.title}
+                  </Link>
+                ) : null}
+                {caseStudiesByPracticeArea.get(area.id)?.[0] ? (
+                  <small>
+                    Caso ejemplo: {caseStudiesByPracticeArea.get(area.id)?.[0]?.title}
+                  </small>
+                ) : null}
+              </div>
             </article>
           ))}
         </div>
@@ -120,7 +145,12 @@ export function FirmLanding({ model }: FirmLandingProps) {
           {guides.map((guide) => (
             <Link className="guide-card" href={`/guias/${guide.slug}`} key={guide.id}>
               <BookOpen size={18} />
-              <span>{guide.readingMinutes} min</span>
+              <span>
+                {guide.readingMinutes} min
+                {guide.practiceAreaId && practiceAreasById.get(guide.practiceAreaId)
+                  ? ` · ${practiceAreasById.get(guide.practiceAreaId)?.title}`
+                  : ""}
+              </span>
               <h3>{guide.title}</h3>
               <p>{guide.summary}</p>
             </Link>
@@ -141,6 +171,9 @@ export function FirmLanding({ model }: FirmLandingProps) {
           {caseStudies.map((caseStudy) => (
             <article className="case-study-card" key={caseStudy.id}>
               <BriefcaseBusiness size={18} />
+              {caseStudy.practiceAreaId && practiceAreasById.get(caseStudy.practiceAreaId) ? (
+                <span>{practiceAreasById.get(caseStudy.practiceAreaId)?.title}</span>
+              ) : null}
               <h3>{caseStudy.title}</h3>
               <p>{caseStudy.scenario}</p>
               <strong>{caseStudy.approach}</strong>

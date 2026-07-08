@@ -415,6 +415,33 @@ button {
   padding: 18px;
 }
 
+.practice-related {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 1px solid #e3e9f0;
+}
+
+.practice-related a,
+.practice-related small {
+  color: var(--brand);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.35;
+  text-decoration: none;
+}
+
+.practice-related a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.practice-related small {
+  color: var(--muted);
+  font-weight: 700;
+}
+
 .practice-card span,
 .guide-card span,
 .case-study-card span,

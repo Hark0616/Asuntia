@@ -45,7 +45,21 @@ test("pagina principal muestra la landing publica de la firma", async ({ page })
   await expect(
     page.getByRole("heading", { exact: true, name: "Persona natural no comerciante" }),
   ).toBeVisible();
-  await expect(page.getByText("Preparar documentos antes de iniciar una insolvencia")).toBeVisible();
+  await expect(
+    page.locator("#guias").getByRole("heading", {
+      name: "Preparar documentos antes de iniciar una insolvencia",
+    }),
+  ).toBeVisible();
+
+  await page.getByRole("link", { name: "Guias" }).click();
+  await expect(page).toHaveURL(/#guias/);
+  await expect(
+    page.getByRole("heading", { name: "Guias rapidas para llegar con informacion ordenada" }),
+  ).toBeVisible();
+
+  await page.getByTestId("landing-consult-cta").click();
+  await expect(page).toHaveURL("/consulta");
+  await expect(page.getByRole("heading", { name: "Consulta el estado de tu proceso" })).toBeVisible();
 });
 
 test("cliente entra desde consulta con codigo y captcha", async ({ page }) => {
