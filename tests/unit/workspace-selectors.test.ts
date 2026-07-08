@@ -193,6 +193,7 @@ describe("workspace selectors", () => {
     ]);
     expect(model?.guides.map((guide) => guide.slug)).toEqual([
       "documentos-antes-de-insolvencia",
+      "flujo-caja-reorganizacion",
       "reorganizacion-vs-liquidacion",
       "negociacion-deudas-persona-natural",
       "acreedor-en-insolvencia",
@@ -206,20 +207,6 @@ describe("workspace selectors", () => {
 
   test("resolves guide pages by published slug and keeps related guides inside the same firm", () => {
     const workspace = cloneWorkspace();
-    workspace.guides.push({
-      id: "guide-related-extra",
-      firmId: "firm-demo",
-      practiceAreaId: "area-empresa",
-      slug: "flujo-caja-reorganizacion",
-      title: "Flujo de caja para reorganizacion",
-      summary: "Relacionado por area.",
-      content: "Relacionado por area.",
-      readingMinutes: 3,
-      status: "published",
-      sortOrder: 15,
-      publishedAt: "2026-07-08T09:00:00.000Z",
-    });
-
     const guide = getFirmGuidePageModel(
       workspace,
       "firm-demo",

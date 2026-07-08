@@ -106,6 +106,21 @@ export const seedData: WorkspaceData = {
       publishedAt: "2026-07-08T08:05:00.000Z",
     },
     {
+      id: "guide-flujo-caja-reorganizacion",
+      firmId: "firm-demo",
+      practiceAreaId: "area-empresa",
+      slug: "flujo-caja-reorganizacion",
+      title: "Flujo de caja en una reorganizacion empresarial",
+      summary:
+        "Como ordenar caja, vencimientos y obligaciones para saber si la continuidad merece una ruta de reorganizacion.",
+      content:
+        "El flujo de caja es una de las primeras piezas para entender si una empresa puede sostener una ruta de continuidad. No basta con listar deudas: tambien hay que mirar ingresos probables, gastos indispensables, contratos que siguen activos y obligaciones que no se pueden postergar.\n\nEn una valoracion inicial, la firma separa obligaciones operativas, financieras, laborales y fiscales. Esa lectura ayuda a priorizar conversaciones y a evitar que la estrategia dependa de una sola cifra aislada.\n\nEsta guia es informativa. La viabilidad de una reorganizacion exige revisar documentos concretos, terminos y riesgos del caso.",
+      readingMinutes: 4,
+      status: "published",
+      sortOrder: 15,
+      publishedAt: "2026-07-08T08:03:00.000Z",
+    },
+    {
       id: "guide-negociacion-deudas-persona-natural",
       firmId: "firm-demo",
       practiceAreaId: "area-persona-natural",

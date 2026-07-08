@@ -147,7 +147,7 @@ test.describe("local performance budgets", () => {
     expect(response.ok()).toBeTruthy();
     expect(durationMs).toBeLessThan(1500);
     expect(data.cases).toHaveLength(3);
-    expect(data.guides.filter((guide: { status: string }) => guide.status === "published")).toHaveLength(4);
+    expect(data.guides.filter((guide: { status: string }) => guide.status === "published")).toHaveLength(5);
     expect(data.practiceAreas).toHaveLength(4);
     expect(data.caseStudies).toHaveLength(3);
     expect(data.documents.every((document: { visibility: string }) => document.visibility)).toBe(

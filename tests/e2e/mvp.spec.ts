@@ -101,6 +101,38 @@ test("cliente entra desde consulta con codigo y captcha", async ({ page }) => {
   ).not.toBeVisible();
 });
 
+test("guia publica renderiza detalle, area y relacionadas", async ({ page }) => {
+  const response = await page.goto("/guias/documentos-antes-de-insolvencia");
+
+  expect(response?.status()).toBe(200);
+  await expect(
+    page.getByRole("heading", {
+      name: "Preparar documentos antes de iniciar una insolvencia",
+    }),
+  ).toBeVisible();
+  await expect(page.getByText("Empresa en reorganizacion").first()).toBeVisible();
+  await expect(page.getByText("Esta guia es informativa")).toBeVisible();
+  await expect(
+    page.locator(".guide-cta-panel").getByRole("link", { name: /Consulta tu caso/ }),
+  ).toHaveAttribute(
+    "href",
+    "/consulta",
+  );
+  await expect(
+    page.getByRole("heading", {
+      name: "Flujo de caja en una reorganizacion empresarial",
+    }),
+  ).toBeVisible();
+});
+
+test("guias inexistentes o no publicadas devuelven not found", async ({ page }) => {
+  const missing = await page.goto("/guias/no-existe");
+  expect(missing?.status()).toBe(404);
+
+  const draft = await page.goto("/guias/borrador-interno");
+  expect(draft?.status()).toBe(404);
+});
+
 test("cliente sin codigo vuelve a la entrada principal", async ({ page }) => {
   await page.goto("/cliente");
 
