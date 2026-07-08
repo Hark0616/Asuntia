@@ -56,6 +56,19 @@ No el dashboard de Supabase.
 
 Si se hace un cambio manual en Supabase, debe convertirse despues en migracion para no perder trazabilidad.
 
+## Estado Local Actual
+
+El MVP usa PGlite como base local de desarrollo y pruebas. El helper `src/lib/server/db.ts` aplica en orden los archivos SQL de `supabase/migrations` sobre `.asuntia/pglite`.
+
+Esto mantiene una sola estructura de base de datos:
+
+- Las pruebas locales corren contra PGlite.
+- El schema versionado vive en `supabase/migrations`.
+- La misma estructura se debe copiar o aplicar despues al proyecto Supabase remoto.
+- Los cambios de schema deben entrar como nuevas migraciones, no como cambios manuales sueltos.
+
+La prueba `tests/unit/database-schema.test.ts` aplica las migraciones en PGlite y valida tablas, restricciones e indices base.
+
 ## Modelo Inicial Esperado
 
 Tablas base:

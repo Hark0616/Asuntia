@@ -19,15 +19,19 @@ npm run dev
 ## Verificar
 
 ```bash
+npm run test:unit
 npm run typecheck
 npm run lint
 npm run build
 npm run test:e2e
+npm run test:visual
 ```
 
 Las pruebas e2e levantan o reutilizan el servidor local en `http://localhost:3000` y validan los flujos principales de firma y cliente.
+Las pruebas unitarias validan reglas de seleccion del workspace y que las migraciones de `supabase/migrations` apliquen en PGlite.
+Las pruebas visuales guardan capturas base de las superficies principales para revisar cambios de UI en GitHub.
 
-La primera version funciona como demo local sin base de datos externa. El objetivo es validar el flujo principal antes de conectar Supabase/Auth/Storage.
+La primera version funciona como demo local sin base de datos externa. PGlite ejecuta localmente las mismas migraciones versionadas que luego se promueven a Supabase. El objetivo es validar el flujo principal antes de conectar Supabase/Auth/Storage.
 
 ## Flujo MVP
 

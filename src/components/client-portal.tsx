@@ -27,6 +27,16 @@ import {
   loadWorkspaceData,
   saveWorkspaceData,
 } from "@/lib/storage";
+import {
+  getCaseDocuments,
+  getCaseMilestones,
+  getCaseRequests,
+  getCaseUpdates,
+  getClientForCase,
+  getCurrentMilestone,
+  getPendingClientRequest,
+  resolveClientTracking,
+} from "@/lib/workspace-selectors";
 import type {
   CaseDocument,
   CaseMilestone,
@@ -34,7 +44,6 @@ import type {
   Client,
   InfoRequest,
   LegalCase,
-  Visibility,
   WorkspaceData,
 } from "@/lib/types";
 
@@ -66,19 +75,16 @@ export function ClientPortal() {
         return;
       }
 
-      const normalizedCode = initialCode.trim().toUpperCase();
-      const legalCase = loaded.cases.find(
-        (item) => item.trackingCode.toUpperCase() === normalizedCode,
-      );
+      const tracking = resolveClientTracking(loaded, initialCode);
 
-      if (!legalCase) {
+      if (!tracking) {
         window.sessionStorage.removeItem("asuntia.trackingCode");
         router.replace("/");
         return;
       }
 
-      setTrackingCode(legalCase.trackingCode);
-      setActiveTrackingCaseId(legalCase.id);
+      setTrackingCode(tracking.legalCase.trackingCode);
+      setActiveTrackingCaseId(tracking.legalCase.id);
       setIsResolvingTracking(false);
     }
 
@@ -92,9 +98,7 @@ export function ClientPortal() {
   const activeTrackingCase = activeTrackingCaseId
     ? data.cases.find((legalCase) => legalCase.id === activeTrackingCaseId)
     : undefined;
-  const activeClient = activeTrackingCase
-    ? data.clients.find((client) => client.id === activeTrackingCase.clientId)
-    : undefined;
+  const activeClient = activeTrackingCase ? getClientForCase(data, activeTrackingCase) : undefined;
 
   function commit(next: WorkspaceData) {
     setData(next);
@@ -128,32 +132,6 @@ export function ClientPortal() {
     });
   }
 
-  function visibleUpdates(caseId: string, visibility?: Visibility) {
-    return data.updates
-      .filter((update) => update.caseId === caseId)
-      .filter((update) => (visibility ? update.visibility === visibility : true))
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  }
-
-  function caseRequests(caseId: string) {
-    return data.requests
-      .filter((request) => request.caseId === caseId)
-      .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
-  }
-
-  function caseDocuments(caseId: string, visibility?: Visibility) {
-    return data.documents
-      .filter((document) => document.caseId === caseId)
-      .filter((document) => (visibility ? document.visibility === visibility : true))
-      .sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt));
-  }
-
-  function caseMilestones(caseId: string) {
-    return data.milestones
-      .filter((milestone) => milestone.caseId === caseId)
-      .sort((a, b) => a.date.localeCompare(b.date));
-  }
-
   function closeTracking() {
     window.sessionStorage.removeItem("asuntia.trackingCode");
     router.push("/");
@@ -174,11 +152,11 @@ export function ClientPortal() {
       <section className="main tracking-shell">
         <ClientTrackingDetail
           client={activeClient}
-          documents={caseDocuments(activeTrackingCase.id, "client")}
+          documents={getCaseDocuments(data, activeTrackingCase.id, "client")}
           legalCase={activeTrackingCase}
-          milestones={caseMilestones(activeTrackingCase.id)}
-          requests={caseRequests(activeTrackingCase.id)}
-          updates={visibleUpdates(activeTrackingCase.id, "client")}
+          milestones={getCaseMilestones(data, activeTrackingCase.id)}
+          requests={getCaseRequests(data, activeTrackingCase.id)}
+          updates={getCaseUpdates(data, activeTrackingCase.id, "client")}
           onAddEvidence={addClientEvidence}
           onExit={closeTracking}
         />
@@ -206,10 +184,8 @@ function ClientTrackingDetail({
   onAddEvidence: (caseId: string, milestoneId: string, fileName: string) => void;
   onExit: () => void;
 }) {
-  const currentMilestone = milestones.find((milestone) => milestone.status === "current");
-  const pendingRequest = requests.find((request) =>
-    !["aceptada", "recibida"].includes(request.status),
-  );
+  const currentMilestone = getCurrentMilestone(milestones);
+  const pendingRequest = getPendingClientRequest(requests);
   const showActionCard =
     legalCase.status === "requiere_cliente" ||
     Boolean(pendingRequest) ||
@@ -340,7 +316,7 @@ function MilestoneTracker({
   milestones: CaseMilestone[];
   onAddEvidence: (caseId: string, milestoneId: string, fileName: string) => void;
 }) {
-  const currentMilestone = milestones.find((milestone) => milestone.status === "current");
+  const currentMilestone = getCurrentMilestone(milestones);
   const currentMilestoneId = currentMilestone?.id;
   const [expanded, setExpanded] = useState<string[]>(() =>
     currentMilestoneId ? [currentMilestoneId] : [],

@@ -21,6 +21,11 @@ import {
   loadWorkspaceData,
   saveWorkspaceData,
 } from "@/lib/storage";
+import {
+  getCaseDocuments,
+  getCaseRequests,
+  getCaseUpdates,
+} from "@/lib/workspace-selectors";
 import type {
   CaseDocument,
   CaseMilestone,
@@ -295,26 +300,6 @@ export function FirmPortal() {
     });
   }
 
-  function visibleUpdates(caseId: string, visibility?: Visibility) {
-    return data.updates
-      .filter((update) => update.caseId === caseId)
-      .filter((update) => (visibility ? update.visibility === visibility : true))
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  }
-
-  function caseRequests(caseId: string) {
-    return data.requests
-      .filter((request) => request.caseId === caseId)
-      .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
-  }
-
-  function caseDocuments(caseId: string, visibility?: Visibility) {
-    return data.documents
-      .filter((document) => document.caseId === caseId)
-      .filter((document) => (visibility ? document.visibility === visibility : true))
-      .sort((a, b) => b.uploadedAt.localeCompare(a.uploadedAt));
-  }
-
   if (isWorkspaceLoading) {
     return null;
   }
@@ -392,10 +377,10 @@ export function FirmPortal() {
 
             {selectedCase ? (
               <CaseDetail
-                documents={caseDocuments(selectedCase.id)}
+                documents={getCaseDocuments(data, selectedCase.id)}
                 legalCase={selectedCase}
-                requests={caseRequests(selectedCase.id)}
-                updates={visibleUpdates(selectedCase.id)}
+                requests={getCaseRequests(data, selectedCase.id)}
+                updates={getCaseUpdates(data, selectedCase.id)}
                 onAddDocument={addDocument}
                 onAddRequest={addRequest}
                 onAddUpdate={addUpdate}
