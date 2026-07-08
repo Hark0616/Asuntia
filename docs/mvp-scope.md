@@ -6,11 +6,14 @@ Validar el flujo principal del producto:
 
 > Un cliente entra con un codigo de seguimiento, ve el tracking de su asunto, entiende el estado actual y consulta lo que se ha hecho.
 
-La version actual es una demo funcional con persistencia en `localStorage`. No usa aun autenticacion real, base de datos externa ni almacenamiento real de archivos.
+La version actual es una demo funcional local-first con PGlite y fallback a `localStorage`.
+No usa aun autenticacion real, base de datos externa ni almacenamiento real de archivos.
 
 ## Incluido
 
-- Entrada principal en `/`.
+- Landing publica de firma en `/`, seed/data-driven para la demo de insolvencia.
+- Consulta publica de caso en `/consulta`.
+- Guias publicas publicadas en `/guias/[slug]`.
 - Acceso cliente por codigo, radicado, correo, telefono o id con captcha MVP.
 - Portal de seguimiento en `/cliente` con lista de casos activos.
 - Login demo de firma en `/firma/login`.
@@ -18,6 +21,7 @@ La version actual es una demo funcional con persistencia en `localStorage`. No u
 - Roles demo para socia, administracion, abogada, asistente y cliente.
 - Workspace de solo lectura para asistente.
 - Bandeja de trabajo priorizada para solicitudes, hitos y casos que requieren accion.
+- Panel de estado del sitio publico dentro de `/firma`.
 - Creacion de clientes.
 - Creacion de casos.
 - Estados de caso.
@@ -32,6 +36,7 @@ La version actual es una demo funcional con persistencia en `localStorage`. No u
 - Auditoria interna en datos locales.
 - Datos demo precargados.
 - Persistencia local para pruebas.
+- Modelo publico tenant-ready por `firm_id`: sitio, areas, guias, casos ejemplo y propuestas de valor.
 
 ## No Incluido Todavia
 
@@ -39,6 +44,8 @@ La version actual es una demo funcional con persistencia en `localStorage`. No u
 - Captcha validado en servidor.
 - Base de datos remota.
 - Multi-tenant real.
+- Resolucion runtime por subdominio/host.
+- Editor CMS para contenido publico.
 - Subida real de documentos a storage.
 - Notificaciones por correo.
 - Supabase/Auth/Storage.
@@ -50,21 +57,22 @@ La version actual es una demo funcional con persistencia en `localStorage`. No u
 
 ## Flujo De Firma
 
-1. Entrar desde `/` con el acceso interno de firma.
+1. Entrar desde `/firma/login` o desde el acceso interno visible en el sitio publico.
 2. Revisar la bandeja de trabajo.
-3. Abrir un asunto pendiente desde la bandeja o seleccionar cliente.
-4. Crear caso o abrir uno existente.
-5. Cambiar estado.
-6. Actualizar proximo paso.
-7. Crear o actualizar hitos del proceso.
-8. Habilitar evidencia de cliente para el hito que lo requiera.
-9. Publicar avance visible al cliente o interno.
-10. Crear solicitud.
-11. Registrar documento.
+3. Revisar el panel de sitio publico para verificar landing, consulta y conteos publicados.
+4. Abrir un asunto pendiente desde la bandeja o seleccionar cliente.
+5. Crear caso o abrir uno existente.
+6. Cambiar estado.
+7. Actualizar proximo paso.
+8. Crear o actualizar hitos del proceso.
+9. Habilitar evidencia de cliente para el hito que lo requiera.
+10. Publicar avance visible al cliente o interno.
+11. Crear solicitud.
+12. Registrar documento.
 
 ## Flujo De Cliente
 
-1. Entrar a `/`.
+1. Entrar a `/consulta` desde el CTA del sitio publico.
 2. Ingresar codigo de seguimiento, correo, telefono o id de cliente, por ejemplo `AS-2026-001` o `laura@constructoranorte.co`.
 3. Completar captcha MVP.
 4. Abrir tracking del asunto en `/cliente`.
@@ -77,6 +85,12 @@ La version actual es una demo funcional con persistencia en `localStorage`. No u
 ## Modelo De Datos Inicial
 
 - `clients`: clientes de la firma.
+- `firms`: firma tenant con slug, subdominio, especialidad y contacto.
+- `firm_public_sites`: landing 1:1 por firma.
+- `firm_practice_areas`: rutas de ayuda publicas por firma.
+- `firm_guides`: guias/blog liviano con estado `draft` o `published`.
+- `firm_case_studies`: casos ejemplo anonimizados, separados de `cases`.
+- `firm_value_props`: propuestas de valor del sitio publico.
 - `profiles`: usuarios, roles y vinculo opcional con cliente.
 - `cases`: asuntos legales asociados a clientes.
 - `milestones`: hitos asociados a casos.
@@ -91,6 +105,7 @@ Conectar Supabase:
 
 - `auth.users` para login.
 - Tabla `firms`.
+- Tablas publicas de firma: `firm_public_sites`, `firm_practice_areas`, `firm_guides`, `firm_case_studies`, `firm_value_props`.
 - Tabla `profiles`.
 - Tabla `clients`.
 - Tabla `cases`.
@@ -109,9 +124,11 @@ La demo se considera suficiente para mostrar a una firma pequena cuando:
 - El abogado puede crear un cliente.
 - El abogado puede crear un caso.
 - El abogado puede abrir asuntos pendientes desde una bandeja priorizada.
+- La firma puede mostrar una landing publica coherente con guias y casos ejemplo.
+- La firma puede ver en su workspace el estado del sitio publico.
 - El abogado puede crear y ajustar hitos.
 - El abogado puede publicar avances.
 - El abogado puede crear solicitudes.
-- El cliente puede entrar con codigo y ver el asunto asociado.
+- El cliente puede entrar a `/consulta` con codigo y ver el asunto asociado.
 - El cliente puede entrar con un dato propio y ver sus casos activos.
 - El cliente puede entender el estado del caso sin explicacion adicional.

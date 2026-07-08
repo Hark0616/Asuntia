@@ -71,11 +71,24 @@ La prueba `tests/unit/database-schema.test.ts` aplica las migraciones en PGlite 
 
 La migracion `20260708000000_profiles_roles.sql` prepara roles de usuario para Supabase Auth: `profiles.role`, `profiles.status`, `profiles.client_id` y unicidad de correo por firma. El script `npm run seed:supabase-users` crea usuarios de Auth con service role y sincroniza `public.profiles`.
 
+La migracion `20260708010000_public_site_schema.sql` agrega el sitio publico tenant-ready:
+
+- Extiende `firms` con `slug`, `subdomain`, `specialty`, `contact_email` y `contact_phone`.
+- Crea `firm_public_sites` como landing 1:1 por firma.
+- Crea `firm_practice_areas`, `firm_guides`, `firm_case_studies` y `firm_value_props`.
+- Mantiene unicidad de slugs por firma para guias, areas y casos ejemplo.
+- Separa `firm_case_studies` de `cases` para que marketing no exponga datos reales.
+
 ## Modelo Inicial Esperado
 
 Tablas base:
 
 - `firms`
+- `firm_public_sites`
+- `firm_practice_areas`
+- `firm_guides`
+- `firm_case_studies`
+- `firm_value_props`
 - `profiles`
 - `clients`
 - `cases`
@@ -87,6 +100,13 @@ Tablas base:
 
 Relaciones base:
 
+- `firm_public_sites.firm_id -> firms.id`
+- `firm_practice_areas.firm_id -> firms.id`
+- `firm_guides.firm_id -> firms.id`
+- `firm_guides.practice_area_id -> firm_practice_areas.id`
+- `firm_case_studies.firm_id -> firms.id`
+- `firm_case_studies.practice_area_id -> firm_practice_areas.id`
+- `firm_value_props.firm_id -> firms.id`
 - `clients.firm_id -> firms.id`
 - `profiles.firm_id -> firms.id`
 - `profiles.client_id -> clients.id`
@@ -111,7 +131,10 @@ Reglas minimas:
 - Hitos internos no deben ser visibles para clientes si en el futuro se agrega visibilidad por hito.
 - Documentos internos no deben ser visibles para clientes.
 - Auditoria no debe ser editable desde cliente.
+- El contenido publico publicado puede leerse anonimamente por `firm_id` o por slug/subdominio cuando se implemente resolucion de tenant.
+- Guias `draft` no deben exponerse en rutas publicas ni en listados anonimos.
+- Casos ejemplo publicos no deben referenciar registros de `cases` reales ni datos identificables de clientes.
 
 ## Pendiente
 
-Este MVP aun usa `localStorage` para validar UX. La siguiente fase tecnica debe reemplazar esa persistencia por Supabase local/remoto usando migraciones.
+Este MVP usa PGlite como base local y `localStorage` como fallback de cliente. La siguiente fase tecnica debe conectar Supabase local/remoto con Auth, RLS y Storage, aplicando las mismas migraciones versionadas.
