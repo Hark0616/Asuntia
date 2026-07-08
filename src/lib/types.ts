@@ -21,6 +21,78 @@ export type UserRole = "owner" | "admin" | "lawyer" | "assistant" | "client";
 
 export type ProfileStatus = "active" | "inactive";
 
+export type PublicContentStatus = "draft" | "published";
+
+export type Firm = {
+  id: string;
+  name: string;
+  slug: string;
+  subdomain: string;
+  specialty: string;
+  contactEmail: string;
+  contactPhone?: string;
+  createdAt: string;
+};
+
+export type FirmPublicSite = {
+  id: string;
+  firmId: string;
+  headline: string;
+  subheadline: string;
+  heroSummary: string;
+  trustStatement: string;
+  primaryCtaLabel: string;
+  secondaryCtaLabel: string;
+  heroImageUrl: string;
+  status: PublicContentStatus;
+  updatedAt: string;
+};
+
+export type FirmPracticeArea = {
+  id: string;
+  firmId: string;
+  slug: string;
+  title: string;
+  summary: string;
+  audience: string;
+  sortOrder: number;
+};
+
+export type FirmGuide = {
+  id: string;
+  firmId: string;
+  practiceAreaId?: string;
+  slug: string;
+  title: string;
+  summary: string;
+  content: string;
+  readingMinutes: number;
+  status: PublicContentStatus;
+  sortOrder: number;
+  publishedAt?: string;
+};
+
+export type FirmCaseStudy = {
+  id: string;
+  firmId: string;
+  practiceAreaId?: string;
+  slug: string;
+  title: string;
+  scenario: string;
+  approach: string;
+  outcomeSummary: string;
+  disclaimer: string;
+  sortOrder: number;
+};
+
+export type FirmValueProp = {
+  id: string;
+  firmId: string;
+  title: string;
+  body: string;
+  sortOrder: number;
+};
+
 export type Profile = {
   id: string;
   firmId: string;
@@ -107,6 +179,12 @@ export type AuditEvent = {
 };
 
 export type WorkspaceData = {
+  firms: Firm[];
+  publicSites: FirmPublicSite[];
+  practiceAreas: FirmPracticeArea[];
+  guides: FirmGuide[];
+  caseStudies: FirmCaseStudy[];
+  valueProps: FirmValueProp[];
   profiles: Profile[];
   clients: Client[];
   cases: LegalCase[];

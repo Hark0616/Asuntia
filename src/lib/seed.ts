@@ -2,6 +2,228 @@ import { demoProfiles } from "./auth";
 import type { WorkspaceData } from "./types";
 
 export const seedData: WorkspaceData = {
+  firms: [
+    {
+      id: "firm-demo",
+      name: "Asuntia Insolvencia",
+      slug: "asuntia-insolvencia",
+      subdomain: "cliente1",
+      specialty: "Derecho de la insolvencia",
+      contactEmail: "contacto@asuntia.local",
+      contactPhone: "+57 300 000 0000",
+      createdAt: "2026-07-04T08:00:00.000Z",
+    },
+  ],
+  publicSites: [
+    {
+      id: "site-firm-demo",
+      firmId: "firm-demo",
+      headline: "Insolvencia con estrategia, orden y seguimiento claro",
+      subheadline:
+        "Acompanamos procesos de reorganizacion, negociacion de deudas y liquidacion con informacion trazable desde el primer dia.",
+      heroSummary:
+        "Un equipo legal enfocado en convertir documentos dispersos, presion de acreedores y proximos vencimientos en una ruta de accion comprensible.",
+      trustStatement:
+        "Cada cliente puede consultar el avance publicado de su proceso sin llamadas innecesarias y sin exponer informacion interna de la firma.",
+      primaryCtaLabel: "Solicitar valoracion",
+      secondaryCtaLabel: "Consulta tu caso",
+      heroImageUrl: "/tenant-assets/insolvencia-hero.svg",
+      status: "published",
+      updatedAt: "2026-07-08T08:00:00.000Z",
+    },
+  ],
+  practiceAreas: [
+    {
+      id: "area-persona-natural",
+      firmId: "firm-demo",
+      slug: "persona-natural",
+      title: "Persona natural no comerciante",
+      summary:
+        "Revision de obligaciones, capacidad de pago y ruta de negociacion cuando la deuda ya no se puede atender normalmente.",
+      audience: "Deudores personales",
+      sortOrder: 10,
+    },
+    {
+      id: "area-empresa",
+      firmId: "firm-demo",
+      slug: "empresa",
+      title: "Empresa en reorganizacion",
+      summary:
+        "Preparacion documental, lectura de flujo de caja y estrategia con acreedores para preservar continuidad cuando sea viable.",
+      audience: "Empresas y administradores",
+      sortOrder: 20,
+    },
+    {
+      id: "area-acreedores",
+      firmId: "firm-demo",
+      slug: "acreedores",
+      title: "Acreedores",
+      summary:
+        "Analisis de recuperacion, riesgos procesales y actuaciones oportunas dentro de procesos de insolvencia.",
+      audience: "Acreedores y areas financieras",
+      sortOrder: 30,
+    },
+    {
+      id: "area-liquidacion",
+      firmId: "firm-demo",
+      slug: "liquidacion",
+      title: "Liquidacion y cierre ordenado",
+      summary:
+        "Acompanamiento para proteger informacion, activos e intereses cuando la continuidad del negocio no es viable.",
+      audience: "Empresas en cierre",
+      sortOrder: 40,
+    },
+  ],
+  guides: [
+    {
+      id: "guide-documentos-antes-de-insolvencia",
+      firmId: "firm-demo",
+      practiceAreaId: "area-empresa",
+      slug: "documentos-antes-de-insolvencia",
+      title: "Preparar documentos antes de iniciar una insolvencia",
+      summary:
+        "Un mapa practico de informacion financiera, contractual y operativa que suele ordenar la primera valoracion del caso.",
+      content:
+        "La preparacion documental no decide el resultado del proceso, pero si cambia la calidad de la primera conversacion. Estados financieros, inventarios de obligaciones, contratos relevantes, litigios activos y flujo de caja proyectado permiten entender que tan urgente es actuar.\n\nPara una empresa, la pregunta inicial suele ser si existe una ruta razonable de continuidad. Para una persona natural, el foco esta en ordenar acreedores, ingresos, gastos y soportes. En ambos casos conviene separar hechos comprobables de expectativas.\n\nEsta guia es informativa y no reemplaza una valoracion juridica. La estrategia depende del tipo de deudor, de los acreedores, de los terminos vencidos y de la autoridad competente.",
+      readingMinutes: 4,
+      status: "published",
+      sortOrder: 10,
+      publishedAt: "2026-07-08T08:00:00.000Z",
+    },
+    {
+      id: "guide-reorganizacion-vs-liquidacion",
+      firmId: "firm-demo",
+      practiceAreaId: "area-liquidacion",
+      slug: "reorganizacion-vs-liquidacion",
+      title: "Reorganizacion o liquidacion: que cambia en la estrategia",
+      summary:
+        "Diferencias de enfoque cuando el objetivo es preservar una empresa viable o cerrar de forma ordenada.",
+      content:
+        "La reorganizacion se analiza cuando el negocio conserva elementos de viabilidad y existe una ruta para normalizar relaciones comerciales y de credito. La liquidacion parte de una premisa distinta: ordenar el cierre y la realizacion de activos disponibles.\n\nLa decision no deberia tomarse por intuicion ni por presion aislada de un acreedor. Requiere revisar contratos, obligaciones laborales, activos, caja, contingencias y capacidad real de cumplir un acuerdo.\n\nLa firma usa esta distincion para definir que informacion pedir primero y como explicar al cliente el estado del proceso sin prometer un resultado juridico.",
+      readingMinutes: 5,
+      status: "published",
+      sortOrder: 20,
+      publishedAt: "2026-07-08T08:05:00.000Z",
+    },
+    {
+      id: "guide-negociacion-deudas-persona-natural",
+      firmId: "firm-demo",
+      practiceAreaId: "area-persona-natural",
+      slug: "negociacion-deudas-persona-natural",
+      title: "Negociacion de deudas para persona natural no comerciante",
+      summary:
+        "Que revisar antes de una negociacion: acreedores, ingresos, gastos, soportes y expectativas realistas.",
+      content:
+        "Antes de iniciar una ruta de negociacion, la persona debe tener clara la lista de obligaciones, fechas de mora, garantias, ingresos disponibles y gastos indispensables. Esa informacion permite distinguir urgencia financiera de riesgo juridico.\n\nTambien importa separar deudas personales, obligaciones respaldadas por garantias y compromisos con codeudores. Una buena preparacion reduce reprocesos y evita que la conversacion se base en cifras incompletas.\n\nEsta guia solo resume criterios de organizacion. La aplicacion concreta depende de la situacion personal y de la documentacion revisada.",
+      readingMinutes: 3,
+      status: "published",
+      sortOrder: 30,
+      publishedAt: "2026-07-08T08:10:00.000Z",
+    },
+    {
+      id: "guide-acreedor-en-insolvencia",
+      firmId: "firm-demo",
+      practiceAreaId: "area-acreedores",
+      slug: "acreedor-en-insolvencia",
+      title: "Como ubicarse como acreedor en un proceso de insolvencia",
+      summary:
+        "Senales y documentos que ayudan a decidir si conviene reclamar, negociar o monitorear el proceso.",
+      content:
+        "El acreedor no siempre necesita la misma respuesta. Algunas situaciones exigen actuar rapido; otras requieren monitorear terminos, validar soportes y medir el costo de cada actuacion.\n\nLa informacion basica incluye titulo de la obligacion, estado de pagos, garantias, comunicaciones previas y relacion comercial con el deudor. Con eso se puede estimar el margen de recuperacion y la mejor forma de participar.\n\nEl objetivo es tomar decisiones informadas, no aumentar ruido operativo ni duplicar gestiones sin efecto practico.",
+      readingMinutes: 4,
+      status: "published",
+      sortOrder: 40,
+      publishedAt: "2026-07-08T08:15:00.000Z",
+    },
+    {
+      id: "guide-borrador-interno",
+      firmId: "firm-demo",
+      practiceAreaId: "area-empresa",
+      slug: "borrador-interno",
+      title: "Borrador interno no publicado",
+      summary: "Contenido de prueba que no debe aparecer en la landing publica.",
+      content: "Este contenido permanece oculto hasta que la firma lo publique.",
+      readingMinutes: 2,
+      status: "draft",
+      sortOrder: 50,
+    },
+  ],
+  caseStudies: [
+    {
+      id: "case-study-empresa-acreedores-financieros",
+      firmId: "firm-demo",
+      practiceAreaId: "area-empresa",
+      slug: "empresa-acreedores-financieros",
+      title: "Empresa con cartera presionada por acreedores financieros",
+      scenario:
+        "Una compania con contratos activos necesitaba ordenar obligaciones vencidas sin perder trazabilidad interna.",
+      approach:
+        "Se separaron obligaciones por acreedor, soporte y urgencia, y se construyo una ruta de comunicacion para decisiones de gerencia.",
+      outcomeSummary:
+        "El equipo directivo obtuvo un mapa de riesgos y una secuencia clara de proximas acciones antes de cualquier radicacion.",
+      disclaimer:
+        "Caso anonimizado con fines informativos. No representa garantia de resultado.",
+      sortOrder: 10,
+    },
+    {
+      id: "case-study-persona-natural-obligaciones-dispersas",
+      firmId: "firm-demo",
+      practiceAreaId: "area-persona-natural",
+      slug: "persona-natural-obligaciones-dispersas",
+      title: "Persona natural con obligaciones dispersas",
+      scenario:
+        "Una persona recibia cobros de varios acreedores y no tenia una vista completa de saldos, fechas y soportes.",
+      approach:
+        "La firma organizo acreedores, documentos y capacidad de pago para preparar una conversacion juridica realista.",
+      outcomeSummary:
+        "El cliente pudo entender que informacion faltaba y que pasos dependian de su documentacion.",
+      disclaimer:
+        "Caso anonimizado con fines informativos. La estrategia depende de cada expediente.",
+      sortOrder: 20,
+    },
+    {
+      id: "case-study-acreedor-monitoreo",
+      firmId: "firm-demo",
+      practiceAreaId: "area-acreedores",
+      slug: "acreedor-monitoreo",
+      title: "Acreedor que necesitaba actuar sin duplicar gestiones",
+      scenario:
+        "Un acreedor comercial queria proteger su posicion sin iniciar actuaciones repetidas o desconectadas del proceso.",
+      approach:
+        "Se revisaron soportes, terminos y comunicaciones para definir una estrategia de seguimiento proporcional.",
+      outcomeSummary:
+        "La empresa conto con criterios de decision y una bitacora de seguimiento para su area financiera.",
+      disclaimer:
+        "Caso anonimizado con fines informativos. No constituye concepto juridico.",
+      sortOrder: 30,
+    },
+  ],
+  valueProps: [
+    {
+      id: "value-diagnostico-documental",
+      firmId: "firm-demo",
+      title: "Diagnostico documental antes de actuar",
+      body:
+        "Ordenamos soportes, obligaciones y terminos para que la decision juridica no nazca de informacion incompleta.",
+      sortOrder: 10,
+    },
+    {
+      id: "value-estrategia-acreedor",
+      firmId: "firm-demo",
+      title: "Estrategia por tipo de acreedor",
+      body:
+        "Diferenciamos urgencias, garantias y conversaciones para que cada accion tenga una razon procesal y operativa.",
+      sortOrder: 20,
+    },
+    {
+      id: "value-seguimiento-visible",
+      firmId: "firm-demo",
+      title: "Seguimiento visible para el cliente",
+      body:
+        "El cliente consulta avances, hitos y proximas acciones desde Asuntia, mientras la firma conserva su informacion interna separada.",
+      sortOrder: 30,
+    },
+  ],
   profiles: demoProfiles,
   clients: [
     {

@@ -9,6 +9,12 @@ import type {
   CaseMilestone,
   CaseUpdate,
   Client,
+  Firm,
+  FirmCaseStudy,
+  FirmGuide,
+  FirmPracticeArea,
+  FirmPublicSite,
+  FirmValueProp,
   InfoRequest,
   LegalCase,
   Profile,
@@ -28,13 +34,48 @@ async function withWorkspaceWriteLock<T>(operation: () => Promise<T>) {
 }
 
 async function ensureDefaultFirm(db: PGlite) {
+  const firm = seedData.firms[0] ?? {
+    contactEmail: "contacto@asuntia.local",
+    contactPhone: "+57 300 000 0000",
+    createdAt: "2026-07-04T08:00:00.000Z",
+    id: DEFAULT_FIRM_ID,
+    name: "Asuntia Insolvencia",
+    slug: "asuntia-insolvencia",
+    specialty: "Derecho de la insolvencia",
+    subdomain: "cliente1",
+  };
+
   await db.query(
     `
-      INSERT INTO firms (id, name, created_at)
-      VALUES ($1, $2, $3)
-      ON CONFLICT (id) DO NOTHING
+      INSERT INTO firms (
+        id,
+        name,
+        slug,
+        subdomain,
+        specialty,
+        contact_email,
+        contact_phone,
+        created_at
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      ON CONFLICT (id) DO UPDATE SET
+        name = EXCLUDED.name,
+        slug = EXCLUDED.slug,
+        subdomain = EXCLUDED.subdomain,
+        specialty = EXCLUDED.specialty,
+        contact_email = EXCLUDED.contact_email,
+        contact_phone = EXCLUDED.contact_phone
     `,
-    [DEFAULT_FIRM_ID, "Asuntia Demo", "2026-07-04T08:00:00.000Z"],
+    [
+      firm.id,
+      firm.name,
+      firm.slug,
+      firm.subdomain,
+      firm.specialty,
+      firm.contactEmail,
+      nullable(firm.contactPhone),
+      firm.createdAt,
+    ],
   );
 }
 
@@ -75,6 +116,217 @@ async function ensureProfiles(db: PGlite, profiles: Profile[] = demoProfiles) {
   }
 }
 
+async function upsertFirms(db: PGlite, firms: Firm[] = seedData.firms) {
+  for (const firm of firms) {
+    await db.query(
+      `
+        INSERT INTO firms (
+          id,
+          name,
+          slug,
+          subdomain,
+          specialty,
+          contact_email,
+          contact_phone,
+          created_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        ON CONFLICT (id) DO UPDATE SET
+          name = EXCLUDED.name,
+          slug = EXCLUDED.slug,
+          subdomain = EXCLUDED.subdomain,
+          specialty = EXCLUDED.specialty,
+          contact_email = EXCLUDED.contact_email,
+          contact_phone = EXCLUDED.contact_phone
+      `,
+      [
+        firm.id,
+        firm.name,
+        firm.slug,
+        firm.subdomain,
+        firm.specialty,
+        firm.contactEmail,
+        nullable(firm.contactPhone),
+        firm.createdAt,
+      ],
+    );
+  }
+}
+
+async function insertPublicSites(db: PGlite, publicSites: FirmPublicSite[]) {
+  for (const site of publicSites) {
+    await db.query(
+      `
+        INSERT INTO firm_public_sites (
+          id,
+          firm_id,
+          headline,
+          subheadline,
+          hero_summary,
+          trust_statement,
+          primary_cta_label,
+          secondary_cta_label,
+          hero_image_url,
+          status,
+          updated_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      `,
+      [
+        site.id,
+        site.firmId,
+        site.headline,
+        site.subheadline,
+        site.heroSummary,
+        site.trustStatement,
+        site.primaryCtaLabel,
+        site.secondaryCtaLabel,
+        site.heroImageUrl,
+        site.status,
+        site.updatedAt,
+      ],
+    );
+  }
+}
+
+async function insertPracticeAreas(db: PGlite, practiceAreas: FirmPracticeArea[]) {
+  for (const area of practiceAreas) {
+    await db.query(
+      `
+        INSERT INTO firm_practice_areas (
+          id,
+          firm_id,
+          slug,
+          title,
+          summary,
+          audience,
+          sort_order
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `,
+      [
+        area.id,
+        area.firmId,
+        area.slug,
+        area.title,
+        area.summary,
+        area.audience,
+        area.sortOrder,
+      ],
+    );
+  }
+}
+
+async function insertGuides(db: PGlite, guides: FirmGuide[]) {
+  for (const guide of guides) {
+    await db.query(
+      `
+        INSERT INTO firm_guides (
+          id,
+          firm_id,
+          practice_area_id,
+          slug,
+          title,
+          summary,
+          content,
+          reading_minutes,
+          status,
+          sort_order,
+          published_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      `,
+      [
+        guide.id,
+        guide.firmId,
+        nullable(guide.practiceAreaId),
+        guide.slug,
+        guide.title,
+        guide.summary,
+        guide.content,
+        guide.readingMinutes,
+        guide.status,
+        guide.sortOrder,
+        nullable(guide.publishedAt),
+      ],
+    );
+  }
+}
+
+async function insertCaseStudies(db: PGlite, caseStudies: FirmCaseStudy[]) {
+  for (const caseStudy of caseStudies) {
+    await db.query(
+      `
+        INSERT INTO firm_case_studies (
+          id,
+          firm_id,
+          practice_area_id,
+          slug,
+          title,
+          scenario,
+          approach,
+          outcome_summary,
+          disclaimer,
+          sort_order
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      `,
+      [
+        caseStudy.id,
+        caseStudy.firmId,
+        nullable(caseStudy.practiceAreaId),
+        caseStudy.slug,
+        caseStudy.title,
+        caseStudy.scenario,
+        caseStudy.approach,
+        caseStudy.outcomeSummary,
+        caseStudy.disclaimer,
+        caseStudy.sortOrder,
+      ],
+    );
+  }
+}
+
+async function insertValueProps(db: PGlite, valueProps: FirmValueProp[]) {
+  for (const valueProp of valueProps) {
+    await db.query(
+      `
+        INSERT INTO firm_value_props (id, firm_id, title, body, sort_order)
+        VALUES ($1, $2, $3, $4, $5)
+      `,
+      [
+        valueProp.id,
+        valueProp.firmId,
+        valueProp.title,
+        valueProp.body,
+        valueProp.sortOrder,
+      ],
+    );
+  }
+}
+
+async function insertPublicContent(db: PGlite, data: WorkspaceData) {
+  await insertPublicSites(db, data.publicSites);
+  await insertPracticeAreas(db, data.practiceAreas);
+  await insertGuides(db, data.guides);
+  await insertCaseStudies(db, data.caseStudies);
+  await insertValueProps(db, data.valueProps);
+}
+
+async function ensurePublicContent(db: PGlite) {
+  const result = await db.query<{ count: number }>(
+    "SELECT count(*)::int AS count FROM firm_public_sites WHERE firm_id = $1",
+    [DEFAULT_FIRM_ID],
+  );
+
+  if (Number(result.rows[0]?.count ?? 0) > 0) {
+    return;
+  }
+
+  await upsertFirms(db);
+  await insertPublicContent(db, seedData);
+}
+
 async function seedIfEmpty(db: PGlite) {
   await ensureDefaultFirm(db);
   const result = await db.query<{ count: number }>(
@@ -91,6 +343,7 @@ async function seedIfEmpty(db: PGlite) {
     "profile-demo-admin",
   ]);
   await ensureProfiles(db);
+  await ensurePublicContent(db);
 }
 
 function nullable<T>(value: T | null | undefined) {
@@ -101,7 +354,128 @@ export async function loadWorkspaceFromDatabase(): Promise<WorkspaceData> {
   const db = await getDatabase();
   await seedIfEmpty(db);
 
-  const [profiles, clients, cases, milestones, updates, requests, documents, audit] = await Promise.all([
+  const [
+    firms,
+    publicSites,
+    practiceAreas,
+    guides,
+    caseStudies,
+    valueProps,
+    profiles,
+    clients,
+    cases,
+    milestones,
+    updates,
+    requests,
+    documents,
+    audit,
+  ] = await Promise.all([
+    db.query<Firm & { contactPhone: string | null }>(
+      `
+        SELECT
+          id,
+          name,
+          slug,
+          subdomain,
+          specialty,
+          contact_email AS "contactEmail",
+          contact_phone AS "contactPhone",
+          created_at::text AS "createdAt"
+        FROM firms
+        WHERE id = $1
+        ORDER BY created_at ASC
+      `,
+      [DEFAULT_FIRM_ID],
+    ),
+    db.query<FirmPublicSite>(
+      `
+        SELECT
+          id,
+          firm_id AS "firmId",
+          headline,
+          subheadline,
+          hero_summary AS "heroSummary",
+          trust_statement AS "trustStatement",
+          primary_cta_label AS "primaryCtaLabel",
+          secondary_cta_label AS "secondaryCtaLabel",
+          hero_image_url AS "heroImageUrl",
+          status,
+          updated_at::text AS "updatedAt"
+        FROM firm_public_sites
+        WHERE firm_id = $1
+        ORDER BY updated_at DESC
+      `,
+      [DEFAULT_FIRM_ID],
+    ),
+    db.query<FirmPracticeArea>(
+      `
+        SELECT
+          id,
+          firm_id AS "firmId",
+          slug,
+          title,
+          summary,
+          audience,
+          sort_order AS "sortOrder"
+        FROM firm_practice_areas
+        WHERE firm_id = $1
+        ORDER BY sort_order ASC, title ASC
+      `,
+      [DEFAULT_FIRM_ID],
+    ),
+    db.query<FirmGuide & { practiceAreaId: string | null; publishedAt: string | null }>(
+      `
+        SELECT
+          id,
+          firm_id AS "firmId",
+          practice_area_id AS "practiceAreaId",
+          slug,
+          title,
+          summary,
+          content,
+          reading_minutes AS "readingMinutes",
+          status,
+          sort_order AS "sortOrder",
+          published_at::text AS "publishedAt"
+        FROM firm_guides
+        WHERE firm_id = $1
+        ORDER BY sort_order ASC, title ASC
+      `,
+      [DEFAULT_FIRM_ID],
+    ),
+    db.query<FirmCaseStudy & { practiceAreaId: string | null }>(
+      `
+        SELECT
+          id,
+          firm_id AS "firmId",
+          practice_area_id AS "practiceAreaId",
+          slug,
+          title,
+          scenario,
+          approach,
+          outcome_summary AS "outcomeSummary",
+          disclaimer,
+          sort_order AS "sortOrder"
+        FROM firm_case_studies
+        WHERE firm_id = $1
+        ORDER BY sort_order ASC, title ASC
+      `,
+      [DEFAULT_FIRM_ID],
+    ),
+    db.query<FirmValueProp>(
+      `
+        SELECT
+          id,
+          firm_id AS "firmId",
+          title,
+          body,
+          sort_order AS "sortOrder"
+        FROM firm_value_props
+        WHERE firm_id = $1
+        ORDER BY sort_order ASC, title ASC
+      `,
+      [DEFAULT_FIRM_ID],
+    ),
     db.query<Profile & { clientId: string | null }>(
       `
         SELECT
@@ -230,6 +604,22 @@ export async function loadWorkspaceFromDatabase(): Promise<WorkspaceData> {
   ]);
 
   return {
+    firms: firms.rows.map((firm) => ({
+      ...firm,
+      contactPhone: firm.contactPhone ?? undefined,
+    })),
+    publicSites: publicSites.rows,
+    practiceAreas: practiceAreas.rows,
+    guides: guides.rows.map((guide) => ({
+      ...guide,
+      practiceAreaId: guide.practiceAreaId ?? undefined,
+      publishedAt: guide.publishedAt ?? undefined,
+    })),
+    caseStudies: caseStudies.rows.map((caseStudy) => ({
+      ...caseStudy,
+      practiceAreaId: caseStudy.practiceAreaId ?? undefined,
+    })),
+    valueProps: valueProps.rows,
     profiles: profiles.rows.map((profile) => ({
       ...profile,
       clientId: profile.clientId ?? undefined,
@@ -254,12 +644,34 @@ export async function loadWorkspaceFromDatabase(): Promise<WorkspaceData> {
 export async function replaceWorkspace(data: WorkspaceData): Promise<WorkspaceData> {
   return withWorkspaceWriteLock(async () => {
     const db = await getDatabase();
+    const nextData: WorkspaceData = {
+      ...data,
+      audit: data.audit ?? seedData.audit,
+      caseStudies: data.caseStudies ?? seedData.caseStudies,
+      cases: data.cases ?? seedData.cases,
+      clients: data.clients ?? seedData.clients,
+      documents: data.documents ?? seedData.documents,
+      firms: data.firms?.length ? data.firms : seedData.firms,
+      guides: data.guides ?? seedData.guides,
+      milestones: data.milestones ?? seedData.milestones,
+      practiceAreas: data.practiceAreas ?? seedData.practiceAreas,
+      profiles: data.profiles ?? demoProfiles,
+      publicSites: data.publicSites ?? seedData.publicSites,
+      requests: data.requests ?? seedData.requests,
+      updates: data.updates ?? seedData.updates,
+      valueProps: data.valueProps ?? seedData.valueProps,
+    };
 
     await db.exec("BEGIN");
     try {
       await ensureDefaultFirm(db);
 
       await db.exec(`
+        DELETE FROM firm_value_props WHERE firm_id = '${DEFAULT_FIRM_ID}';
+        DELETE FROM firm_case_studies WHERE firm_id = '${DEFAULT_FIRM_ID}';
+        DELETE FROM firm_guides WHERE firm_id = '${DEFAULT_FIRM_ID}';
+        DELETE FROM firm_practice_areas WHERE firm_id = '${DEFAULT_FIRM_ID}';
+        DELETE FROM firm_public_sites WHERE firm_id = '${DEFAULT_FIRM_ID}';
         DELETE FROM audit_events WHERE firm_id = '${DEFAULT_FIRM_ID}';
         DELETE FROM documents;
         DELETE FROM requests;
@@ -270,7 +682,10 @@ export async function replaceWorkspace(data: WorkspaceData): Promise<WorkspaceDa
         DELETE FROM profiles WHERE firm_id = '${DEFAULT_FIRM_ID}';
       `);
 
-      for (const client of data.clients) {
+      await upsertFirms(db, nextData.firms);
+      await insertPublicContent(db, nextData);
+
+      for (const client of nextData.clients) {
         await db.query(
           `
             INSERT INTO clients (id, firm_id, name, contact_name, email, phone, notes, created_at)
@@ -289,7 +704,7 @@ export async function replaceWorkspace(data: WorkspaceData): Promise<WorkspaceDa
         );
       }
 
-      for (const legalCase of data.cases) {
+      for (const legalCase of nextData.cases) {
         await db.query(
           `
             INSERT INTO cases (
@@ -325,7 +740,7 @@ export async function replaceWorkspace(data: WorkspaceData): Promise<WorkspaceDa
         );
       }
 
-      for (const milestone of data.milestones) {
+      for (const milestone of nextData.milestones) {
         await db.query(
           `
             INSERT INTO case_milestones (
@@ -353,7 +768,7 @@ export async function replaceWorkspace(data: WorkspaceData): Promise<WorkspaceDa
         );
       }
 
-      for (const update of data.updates) {
+      for (const update of nextData.updates) {
         await db.query(
           `
             INSERT INTO case_updates (id, case_id, author, body, visibility, created_at)
@@ -370,7 +785,7 @@ export async function replaceWorkspace(data: WorkspaceData): Promise<WorkspaceDa
         );
       }
 
-      for (const request of data.requests) {
+      for (const request of nextData.requests) {
         await db.query(
           `
             INSERT INTO requests (id, case_id, title, detail, owner, due_date, status, created_at)
@@ -389,7 +804,7 @@ export async function replaceWorkspace(data: WorkspaceData): Promise<WorkspaceDa
         );
       }
 
-      for (const document of data.documents) {
+      for (const document of nextData.documents) {
         await db.query(
           `
             INSERT INTO documents (
@@ -417,7 +832,7 @@ export async function replaceWorkspace(data: WorkspaceData): Promise<WorkspaceDa
         );
       }
 
-      for (const event of data.audit) {
+      for (const event of nextData.audit) {
         await db.query(
           `
             INSERT INTO audit_events (id, firm_id, actor, action, target, created_at)
@@ -434,7 +849,7 @@ export async function replaceWorkspace(data: WorkspaceData): Promise<WorkspaceDa
         );
       }
 
-      await ensureProfiles(db, data.profiles ?? demoProfiles);
+      await ensureProfiles(db, nextData.profiles);
 
       await db.exec("COMMIT");
     } catch (error) {

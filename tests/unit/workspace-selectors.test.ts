@@ -6,6 +6,8 @@ import {
   findClientByIdentifier,
   getCaseDocuments,
   getClientActiveCases,
+  getFirmGuidePageModel,
+  getFirmPublicSiteModel,
   getFirmWorkQueue,
   getCaseMilestones,
   getCaseUpdates,
@@ -148,6 +150,107 @@ describe("workspace selectors", () => {
     expect(queue[0]?.severity).toBe("high");
     expect(queue.find((item) => item.id === "case-case-1")?.clientName).toBe(
       "Constructora Norte S.A.S.",
+    );
+  });
+
+  test("composes the public firm site from related published content", () => {
+    const workspace = cloneWorkspace();
+    workspace.guides.push({
+      id: "guide-other-firm",
+      firmId: "firm-other",
+      practiceAreaId: "area-empresa",
+      slug: "otra-firma",
+      title: "Otra firma",
+      summary: "No debe aparecer.",
+      content: "No debe aparecer.",
+      readingMinutes: 1,
+      status: "published",
+      sortOrder: 1,
+      publishedAt: "2026-07-08T09:00:00.000Z",
+    });
+    workspace.caseStudies.push({
+      id: "case-study-broken-area",
+      firmId: "firm-demo",
+      practiceAreaId: "area-inexistente",
+      slug: "area-inexistente",
+      title: "Area inexistente",
+      scenario: "No debe aparecer.",
+      approach: "No debe aparecer.",
+      outcomeSummary: "No debe aparecer.",
+      disclaimer: "No debe aparecer.",
+      sortOrder: 1,
+    });
+
+    const model = getFirmPublicSiteModel(workspace, "firm-demo");
+
+    expect(model?.firm.name).toBe("Asuntia Insolvencia");
+    expect(model?.site.status).toBe("published");
+    expect(model?.practiceAreas.map((area) => area.slug)).toEqual([
+      "persona-natural",
+      "empresa",
+      "acreedores",
+      "liquidacion",
+    ]);
+    expect(model?.guides.map((guide) => guide.slug)).toEqual([
+      "documentos-antes-de-insolvencia",
+      "reorganizacion-vs-liquidacion",
+      "negociacion-deudas-persona-natural",
+      "acreedor-en-insolvencia",
+    ]);
+    expect(model?.guides.map((guide) => guide.slug)).not.toContain("borrador-interno");
+    expect(model?.guides.map((guide) => guide.slug)).not.toContain("otra-firma");
+    expect(model?.caseStudies.map((caseStudy) => caseStudy.slug)).not.toContain(
+      "area-inexistente",
+    );
+  });
+
+  test("resolves guide pages by published slug and keeps related guides inside the same firm", () => {
+    const workspace = cloneWorkspace();
+    workspace.guides.push({
+      id: "guide-related-extra",
+      firmId: "firm-demo",
+      practiceAreaId: "area-empresa",
+      slug: "flujo-caja-reorganizacion",
+      title: "Flujo de caja para reorganizacion",
+      summary: "Relacionado por area.",
+      content: "Relacionado por area.",
+      readingMinutes: 3,
+      status: "published",
+      sortOrder: 15,
+      publishedAt: "2026-07-08T09:00:00.000Z",
+    });
+
+    const guide = getFirmGuidePageModel(
+      workspace,
+      "firm-demo",
+      "documentos-antes-de-insolvencia",
+    );
+    const draft = getFirmGuidePageModel(workspace, "firm-demo", "borrador-interno");
+    const missing = getFirmGuidePageModel(workspace, "firm-demo", "no-existe");
+
+    expect(guide?.guide.title).toBe("Preparar documentos antes de iniciar una insolvencia");
+    expect(guide?.practiceArea?.id).toBe("area-empresa");
+    expect(guide?.relatedGuides.map((item) => item.slug)).toEqual([
+      "flujo-caja-reorganizacion",
+    ]);
+    expect(guide?.relatedGuides.every((item) => item.firmId === "firm-demo")).toBe(true);
+    expect(draft).toBeNull();
+    expect(missing).toBeNull();
+  });
+
+  test("keeps public marketing examples separate from real legal cases", () => {
+    const workspace = cloneWorkspace();
+    const legalCaseIds = new Set(workspace.cases.map((legalCase) => legalCase.id));
+    const guideSlugs = workspace.guides.map((guide) => `${guide.firmId}/${guide.slug}`);
+    const caseStudySlugs = workspace.caseStudies.map(
+      (caseStudy) => `${caseStudy.firmId}/${caseStudy.slug}`,
+    );
+
+    expect(new Set(guideSlugs).size).toBe(guideSlugs.length);
+    expect(new Set(caseStudySlugs).size).toBe(caseStudySlugs.length);
+    expect(workspace.caseStudies.every((caseStudy) => !legalCaseIds.has(caseStudy.id))).toBe(true);
+    expect(workspace.caseStudies.every((caseStudy) => caseStudy.disclaimer.length > 0)).toBe(
+      true,
     );
   });
 

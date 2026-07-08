@@ -3,6 +3,12 @@ import type {
   CaseMilestone,
   CaseUpdate,
   Client,
+  Firm,
+  FirmCaseStudy,
+  FirmGuide,
+  FirmPracticeArea,
+  FirmPublicSite,
+  FirmValueProp,
   InfoRequest,
   LegalCase,
   Visibility,
@@ -35,6 +41,21 @@ export type ClientTrackingModel = {
   pendingRequest?: InfoRequest;
   requests: InfoRequest[];
   updates: CaseUpdate[];
+};
+
+export type FirmPublicSiteModel = {
+  caseStudies: FirmCaseStudy[];
+  firm: Firm;
+  guides: FirmGuide[];
+  practiceAreas: FirmPracticeArea[];
+  site: FirmPublicSite;
+  valueProps: FirmValueProp[];
+};
+
+export type FirmGuidePageModel = FirmPublicSiteModel & {
+  guide: FirmGuide;
+  practiceArea?: FirmPracticeArea;
+  relatedGuides: FirmGuide[];
 };
 
 export type PublicAccessTarget =
@@ -160,6 +181,90 @@ function severityRank(severity: FirmWorkQueueSeverity) {
   }
 
   return 2;
+}
+
+function compareSortOrder<T extends { sortOrder: number; title?: string }>(a: T, b: T) {
+  const sortDifference = a.sortOrder - b.sortOrder;
+  if (sortDifference !== 0) {
+    return sortDifference;
+  }
+
+  return (a.title ?? "").localeCompare(b.title ?? "");
+}
+
+function sameFirm<T extends { firmId: string }>(firmId: string) {
+  return (item: T) => item.firmId === firmId;
+}
+
+function isPublished<T extends { status: "draft" | "published" }>(item: T) {
+  return item.status === "published";
+}
+
+export function getFirmPublicSiteModel(
+  data: WorkspaceData,
+  firmId: string,
+): FirmPublicSiteModel | null {
+  const firm = data.firms.find((item) => item.id === firmId);
+  const site = data.publicSites.find((item) => item.firmId === firmId && isPublished(item));
+
+  if (!firm || !site) {
+    return null;
+  }
+
+  const practiceAreaIds = new Set(
+    data.practiceAreas.filter(sameFirm(firmId)).map((area) => area.id),
+  );
+
+  return {
+    caseStudies: data.caseStudies
+      .filter(sameFirm(firmId))
+      .filter((caseStudy) =>
+        caseStudy.practiceAreaId ? practiceAreaIds.has(caseStudy.practiceAreaId) : true,
+      )
+      .sort(compareSortOrder),
+    firm,
+    guides: data.guides
+      .filter(sameFirm(firmId))
+      .filter(isPublished)
+      .filter((guide) => (guide.practiceAreaId ? practiceAreaIds.has(guide.practiceAreaId) : true))
+      .sort(compareSortOrder),
+    practiceAreas: data.practiceAreas.filter(sameFirm(firmId)).sort(compareSortOrder),
+    site,
+    valueProps: data.valueProps.filter(sameFirm(firmId)).sort(compareSortOrder),
+  };
+}
+
+export function getFirmGuidePageModel(
+  data: WorkspaceData,
+  firmId: string,
+  slug: string,
+): FirmGuidePageModel | null {
+  const publicSite = getFirmPublicSiteModel(data, firmId);
+  if (!publicSite) {
+    return null;
+  }
+
+  const guide = publicSite.guides.find((item) => item.slug === slug);
+  if (!guide) {
+    return null;
+  }
+
+  const practiceArea = guide.practiceAreaId
+    ? publicSite.practiceAreas.find((area) => area.id === guide.practiceAreaId)
+    : undefined;
+  const relatedGuides = publicSite.guides
+    .filter((item) => item.id !== guide.id)
+    .filter((item) =>
+      guide.practiceAreaId ? item.practiceAreaId === guide.practiceAreaId : true,
+    )
+    .slice(0, 3);
+
+  return {
+    ...publicSite,
+    guide,
+    practiceArea,
+    relatedGuides,
+  };
 }
 
 export function getFirmWorkQueue(

@@ -44,11 +44,235 @@ describe("Supabase migrations on PGlite", () => {
         "cases",
         "clients",
         "documents",
+        "firm_case_studies",
+        "firm_guides",
+        "firm_practice_areas",
+        "firm_public_sites",
+        "firm_value_props",
         "firms",
         "profiles",
         "requests",
       ]),
     );
+  });
+
+  test("extends firms and keeps public content scoped by firm and slug", async () => {
+    const database = await applySupabaseMigrations();
+
+    const columns = await database.query<{ column_name: string }>(`
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = 'firms'
+      ORDER BY column_name
+    `);
+
+    expect(columns.rows.map((row) => row.column_name)).toEqual(
+      expect.arrayContaining([
+        "contact_email",
+        "contact_phone",
+        "slug",
+        "specialty",
+        "subdomain",
+      ]),
+    );
+
+    await database.query(
+      `
+        INSERT INTO firms (
+          id,
+          name,
+          slug,
+          subdomain,
+          specialty,
+          contact_email,
+          created_at
+        )
+        VALUES (
+          'firm-public',
+          'Firma Publica',
+          'firma-publica',
+          'publica',
+          'Insolvencia',
+          'publica@example.com',
+          '2026-07-01T00:00:00.000Z'
+        )
+      `,
+    );
+    await database.query(
+      `
+        INSERT INTO firm_public_sites (
+          id,
+          firm_id,
+          headline,
+          subheadline,
+          hero_summary,
+          trust_statement,
+          primary_cta_label,
+          secondary_cta_label,
+          hero_image_url,
+          status,
+          updated_at
+        )
+        VALUES (
+          'site-public',
+          'firm-public',
+          'Insolvencia con orden',
+          'Subtitulo',
+          'Resumen',
+          'Confianza',
+          'Valoracion',
+          'Consulta tu caso',
+          '/tenant-assets/insolvencia-hero.svg',
+          'published',
+          '2026-07-01T00:00:00.000Z'
+        )
+      `,
+    );
+    await database.query(
+      `
+        INSERT INTO firm_practice_areas (
+          id,
+          firm_id,
+          slug,
+          title,
+          summary,
+          audience,
+          sort_order
+        )
+        VALUES (
+          'area-public',
+          'firm-public',
+          'empresa',
+          'Empresa',
+          'Resumen',
+          'Empresas',
+          10
+        )
+      `,
+    );
+    await database.query(
+      `
+        INSERT INTO firm_guides (
+          id,
+          firm_id,
+          practice_area_id,
+          slug,
+          title,
+          summary,
+          content,
+          reading_minutes,
+          status,
+          sort_order,
+          published_at
+        )
+        VALUES (
+          'guide-public',
+          'firm-public',
+          'area-public',
+          'preparacion',
+          'Preparacion',
+          'Resumen',
+          'Contenido',
+          3,
+          'published',
+          10,
+          '2026-07-01T00:00:00.000Z'
+        )
+      `,
+    );
+
+    await expect(
+      database.query(
+        `
+          INSERT INTO firm_guides (
+            id,
+            firm_id,
+            practice_area_id,
+            slug,
+            title,
+            summary,
+            content,
+            reading_minutes,
+            status,
+            sort_order
+          )
+          VALUES (
+            'guide-duplicate',
+            'firm-public',
+            'area-public',
+            'preparacion',
+            'Preparacion duplicada',
+            'Resumen',
+            'Contenido',
+            2,
+            'published',
+            20
+          )
+        `,
+      ),
+    ).rejects.toThrow();
+
+    await expect(
+      database.query(
+        `
+          INSERT INTO firm_guides (
+            id,
+            firm_id,
+            practice_area_id,
+            slug,
+            title,
+            summary,
+            content,
+            reading_minutes,
+            status,
+            sort_order
+          )
+          VALUES (
+            'guide-invalid-status',
+            'firm-public',
+            'area-public',
+            'estado-invalido',
+            'Estado invalido',
+            'Resumen',
+            'Contenido',
+            2,
+            'archived',
+            30
+          )
+        `,
+      ),
+    ).rejects.toThrow();
+
+    await expect(
+      database.query(
+        `
+          INSERT INTO firm_case_studies (
+            id,
+            firm_id,
+            practice_area_id,
+            slug,
+            title,
+            scenario,
+            approach,
+            outcome_summary,
+            disclaimer,
+            sort_order
+          )
+          VALUES (
+            'case-study-invalid-area',
+            'firm-public',
+            'area-missing',
+            'area-missing',
+            'Area faltante',
+            'Escenario',
+            'Enfoque',
+            'Resultado',
+            'Anonimizado',
+            10
+          )
+        `,
+      ),
+    ).rejects.toThrow();
   });
 
   test("keeps client visibility and case status as database-level constraints", async () => {
@@ -299,6 +523,15 @@ describe("Supabase migrations on PGlite", () => {
         "cases_firm_id_idx",
         "clients_firm_id_idx",
         "documents_case_id_idx",
+        "firm_case_studies_firm_id_idx",
+        "firm_case_studies_practice_area_id_idx",
+        "firm_guides_firm_id_idx",
+        "firm_guides_practice_area_id_idx",
+        "firm_practice_areas_firm_id_idx",
+        "firm_public_sites_firm_id_idx",
+        "firm_value_props_firm_id_idx",
+        "firms_slug_idx",
+        "firms_subdomain_idx",
         "profiles_client_id_idx",
         "profiles_firm_email_idx",
         "profiles_firm_id_idx",
