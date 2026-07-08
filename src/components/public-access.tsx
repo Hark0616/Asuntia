@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, LockKeyhole, RefreshCcw, Search, ShieldCheck } from "lucide-react";
+import { LockKeyhole, RefreshCcw, Search, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -77,7 +77,7 @@ export function PublicAccess() {
   }
 
   return (
-    <main className="public-shell">
+    <main className="public-shell public-consult-shell">
       <header className="public-topbar">
         <div className="brand">
           <div className="brand-mark">A</div>
@@ -91,30 +91,34 @@ export function PublicAccess() {
         </span>
       </header>
 
-      <section className="access-layout">
-        <section className="access-panel primary-access">
-          <div className="section-title">
-            <div>
-              <h3>Consultar asunto</h3>
-            </div>
-            <Search size={18} />
-          </div>
+      <section className="consult-stage">
+        <div className="consult-copy">
+          <span className="consult-kicker">Portal de seguimiento</span>
+          <h2>Consulta el estado de tu proceso</h2>
+          <p>
+            Ingresa el radicado o codigo entregado por la firma para ver el avance
+            publicado.
+          </p>
+        </div>
 
+        <section className="consult-panel" aria-label="Consulta de asunto">
           <form className="access-form" onSubmit={handleTrackingSubmit}>
-            <div className="field full">
-              <label htmlFor="public-tracking-code">Código, radicado, correo o teléfono</label>
+            <div className="field full consult-field">
+              <label className="sr-only" htmlFor="public-tracking-code">
+                Numero de radicado o codigo
+              </label>
               <input
                 autoComplete="off"
                 data-testid="public-tracking-code"
                 id="public-tracking-code"
                 onChange={(event) => setAccessQuery(event.target.value)}
-                placeholder="AS-2026-001 o correo"
+                placeholder="Ingresa tu numero de radicado o codigo"
                 required
                 value={accessQuery}
               />
             </div>
 
-            <div className="captcha-row">
+            <div className="captcha-row security-check">
               <div className="captcha-box">
                 <span className="muted small">Verificación</span>
                 <strong data-testid="captcha-question">
@@ -148,23 +152,19 @@ export function PublicAccess() {
               disabled={isSearching}
               type="submit"
             >
-              <CheckCircle2 size={16} />
+              <Search size={17} />
               {isSearching ? "Consultando" : "Consultar"}
             </button>
+
+            <p className="consult-trust">
+              <ShieldCheck size={14} />
+              Consulta cifrada y protegida bajo secreto profesional.
+            </p>
           </form>
-        </section>
 
-        <section className="access-panel internal-access">
-          <div className="section-title">
-            <div>
-              <h3>Iniciar sesión</h3>
-            </div>
-            <LockKeyhole size={18} />
-          </div>
-
-          <Link className="secondary-button wide-button" data-testid="home-login" href="/firma/login">
+          <Link className="firm-access-link" data-testid="home-login" href="/firma/login">
             <LockKeyhole size={16} />
-            Iniciar sesión
+            Acceso firma
           </Link>
         </section>
       </section>

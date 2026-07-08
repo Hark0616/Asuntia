@@ -21,7 +21,7 @@ test.describe("visual regression", () => {
   test("public access stays visually stable on desktop and mobile", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/");
-    await expect(page.getByRole("heading", { name: "Consultar asunto" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Consulta el estado de tu proceso" })).toBeVisible();
     await expect(page).toHaveScreenshot("home-desktop.png", {
       animations: "disabled",
       caret: "initial",
@@ -31,7 +31,7 @@ test.describe("visual regression", () => {
 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/");
-    await expect(page.getByRole("heading", { name: "Consultar asunto" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Consulta el estado de tu proceso" })).toBeVisible();
     await expect(page).toHaveScreenshot("home-mobile.png", {
       animations: "disabled",
       caret: "initial",
@@ -79,12 +79,12 @@ test.describe("visual regression", () => {
 test.describe("local performance budgets", () => {
   test("public access route loads within a local interaction budget after warmup", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByRole("heading", { name: "Consultar asunto" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Consulta el estado de tu proceso" })).toBeVisible();
 
     await page.goto("about:blank");
     const startedAt = Date.now();
     await page.goto("/", { waitUntil: "load" });
-    await expect(page.getByRole("heading", { name: "Consultar asunto" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Consulta el estado de tu proceso" })).toBeVisible();
     const wallTimeMs = Date.now() - startedAt;
 
     const metrics = await page.evaluate(() => {

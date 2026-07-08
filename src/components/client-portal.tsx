@@ -295,19 +295,18 @@ function ClientTrackingDetail({
         </button>
       </div>
 
-      {showActionCard ? (
-        <ClientActionCard
-          currentMilestone={currentMilestone}
-          legalCase={legalCase}
-          request={pendingRequest}
-        />
-      ) : null}
+      <ClientUpdateBrief
+        currentMilestone={currentMilestone}
+        legalCase={legalCase}
+        request={pendingRequest}
+        updates={updates}
+      />
 
       <section className="tracking-grid">
         <div className="panel tracking-main">
           <div>
             <div className="row between">
-              <h3>Estado del asunto</h3>
+              <h3>Seguimiento del proceso</h3>
               <StatusBadge status={legalCase.status} />
             </div>
             <p className="muted">{legalCase.description}</p>
@@ -322,6 +321,14 @@ function ClientTrackingDetail({
         </div>
 
         <aside className="tracking-side">
+          {showActionCard ? (
+            <ClientActionCard
+              currentMilestone={currentMilestone}
+              legalCase={legalCase}
+              request={pendingRequest}
+            />
+          ) : null}
+
           <div className="panel">
             <div className="section-title">
               <h3>Proximo paso</h3>
@@ -358,6 +365,51 @@ function ClientTrackingDetail({
         </aside>
       </section>
     </>
+  );
+}
+
+function ClientUpdateBrief({
+  currentMilestone,
+  legalCase,
+  request,
+  updates,
+}: {
+  currentMilestone?: CaseMilestone;
+  legalCase: LegalCase;
+  request?: InfoRequest;
+  updates: CaseUpdate[];
+}) {
+  const lastUpdateDate = currentMilestone?.date ?? updates[0]?.createdAt ?? legalCase.updatedAt;
+  const requiresClientAction =
+    legalCase.status === "requiere_cliente" ||
+    Boolean(request) ||
+    Boolean(currentMilestone?.evidenceEnabled);
+  const nextAction = request?.detail ?? legalCase.nextStep;
+
+  return (
+    <section className="tracking-brief" data-testid="client-update-brief">
+      <div>
+        <span className="muted small">Ultima actualizacion</span>
+        <strong>{formatDate(lastUpdateDate)}</strong>
+      </div>
+      <div>
+        <span className="muted small">Proxima accion</span>
+        <p>{nextAction}</p>
+      </div>
+      <div className={requiresClientAction ? "brief-state warning" : "brief-state"}>
+        {requiresClientAction ? (
+          <>
+            <strong>Accion pendiente</strong>
+            <span>No es necesario llamar: la firma vera el soporte aqui.</span>
+          </>
+        ) : (
+          <>
+            <strong>No se requiere accion de tu parte</strong>
+            <span>La firma publicara el siguiente avance cuando exista novedad.</span>
+          </>
+        )}
+      </div>
+    </section>
   );
 }
 

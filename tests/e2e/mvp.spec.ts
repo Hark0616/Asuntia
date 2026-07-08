@@ -35,8 +35,8 @@ test.beforeEach(async ({ page, request }) => {
 test("cliente entra desde la pagina principal con codigo y captcha", async ({ page }) => {
   await page.goto("/");
 
-  await expect(page.getByRole("heading", { name: "Consultar asunto" })).toBeVisible();
-  await expect(page.getByTestId("home-login")).toContainText("Iniciar sesión");
+  await expect(page.getByRole("heading", { name: "Consulta el estado de tu proceso" })).toBeVisible();
+  await expect(page.getByTestId("home-login")).toContainText("Acceso firma");
   await page.getByTestId("public-tracking-code").fill("AS-2026-001");
   await page.getByTestId("captcha-answer").fill("10");
   await page.getByTestId("public-search").click();
@@ -61,7 +61,9 @@ test("cliente entra desde la pagina principal con codigo y captcha", async ({ pa
     page.getByText("Se revisaron los requisitos habilitantes y se identifico un documento pendiente."),
   ).toBeVisible();
   await expect(
-    page.getByRole("complementary").getByText("Certificado de experiencia", { exact: true }),
+    page.getByTestId("client-action-card").getByRole("heading", {
+      name: "Certificado de experiencia",
+    }),
   ).toBeVisible();
 
   await expect(
@@ -73,7 +75,7 @@ test("cliente sin codigo vuelve a la entrada principal", async ({ page }) => {
   await page.goto("/cliente");
 
   await expect(page).toHaveURL("/");
-  await expect(page.getByRole("heading", { name: "Consultar asunto" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Consulta el estado de tu proceso" })).toBeVisible();
 });
 
 test("cliente entra con correo y cambia entre sus casos activos", async ({ page }) => {
