@@ -77,7 +77,7 @@ export function ClientPortal() {
 
       if (!initialQuery) {
         window.sessionStorage.removeItem("asuntia.accessQuery");
-        router.replace("/");
+        router.replace("/consulta");
         return;
       }
 
@@ -85,7 +85,7 @@ export function ClientPortal() {
 
       if (!target) {
         window.sessionStorage.removeItem("asuntia.accessQuery");
-        router.replace("/");
+        router.replace("/consulta");
         return;
       }
 
@@ -157,7 +157,7 @@ export function ClientPortal() {
   function closeTracking() {
     window.sessionStorage.removeItem("asuntia.accessQuery");
     window.sessionStorage.removeItem("asuntia.trackingCode");
-    router.push("/");
+    router.push("/consulta");
   }
 
   if (isResolvingTracking || !activeClient) {

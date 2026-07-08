@@ -79,12 +79,12 @@ export function PublicAccess() {
   return (
     <main className="public-shell public-consult-shell">
       <header className="public-topbar">
-        <div className="brand">
+        <Link className="brand" href="/">
           <div className="brand-mark">A</div>
           <div>
-            <h1>Asuntia</h1>
+            <h1>Asuntia Insolvencia</h1>
           </div>
-        </div>
+        </Link>
         <span className="access-trust">
           <ShieldCheck size={16} />
           Acceso seguro

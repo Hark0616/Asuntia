@@ -1,0 +1,40 @@
+<svg width="720" height="520" viewBox="0 0 720 520" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Mapa de seguimiento de insolvencia</title>
+  <desc id="desc">Documentos, obligaciones y seguimiento del caso organizados para una firma de insolvencia.</desc>
+  <rect width="720" height="520" rx="18" fill="#F7FAFC"/>
+  <rect x="40" y="42" width="640" height="436" rx="14" fill="#FFFFFF" stroke="#CFD9E6" stroke-width="2"/>
+  <rect x="72" y="78" width="260" height="54" rx="8" fill="#0F3557"/>
+  <rect x="96" y="98" width="168" height="10" rx="5" fill="#F7FAFC"/>
+  <rect x="72" y="154" width="180" height="18" rx="4" fill="#DAE4EF"/>
+  <rect x="72" y="186" width="224" height="12" rx="6" fill="#E7EDF4"/>
+  <rect x="72" y="210" width="196" height="12" rx="6" fill="#E7EDF4"/>
+  <rect x="72" y="234" width="228" height="12" rx="6" fill="#E7EDF4"/>
+  <rect x="72" y="286" width="172" height="42" rx="8" fill="#E6F3F0" stroke="#9FD1C8"/>
+  <rect x="96" y="302" width="92" height="9" rx="4.5" fill="#1D766F"/>
+  <rect x="72" y="344" width="224" height="42" rx="8" fill="#FFF5DB" stroke="#E5C981"/>
+  <rect x="96" y="360" width="130" height="9" rx="4.5" fill="#8B5B12"/>
+  <rect x="72" y="402" width="184" height="42" rx="8" fill="#F1F4F7" stroke="#D9E0E8"/>
+  <rect x="96" y="418" width="110" height="9" rx="4.5" fill="#5B6574"/>
+  <rect x="382" y="78" width="242" height="110" rx="10" fill="#F1F5F8" stroke="#D8E0EA"/>
+  <rect x="410" y="106" width="84" height="10" rx="5" fill="#0F3557"/>
+  <rect x="410" y="132" width="172" height="10" rx="5" fill="#B9C7D7"/>
+  <rect x="410" y="154" width="132" height="10" rx="5" fill="#B9C7D7"/>
+  <circle cx="588" cy="112" r="18" fill="#1D766F"/>
+  <path d="M580 112.5L586 118.5L598 104.5" stroke="white" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="382" y="216" width="242" height="228" rx="10" fill="#0B1728"/>
+  <rect x="414" y="250" width="106" height="12" rx="6" fill="#F7FAFC"/>
+  <rect x="414" y="282" width="164" height="8" rx="4" fill="#95A9BF"/>
+  <rect x="414" y="304" width="124" height="8" rx="4" fill="#95A9BF"/>
+  <circle cx="426" cy="354" r="13" fill="#18805E"/>
+  <path d="M420.5 354.5L424.5 358.5L432.5 349.5" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="454" y="347" width="114" height="10" rx="5" fill="#DDE8F4"/>
+  <rect x="424" y="374" width="2" height="28" rx="1" fill="#6C829B"/>
+  <circle cx="426" cy="416" r="13" fill="#F4C95D"/>
+  <rect x="421" y="411" width="10" height="10" rx="5" fill="#0B1728"/>
+  <rect x="454" y="409" width="138" height="10" rx="5" fill="#DDE8F4"/>
+  <path d="M330 307H382" stroke="#9CB0C5" stroke-width="3" stroke-linecap="round"/>
+  <path d="M364 291L382 307L364 323" stroke="#9CB0C5" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="312" y="272" width="88" height="70" rx="10" fill="#FFFFFF" stroke="#C9D6E4" stroke-width="2"/>
+  <rect x="330" y="296" width="52" height="8" rx="4" fill="#1D766F"/>
+  <rect x="330" y="316" width="34" height="8" rx="4" fill="#BAC8D6"/>
+</svg>

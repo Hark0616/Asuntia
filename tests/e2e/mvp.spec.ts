@@ -32,8 +32,24 @@ test.beforeEach(async ({ page, request }) => {
   }, storageKey);
 });
 
-test("cliente entra desde la pagina principal con codigo y captcha", async ({ page }) => {
+test("pagina principal muestra la landing publica de la firma", async ({ page }) => {
   await page.goto("/");
+
+  await expect(
+    page.getByRole("heading", {
+      name: "Insolvencia con estrategia, orden y seguimiento claro",
+    }),
+  ).toBeVisible();
+  await expect(page.getByText("Derecho de la insolvencia").first()).toBeVisible();
+  await expect(page.getByTestId("landing-consult-cta")).toHaveAttribute("href", "/consulta");
+  await expect(
+    page.getByRole("heading", { exact: true, name: "Persona natural no comerciante" }),
+  ).toBeVisible();
+  await expect(page.getByText("Preparar documentos antes de iniciar una insolvencia")).toBeVisible();
+});
+
+test("cliente entra desde consulta con codigo y captcha", async ({ page }) => {
+  await page.goto("/consulta");
 
   await expect(page.getByRole("heading", { name: "Consulta el estado de tu proceso" })).toBeVisible();
   await expect(page.getByTestId("home-login")).toContainText("Acceso firma");
@@ -74,12 +90,12 @@ test("cliente entra desde la pagina principal con codigo y captcha", async ({ pa
 test("cliente sin codigo vuelve a la entrada principal", async ({ page }) => {
   await page.goto("/cliente");
 
-  await expect(page).toHaveURL("/");
+  await expect(page).toHaveURL("/consulta");
   await expect(page.getByRole("heading", { name: "Consulta el estado de tu proceso" })).toBeVisible();
 });
 
 test("cliente entra con correo y cambia entre sus casos activos", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/consulta");
 
   await page.getByTestId("public-tracking-code").fill("laura@constructoranorte.co");
   await page.getByTestId("captcha-answer").fill("10");
@@ -166,7 +182,7 @@ test("firma publica avance, solicitud y documento visibles para el cliente", asy
   await documentSaved;
   await expect(page.getByText("Camara_comercio_actualizada.pdf")).toBeVisible();
 
-  await page.goto("/");
+  await page.goto("/consulta");
   await page.getByTestId("public-tracking-code").fill("AS-2026-001");
   await page.getByTestId("captcha-answer").fill("10");
   await page.getByTestId("public-search").click();
@@ -209,7 +225,7 @@ test("cambio de estado y proximo paso se reflejan en el portal cliente", async (
   await page.getByTestId("save-case").click();
   await caseSaved;
 
-  await page.goto("/");
+  await page.goto("/consulta");
   await page.getByTestId("public-tracking-code").fill("AS-2026-001");
   await page.getByTestId("captcha-answer").fill("10");
   await page.getByTestId("public-search").click();
@@ -241,7 +257,7 @@ test("firma gestiona hitos y el cliente ve el nuevo punto actual del proceso", a
   await expect(page.getByText("Radicacion confirmada")).toBeVisible();
   await expect(page.getByTestId("milestone-status-milestone-3")).toHaveValue("completed");
 
-  await page.goto("/");
+  await page.goto("/consulta");
   await page.getByTestId("public-tracking-code").fill("AS-2026-001");
   await page.getByTestId("captcha-answer").fill("10");
   await page.getByTestId("public-search").click();

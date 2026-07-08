@@ -87,6 +87,8 @@ button {
   align-items: center;
   gap: 12px;
   min-width: 0;
+  color: inherit;
+  text-decoration: none;
 }
 
 .brand-mark {
@@ -197,6 +199,281 @@ button {
 
 .public-consult-shell .brand h1 {
   color: #f8fafc;
+}
+
+.firm-landing-shell {
+  min-height: 100vh;
+  background: #f6f8fb;
+  color: #101827;
+}
+
+.landing-header,
+.landing-hero,
+.landing-section,
+.landing-footer {
+  width: min(1180px, 100%);
+  margin: 0 auto;
+  padding-right: 24px;
+  padding-left: 24px;
+}
+
+.landing-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  min-height: 74px;
+  border-bottom: 1px solid #dbe3ec;
+  background: rgba(246, 248, 251, 0.94);
+  backdrop-filter: blur(10px);
+}
+
+.landing-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.landing-brand span:last-child {
+  display: grid;
+  gap: 2px;
+}
+
+.landing-brand small {
+  color: var(--muted);
+}
+
+.landing-nav,
+.landing-actions,
+.landing-hero-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.landing-nav a {
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.landing-nav a:hover {
+  color: var(--brand);
+}
+
+.landing-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(360px, 0.8fr);
+  gap: 44px;
+  align-items: center;
+  padding-top: 68px;
+  padding-bottom: 54px;
+}
+
+.landing-hero-copy {
+  display: grid;
+  gap: 18px;
+  align-content: start;
+}
+
+.landing-specialty {
+  color: var(--accent);
+  font-weight: 800;
+}
+
+.landing-hero h1,
+.landing-section h2 {
+  margin: 0;
+  text-wrap: balance;
+}
+
+.landing-hero h1 {
+  max-width: 760px;
+  color: #091523;
+  font-size: clamp(44px, 6vw, 72px);
+  line-height: 0.98;
+  letter-spacing: -0.03em;
+}
+
+.landing-hero p,
+.landing-section-head p,
+.portal-band p,
+.landing-value-item p,
+.practice-card p,
+.guide-card p,
+.case-study-card p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+  text-wrap: pretty;
+}
+
+.landing-hero-copy > p:not(.landing-trust) {
+  max-width: 640px;
+  font-size: 18px;
+}
+
+.landing-trust {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: 620px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.landing-hero-visual {
+  border: 1px solid #d8e1ec;
+  border-radius: 12px;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.landing-hero-visual img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.landing-section {
+  padding-top: 52px;
+  padding-bottom: 52px;
+}
+
+.landing-intent {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.8fr) minmax(360px, 1fr);
+  gap: 28px;
+  border-top: 1px solid #dbe3ec;
+  border-bottom: 1px solid #dbe3ec;
+}
+
+.landing-intent h2,
+.landing-section-head h2,
+.portal-band h2 {
+  font-size: clamp(30px, 4vw, 48px);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+}
+
+.landing-value-list,
+.guide-list,
+.case-study-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.landing-value-item,
+.practice-card,
+.guide-card,
+.case-study-card {
+  border: 1px solid #d8e1ec;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.landing-value-item {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: 12px;
+  padding: 16px;
+}
+
+.landing-value-item h3,
+.practice-card h3,
+.guide-card h3,
+.case-study-card h3 {
+  margin: 0 0 8px;
+}
+
+.landing-section-head {
+  display: grid;
+  gap: 12px;
+  max-width: 760px;
+  margin-bottom: 24px;
+}
+
+.practice-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.practice-card,
+.guide-card,
+.case-study-card {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-height: 180px;
+  padding: 18px;
+}
+
+.practice-card span,
+.guide-card span,
+.case-study-card span,
+.portal-band span {
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.guide-list {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.guide-card {
+  color: inherit;
+  text-decoration: none;
+}
+
+.guide-card:hover {
+  border-color: var(--brand);
+}
+
+.case-study-grid {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.case-study-card strong {
+  line-height: 1.45;
+}
+
+.portal-band {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 22px;
+  border-top: 1px solid #dbe3ec;
+}
+
+.portal-band > div {
+  display: grid;
+  max-width: 760px;
+  gap: 12px;
+}
+
+.landing-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding-top: 28px;
+  padding-bottom: 32px;
+  border-top: 1px solid #dbe3ec;
+  color: var(--muted);
+}
+
+.landing-footer > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .access-trust {
@@ -1464,6 +1741,26 @@ button {
 }
 
 @media (max-width: 1080px) {
+  .landing-header {
+    align-items: flex-start;
+    flex-direction: column;
+    padding-top: 14px;
+    padding-bottom: 14px;
+  }
+
+  .landing-hero,
+  .landing-intent {
+    grid-template-columns: 1fr;
+  }
+
+  .landing-hero {
+    padding-top: 48px;
+  }
+
+  .landing-hero-visual {
+    max-width: 720px;
+  }
+
   .access-layout {
     grid-template-columns: 1fr;
     max-width: 760px;
@@ -1510,6 +1807,53 @@ button {
 }
 
 @media (max-width: 760px) {
+  .landing-header,
+  .landing-hero,
+  .landing-section,
+  .landing-footer {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+
+  .landing-nav,
+  .landing-actions,
+  .landing-hero-actions,
+  .portal-band,
+  .landing-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .landing-nav {
+    width: 100%;
+  }
+
+  .landing-nav a {
+    min-height: 34px;
+  }
+
+  .landing-actions,
+  .landing-hero-actions {
+    width: 100%;
+  }
+
+  .landing-actions .primary-button,
+  .landing-actions .secondary-button,
+  .landing-hero-actions .primary-button,
+  .landing-hero-actions .secondary-button,
+  .portal-band .primary-button {
+    width: 100%;
+  }
+
+  .landing-hero h1 {
+    font-size: 42px;
+  }
+
+  .landing-section {
+    padding-top: 40px;
+    padding-bottom: 40px;
+  }
+
   .topbar {
     align-items: flex-start;
     flex-direction: column;
