@@ -1,4 +1,4 @@
-import type { CaseStatus, RequestStatus, Visibility } from "./types";
+import type { CaseStatus, MilestoneStatus, RequestStatus, Visibility } from "./types";
 
 export const caseStatusLabels: Record<CaseStatus, string> = {
   nuevo: "Nuevo",
@@ -15,6 +15,12 @@ export const requestStatusLabels: Record<RequestStatus, string> = {
   requiere_correccion: "Requiere correccion",
   aceptada: "Aceptada",
   vencida: "Vencida",
+};
+
+export const milestoneStatusLabels: Record<MilestoneStatus, string> = {
+  completed: "Completado",
+  current: "Actual",
+  upcoming: "Siguiente",
 };
 
 export const visibilityLabels: Record<Visibility, string> = {

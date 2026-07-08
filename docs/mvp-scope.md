@@ -19,6 +19,7 @@ La version actual es una demo funcional con persistencia en `localStorage`. No u
 - Estados de caso.
 - Proximo paso visible para cliente.
 - Hitos verticales del asunto.
+- Gestion de hitos desde el espacio de firma.
 - Carga de evidencia cuando la firma la habilita para el hito actual.
 - Timeline con avances internos o visibles al cliente.
 - Solicitudes de informacion.
@@ -50,9 +51,11 @@ La version actual es una demo funcional con persistencia en `localStorage`. No u
 3. Crear caso o abrir uno existente.
 4. Cambiar estado.
 5. Actualizar proximo paso.
-6. Publicar avance visible al cliente o interno.
-7. Crear solicitud.
-8. Registrar documento.
+6. Crear o actualizar hitos del proceso.
+7. Habilitar evidencia de cliente para el hito que lo requiera.
+8. Publicar avance visible al cliente o interno.
+9. Crear solicitud.
+10. Registrar documento.
 
 ## Flujo De Cliente
 
@@ -98,6 +101,7 @@ La demo se considera suficiente para mostrar a una firma pequena cuando:
 
 - El abogado puede crear un cliente.
 - El abogado puede crear un caso.
+- El abogado puede crear y ajustar hitos.
 - El abogado puede publicar avances.
 - El abogado puede crear solicitudes.
 - El cliente puede entrar con codigo y ver solo el asunto asociado.

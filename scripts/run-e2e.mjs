@@ -1,33 +1,56 @@
 import { spawn } from "node:child_process";
+import net from "node:net";
 import process from "node:process";
 
-const port = process.env.PORT ?? "3000";
-const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? `http://localhost:${port}`;
 const nextBin = "./node_modules/next/dist/bin/next";
 const playwrightBin = "./node_modules/@playwright/test/cli.js";
 const testArgs = process.argv.slice(2);
 
 let serverExited = false;
 let shuttingDown = false;
+let server;
 
-const server = spawn(process.execPath, [nextBin, "dev", "-p", port], {
-  cwd: process.cwd(),
-  env: { ...process.env, PORT: port },
-  stdio: ["ignore", "pipe", "pipe"],
-  windowsHide: true,
-});
+function findOpenPort(preferredPort) {
+  return new Promise((resolve, reject) => {
+    const probe = net.createServer();
 
-server.once("exit", () => {
-  serverExited = true;
-});
+    probe.once("error", (error) => {
+      if (error.code === "EADDRINUSE") {
+        findOpenPort(0).then(resolve, reject);
+        return;
+      }
 
-server.stdout.on("data", (chunk) => {
-  process.stdout.write(chunk);
-});
+      reject(error);
+    });
 
-server.stderr.on("data", (chunk) => {
-  process.stderr.write(chunk);
-});
+    probe.listen(preferredPort, () => {
+      const address = probe.address();
+      const openPort = typeof address === "object" && address ? address.port : preferredPort;
+      probe.close(() => resolve(String(openPort)));
+    });
+  });
+}
+
+async function startServer(port) {
+  server = spawn(process.execPath, [nextBin, "dev", "-p", port], {
+    cwd: process.cwd(),
+    env: { ...process.env, PORT: port },
+    stdio: ["ignore", "pipe", "pipe"],
+    windowsHide: true,
+  });
+
+  server.once("exit", () => {
+    serverExited = true;
+  });
+
+  server.stdout.on("data", (chunk) => {
+    process.stdout.write(chunk);
+  });
+
+  server.stderr.on("data", (chunk) => {
+    process.stderr.write(chunk);
+  });
+}
 
 function delay(ms) {
   return new Promise((resolve) => {
@@ -35,7 +58,21 @@ function delay(ms) {
   });
 }
 
-async function waitForServer() {
+async function isExistingWorkspaceServer(baseURL) {
+  try {
+    const response = await fetch(baseURL);
+    if (response.status >= 500) {
+      return false;
+    }
+
+    const body = await response.text();
+    return body.includes("Asuntia");
+  } catch {
+    return false;
+  }
+}
+
+async function waitForServer(baseURL) {
   const deadline = Date.now() + 120_000;
 
   while (Date.now() < deadline) {
@@ -65,7 +102,7 @@ function waitForExit(child) {
 }
 
 async function stopServer() {
-  if (serverExited || shuttingDown) {
+  if (!server || serverExited || shuttingDown) {
     return;
   }
 
@@ -82,9 +119,30 @@ async function stopServer() {
 
 async function run() {
   let exitCode = 1;
+  let port = process.env.PORT;
+  let baseURL = process.env.PLAYWRIGHT_BASE_URL;
+  let shouldStartServer = !baseURL;
+
+  if (!baseURL) {
+    const defaultBaseURL = "http://localhost:3000";
+    const existingWorkspaceServer =
+      !port && (await isExistingWorkspaceServer(defaultBaseURL));
+
+    if (existingWorkspaceServer) {
+      baseURL = defaultBaseURL;
+      shouldStartServer = false;
+    } else {
+      port = port ?? (await findOpenPort(3000));
+      baseURL = `http://localhost:${port}`;
+    }
+  }
 
   try {
-    await waitForServer();
+    if (shouldStartServer) {
+      await startServer(port);
+    }
+
+    await waitForServer(baseURL);
 
     const tests = spawn(process.execPath, [playwrightBin, "test", ...testArgs], {
       cwd: process.cwd(),

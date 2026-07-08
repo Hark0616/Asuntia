@@ -6,13 +6,14 @@ import { AppHeader } from "@/components/app-header";
 import {
   CaseCard,
   DocumentList,
+  formatDate,
   Metric,
   Modal,
   RequestList,
   StatusBadge,
   Timeline,
 } from "@/components/shared-ui";
-import { caseStatusLabels } from "@/lib/labels";
+import { caseStatusLabels, milestoneStatusLabels } from "@/lib/labels";
 import {
   audit,
   cloneSeed,
@@ -21,8 +22,10 @@ import {
   loadWorkspaceData,
   saveWorkspaceData,
 } from "@/lib/storage";
+import { insertCaseMilestone, updateCaseMilestone } from "@/lib/workspace-mutators";
 import {
   getCaseDocuments,
+  getCaseMilestones,
   getCaseRequests,
   getCaseUpdates,
 } from "@/lib/workspace-selectors";
@@ -34,6 +37,7 @@ import type {
   Client,
   InfoRequest,
   LegalCase,
+  MilestoneStatus,
   RequestStatus,
   Visibility,
   WorkspaceData,
@@ -43,6 +47,7 @@ type DrawerKind = "client" | "case" | null;
 
 const lawyers = ["Daniela Torres", "Martin Acosta", "Sofia Bernal"];
 const caseStatuses = Object.keys(caseStatusLabels) as CaseStatus[];
+const milestoneStatuses = Object.keys(milestoneStatusLabels) as MilestoneStatus[];
 
 export function FirmPortal() {
   const [data, setData] = useState<WorkspaceData>(() => cloneSeed());
@@ -207,6 +212,64 @@ export function FirmPortal() {
       });
 
       return next;
+    });
+  }
+
+  function addMilestone(
+    caseId: string,
+    input: Omit<CaseMilestone, "id" | "caseId">,
+  ) {
+    const legalCase = data.cases.find((item) => item.id === caseId);
+    if (
+      !legalCase ||
+      !input.title.trim() ||
+      !input.description.trim() ||
+      !input.detail.trim() ||
+      !input.date
+    ) {
+      return;
+    }
+
+    const milestone: CaseMilestone = {
+      ...input,
+      id: createId("milestone"),
+      caseId,
+      title: input.title.trim(),
+      description: input.description.trim(),
+      detail: input.detail.trim(),
+    };
+    const now = getTodayIso();
+
+    commit({
+      ...data,
+      milestones: insertCaseMilestone(data.milestones, milestone),
+      cases: data.cases.map((item) =>
+        item.id === caseId ? { ...item, updatedAt: now } : item,
+      ),
+      audit: [audit(legalCase.responsible, "Creo hito", milestone.title), ...data.audit],
+    });
+  }
+
+  function updateMilestone(
+    caseId: string,
+    milestoneId: string,
+    patch: Partial<CaseMilestone>,
+  ) {
+    const legalCase = data.cases.find((item) => item.id === caseId);
+    const milestone = data.milestones.find((item) => item.id === milestoneId);
+    if (!legalCase || !milestone) {
+      return;
+    }
+
+    const now = getTodayIso();
+
+    commit({
+      ...data,
+      milestones: updateCaseMilestone(data.milestones, caseId, milestoneId, patch),
+      cases: data.cases.map((item) =>
+        item.id === caseId ? { ...item, updatedAt: now } : item,
+      ),
+      audit: [audit(legalCase.responsible, "Actualizo hito", milestone.title), ...data.audit],
     });
   }
 
@@ -379,13 +442,16 @@ export function FirmPortal() {
               <CaseDetail
                 documents={getCaseDocuments(data, selectedCase.id)}
                 legalCase={selectedCase}
+                milestones={getCaseMilestones(data, selectedCase.id)}
                 requests={getCaseRequests(data, selectedCase.id)}
                 updates={getCaseUpdates(data, selectedCase.id)}
                 onAddDocument={addDocument}
+                onAddMilestone={addMilestone}
                 onAddRequest={addRequest}
                 onAddUpdate={addUpdate}
                 onRequestStatus={updateRequestStatus}
                 onUpdateCase={updateCaseFields}
+                onUpdateMilestone={updateMilestone}
               />
             ) : (
               <div className="empty-state">
@@ -415,21 +481,29 @@ export function FirmPortal() {
 function CaseDetail({
   documents,
   legalCase,
+  milestones,
   requests,
   updates,
   onAddDocument,
+  onAddMilestone,
   onAddRequest,
   onAddUpdate,
   onRequestStatus,
   onUpdateCase,
+  onUpdateMilestone,
 }: {
   documents: CaseDocument[];
   legalCase: LegalCase;
+  milestones: CaseMilestone[];
   requests: InfoRequest[];
   updates: CaseUpdate[];
   onAddDocument: (
     caseId: string,
     input: Pick<CaseDocument, "name" | "category" | "visibility">,
+  ) => void;
+  onAddMilestone: (
+    caseId: string,
+    input: Omit<CaseMilestone, "id" | "caseId">,
   ) => void;
   onAddRequest: (
     caseId: string,
@@ -438,6 +512,11 @@ function CaseDetail({
   onAddUpdate: (caseId: string, body: string, visibility: Visibility) => void;
   onRequestStatus: (requestId: string, status: RequestStatus) => void;
   onUpdateCase: (caseId: string, patch: Partial<LegalCase>) => void;
+  onUpdateMilestone: (
+    caseId: string,
+    milestoneId: string,
+    patch: Partial<CaseMilestone>,
+  ) => void;
 }) {
   const [nextStep, setNextStep] = useState(legalCase.nextStep);
 
@@ -516,34 +595,271 @@ function CaseDetail({
         </div>
       </div>
 
-      <UpdateComposer caseId={legalCase.id} onSubmit={onAddUpdate} />
-      <RequestComposer caseId={legalCase.id} onSubmit={onAddRequest} />
-      <DocumentComposer caseId={legalCase.id} onSubmit={onAddDocument} />
+      <div className="case-workbench">
+        <div className="case-workbench-main">
+          <MilestonePlanner
+            legalCase={legalCase}
+            milestones={milestones}
+            onAddMilestone={onAddMilestone}
+            onUpdateMilestone={onUpdateMilestone}
+          />
+          <UpdateComposer caseId={legalCase.id} onSubmit={onAddUpdate} />
 
-      <div className="panel">
-        <div className="section-title">
-          <h3>Timeline</h3>
-          <History size={17} />
+          <div className="panel">
+            <div className="section-title">
+              <h3>Timeline</h3>
+              <History size={17} />
+            </div>
+            <Timeline updates={updates} />
+          </div>
         </div>
-        <Timeline updates={updates} />
-      </div>
 
-      <div className="panel">
-        <div className="section-title">
-          <h3>Solicitudes</h3>
-          <CalendarClock size={17} />
-        </div>
-        <RequestList requests={requests} editable onStatus={onRequestStatus} />
-      </div>
+        <aside className="case-workbench-side">
+          <RequestComposer caseId={legalCase.id} onSubmit={onAddRequest} />
+          <DocumentComposer caseId={legalCase.id} onSubmit={onAddDocument} />
 
-      <div className="panel">
-        <div className="section-title">
-          <h3>Documentos</h3>
-          <FileText size={17} />
-        </div>
-        <DocumentList documents={documents} />
+          <div className="panel">
+            <div className="section-title">
+              <h3>Solicitudes</h3>
+              <CalendarClock size={17} />
+            </div>
+            <RequestList requests={requests} editable onStatus={onRequestStatus} />
+          </div>
+
+          <div className="panel">
+            <div className="section-title">
+              <h3>Documentos</h3>
+              <FileText size={17} />
+            </div>
+            <DocumentList documents={documents} />
+          </div>
+        </aside>
       </div>
     </section>
+  );
+}
+
+function MilestonePlanner({
+  legalCase,
+  milestones,
+  onAddMilestone,
+  onUpdateMilestone,
+}: {
+  legalCase: LegalCase;
+  milestones: CaseMilestone[];
+  onAddMilestone: (
+    caseId: string,
+    input: Omit<CaseMilestone, "id" | "caseId">,
+  ) => void;
+  onUpdateMilestone: (
+    caseId: string,
+    milestoneId: string,
+    patch: Partial<CaseMilestone>,
+  ) => void;
+}) {
+  return (
+    <section className="panel">
+      <div className="section-title">
+        <div>
+          <h3>Plan del caso</h3>
+          <span className="muted small">{milestones.length} hitos</span>
+        </div>
+        <CalendarClock size={17} />
+      </div>
+
+      {milestones.length > 0 ? (
+        <div className="milestone-admin-list">
+          {milestones.map((milestone) => (
+            <article
+              className="milestone-admin-item"
+              data-testid={`firm-milestone-${milestone.id}`}
+              key={milestone.id}
+            >
+              <div className="milestone-admin-copy">
+                <div className="row wrap">
+                  <span className="badge neutral">{formatDate(milestone.date)}</span>
+                  <span className="badge">{milestoneStatusLabels[milestone.status]}</span>
+                  {milestone.evidenceEnabled ? (
+                    <span className="badge warning">Evidencia cliente</span>
+                  ) : null}
+                </div>
+                <strong>{milestone.title}</strong>
+                <p className="muted">{milestone.description}</p>
+                <span className="small">{milestone.detail}</span>
+              </div>
+
+              <div className="milestone-admin-controls">
+                <label className="field compact">
+                  <span>Estado</span>
+                  <select
+                    aria-label={`Estado de ${milestone.title}`}
+                    data-testid={`milestone-status-${milestone.id}`}
+                    value={milestone.status}
+                    onChange={(event) =>
+                      onUpdateMilestone(legalCase.id, milestone.id, {
+                        status: event.target.value as MilestoneStatus,
+                      })
+                    }
+                  >
+                    {milestoneStatuses.map((status) => (
+                      <option key={status} value={status}>
+                        {milestoneStatusLabels[status]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="checkbox-field">
+                  <input
+                    checked={milestone.evidenceEnabled}
+                    data-testid={`milestone-evidence-${milestone.id}`}
+                    type="checkbox"
+                    onChange={(event) =>
+                      onUpdateMilestone(legalCase.id, milestone.id, {
+                        evidenceEnabled: event.target.checked,
+                      })
+                    }
+                  />
+                  Evidencia
+                </label>
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <div className="empty-state">
+          <span className="muted">Sin hitos configurados</span>
+        </div>
+      )}
+
+      <MilestoneComposer caseId={legalCase.id} onSubmit={onAddMilestone} />
+    </section>
+  );
+}
+
+function MilestoneComposer({
+  caseId,
+  onSubmit,
+}: {
+  caseId: string;
+  onSubmit: (
+    caseId: string,
+    input: Omit<CaseMilestone, "id" | "caseId">,
+  ) => void;
+}) {
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [detail, setDetail] = useState("");
+  const [date, setDate] = useState("");
+  const [status, setStatus] = useState<MilestoneStatus>("upcoming");
+  const [evidenceEnabled, setEvidenceEnabled] = useState(false);
+
+  useEffect(() => {
+    setTitle("");
+    setDescription("");
+    setDetail("");
+    setDate("");
+    setStatus("upcoming");
+    setEvidenceEnabled(false);
+  }, [caseId]);
+
+  function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    onSubmit(caseId, {
+      title,
+      description,
+      detail,
+      date,
+      status,
+      evidenceEnabled,
+    });
+    setTitle("");
+    setDescription("");
+    setDetail("");
+    setDate("");
+    setStatus("upcoming");
+    setEvidenceEnabled(false);
+  }
+
+  return (
+    <form className="milestone-composer" onSubmit={handleSubmit}>
+      <div className="section-title compact">
+        <h3>Nuevo hito</h3>
+        <Plus size={17} />
+      </div>
+      <div className="form-grid">
+        <div className="field">
+          <label htmlFor="milestone-title">Titulo</label>
+          <input
+            data-testid="milestone-title"
+            id="milestone-title"
+            onChange={(event) => setTitle(event.target.value)}
+            required
+            value={title}
+          />
+        </div>
+        <div className="field">
+          <label htmlFor="milestone-date">Fecha</label>
+          <input
+            data-testid="milestone-date"
+            id="milestone-date"
+            onChange={(event) => setDate(event.target.value)}
+            required
+            type="date"
+            value={date}
+          />
+        </div>
+        <div className="field">
+          <label htmlFor="milestone-status">Estado</label>
+          <select
+            data-testid="milestone-status"
+            id="milestone-status"
+            onChange={(event) => setStatus(event.target.value as MilestoneStatus)}
+            value={status}
+          >
+            {milestoneStatuses.map((milestoneStatus) => (
+              <option key={milestoneStatus} value={milestoneStatus}>
+                {milestoneStatusLabels[milestoneStatus]}
+              </option>
+            ))}
+          </select>
+        </div>
+        <label className="checkbox-field form-grid-checkbox">
+          <input
+            checked={evidenceEnabled}
+            data-testid="milestone-evidence"
+            type="checkbox"
+            onChange={(event) => setEvidenceEnabled(event.target.checked)}
+          />
+          Evidencia cliente
+        </label>
+        <div className="field full">
+          <label htmlFor="milestone-description">Descripcion visible</label>
+          <input
+            data-testid="milestone-description"
+            id="milestone-description"
+            onChange={(event) => setDescription(event.target.value)}
+            required
+            value={description}
+          />
+        </div>
+        <div className="field full">
+          <label htmlFor="milestone-detail">Detalle</label>
+          <textarea
+            data-testid="milestone-detail"
+            id="milestone-detail"
+            onChange={(event) => setDetail(event.target.value)}
+            required
+            value={detail}
+          />
+        </div>
+        <div className="field full">
+          <button className="secondary-button" data-testid="create-milestone" type="submit">
+            <Plus size={16} />
+            Crear hito
+          </button>
+        </div>
+      </div>
+    </form>
   );
 }
 

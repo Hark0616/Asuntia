@@ -67,7 +67,7 @@ Esto mantiene una sola estructura de base de datos:
 - La misma estructura se debe copiar o aplicar despues al proyecto Supabase remoto.
 - Los cambios de schema deben entrar como nuevas migraciones, no como cambios manuales sueltos.
 
-La prueba `tests/unit/database-schema.test.ts` aplica las migraciones en PGlite y valida tablas, restricciones e indices base.
+La prueba `tests/unit/database-schema.test.ts` aplica las migraciones en PGlite y valida tablas, restricciones e indices base. La migracion `20260707000000_milestone_current_guard.sql` protege que cada caso tenga como maximo un hito `current`, una regla que debe mantenerse al promover el schema a Supabase.
 
 ## Modelo Inicial Esperado
 

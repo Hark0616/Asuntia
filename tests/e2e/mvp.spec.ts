@@ -150,3 +150,36 @@ test("cambio de estado y proximo paso se reflejan en el portal cliente", async (
     "Esperar respuesta de la entidad antes de radicar observaciones.",
   );
 });
+
+test("firma gestiona hitos y el cliente ve el nuevo punto actual del proceso", async ({ page }) => {
+  await page.goto("/firma");
+  await page.getByTestId("case-card-case-1").click();
+
+  await page.getByTestId("milestone-title").fill("Radicacion confirmada");
+  await page.getByTestId("milestone-date").fill("2026-07-12");
+  await page.getByTestId("milestone-status").selectOption("current");
+  await page.getByTestId("milestone-evidence").check();
+  await page
+    .getByTestId("milestone-description")
+    .fill("La firma radico observaciones y espera soporte final del cliente.");
+  await page
+    .getByTestId("milestone-detail")
+    .fill("El soporte final debe quedar visible al cliente antes del cierre.");
+  const milestoneSaved = waitForWorkspaceSave(page);
+  await page.getByTestId("create-milestone").click();
+  await milestoneSaved;
+
+  await expect(page.getByText("Radicacion confirmada")).toBeVisible();
+  await expect(page.getByTestId("milestone-status-milestone-3")).toHaveValue("completed");
+
+  await page.goto("/");
+  await page.getByTestId("public-tracking-code").fill("AS-2026-001");
+  await page.getByTestId("captcha-answer").fill("10");
+  await page.getByTestId("public-search").click();
+
+  await expect(page.locator(".milestone-current").filter({ hasText: "Radicacion confirmada" })).toBeVisible();
+  await expect(page.getByTestId("milestone-milestone-3")).toHaveClass(/milestone-completed/);
+  await expect(
+    page.getByText("El soporte final debe quedar visible al cliente antes del cierre."),
+  ).toBeVisible();
+});

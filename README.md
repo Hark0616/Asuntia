@@ -7,7 +7,7 @@ MVP web para seguimiento de asuntos legales entre una firma de abogados y sus cl
 - Next.js
 - React
 - TypeScript
-- Persistencia local para demo (`localStorage`)
+- Persistencia local con PGlite y respaldo de UI en `localStorage`
 
 ## Ejecutar
 
@@ -37,7 +37,7 @@ La primera version funciona como demo local sin base de datos externa. PGlite ej
 
 - `/`: entrada principal con consulta por codigo/radicado, captcha MVP y acceso interno de firma.
 - `/cliente`: portal aislado de seguimiento del asunto, hitos, solicitudes y documentos publicados.
-- `/firma`: espacio interno aislado para crear clientes, crear casos, cambiar estados, agregar avances, registrar solicitudes y documentos.
+- `/firma`: espacio interno aislado para crear clientes, crear casos, gestionar hitos, cambiar estados, agregar avances, registrar solicitudes y documentos.
 
 El captcha actual es de demo y se valida en cliente. En produccion debe reemplazarse por Turnstile/hCaptcha con verificacion del lado servidor.
 
