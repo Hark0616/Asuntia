@@ -1,4 +1,4 @@
-## Interfaz cliente
+# Interfaz cliente
 ### Avance procesal
 * 1. Radicar
 * 2. Audiencia
@@ -11,7 +11,7 @@
 - Total pagado hasta el momento
 ---
 
-## Interfaz oficina
+# Interfaz oficina
 3 perfiles
 
 * **Roles:**  Administrador (Edwin), Abogada (Hannahi), Auxiliar (Daniela).
@@ -51,9 +51,8 @@ Explicacion futura
 
 ---
 
-### Archivo: `3000.jpg`
 
-**Título General:** Solicitudes de conciliación - negociación de Pasivos.
+## Solicitudes de conciliación - negociación de Pasivos.
 
 **Esquema Principal (Círculos y Flujo)**
 
@@ -76,4 +75,4 @@ Explicacion futura
 
 * **Ruta de Fracaso (Centro hacia la izquierda):**
 * Una vez fracase negociación $\rightarrow$ Liquidación patrimonial $\rightarrow$ Juzgado.
-* * Auto de admit *(escrito dentro de un recuadro/círculo aparte)*.
+* * Acta de cliente.
