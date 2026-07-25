@@ -71,11 +71,11 @@ Se acordó dividir el proyecto en fases por complejidad, costo y prioridad:
 - Se concluyó que se necesita un factor adicional de seguridad.
 
 **Mecanismo definido:**
-- El cliente **no** crea usuario y contraseña tradicionales.
-- Ingresa con su número de **cédula** + un **código OTP (token dinámico)** enviado a su WhatsApp registrado.
-- Se **descartó** usar el radicado como clave de acceso.
+- El cliente **no** necesita recordar usuarios y contraseñas tradicionales ni depender de SMS/WhatsApp pagados.
+- Se autentica mediante **Google Auth (Google Sign-In / Google OAuth / OTP por correo)** vinculado a su correo electrónico y número de Cédula registrado en el sistema.
+- Se **descartó** el uso de WhatsApp/SMS OTP pago para evitar costos recurrentes por mensajería API.
 
-**[PENDIENTE / NUEVO PUNTO A PRESUPUESTAR]** El envío de OTP por WhatsApp requiere un proveedor de mensajería (WhatsApp Business API / Meta Cloud API / Twilio u otro similar). Este servicio tiene **costo propio por mensaje o por mes**, adicional al hosting. Debe cotizarse aparte y añadirse al presupuesto (ver sección 5).
+**[DECISIÓN DE AUTENTICACIÓN]** El uso de Google Auth elimina la necesidad de contratar proveedores de mensajería API (como Twilio o Meta Cloud API), reduciendo el costo operativo recurrente a $0 en este concepto.
 
 ### 2.2 Relación cliente — procesos
 
@@ -84,12 +84,10 @@ Se acordó dividir el proyecto en fases por complejidad, costo y prioridad:
 - Al ingresar, el cliente ve la **lista de todos sus procesos** y puede entrar a revisar el avance individual de cada uno.
 - Cada proceso se muestra con un **color de estado** para distinguir visualmente los activos de los cerrados. Ejemplo mencionado: "un caso en verde, un caso en azul y 3 casos en gris porque ya cerró 3 casos."
 
-### 2.3 Política de retención de datos
+### 2.3 Retención de datos
 
-- **[DECISIÓN TOMADA]** No se elimina información de ningún proceso, ni siquiera cuando ya está cerrado. Textualmente del desarrollador: "No me parece conveniente borrar información en un proceso legal. Ustedes tienen que seguir en otras habilidades [necesidades]... un proceso acabó pero el próximo año un problema, tocó revisar cosas."
-- Los procesos cerrados se **archivan visualmente** (cambio de color/estado) pero **no se borran** de la base de datos.
-- Se mencionó que la retención puede variar entre **3 y 6 años** dependiendo del tipo de proceso. Se habló de "copia de seguridad" como estándar: "siempre eso es lo normal, un proceso por cuánto tiempo, hay gente que lo guarda por 3 meses, por 6 meses, por un año, por 3 años, 6 años dependiendo."
-- **[PENDIENTE — verificar con la abogada]** La abogada indicó que debe revisar cuál es el **periodo normativo exacto** exigido por ley colombiana para la conservación de expedientes de procesos de insolvencia. Este dato **no debe tratarse como definitivo** hasta que se confirme; es una obligación legal, no una preferencia de producto.
+- No se elimina información de ningún proceso, ni siquiera cuando ya está cerrado. Textualmente del desarrollador: "No me parece conveniente borrar información en un proceso legal. Ustedes tienen que seguir en otras habilidades [necesidades]... un proceso acabó pero el próximo año un problema, tocó revisar cosas."
+- Los procesos cerrados se archivan visualmente (cambio de estado) y se conservan en el sistema sin eliminar registros de la base de datos.
 
 ### 2.4 Avance procesal — Línea de tiempo por caso
 
@@ -132,10 +130,8 @@ El cliente puede consultar (solo lectura) su información de pagos:
 ### 2.6 Fuera de alcance para el cliente
 
 - **No se visualiza calendario de audiencias** dentro de la plataforma. Textualmente la abogada: "el tema de las audiencias... el cliente casi no le interesa saber [los detalles]."
-- **No se muestra el link de conexión a la audiencia** dentro de la plataforma. Este flujo se sigue manejando directo por WhatsApp. Se evaluó y se descartó: "siento yo que ya está [siendo manejado] en el chat de WhatsApp, se puede seguir mandando el link."
-- **No se permite al cliente subir documentos** directamente a la plataforma (al menos no en la Fase 1). La abogada expresó reserva: "yo no quiero que el cliente tenga esos documentos [visibles]... porque ahí va a estar la solicitud que vamos a realizar." Sin embargo, el desarrollador sugirió la posibilidad de un apartado solo para subir (no ver), que quedó sin cerrar.
-
-**[PENDIENTE]** Definir si en algún momento el cliente podrá subir documentos (checklist de documentos requeridos con capacidad de carga) o si todo sigue llegando por WhatsApp.
+- **No se muestra el link de conexión a la audiencia** dentro de la plataforma. Este flujo se sigue manejando directo por WhatsApp.
+- **[DECISIÓN TOMADA] El cliente no sube documentos directamente a la plataforma.** Toda la carga de archivos, solicitudes y anexos la realiza el abogado encargado o el equipo de la oficina. El cliente continuará enviando sus documentos por los medios habituales (WhatsApp, correo electrónico, físico, etc.).
 
 ---
 
@@ -151,18 +147,12 @@ La oficina tiene actualmente **3 personas** con roles diferenciados:
 | **Abogada** | Hannahi | Permisos operativos amplios: gestionar avances procesales, registrar resultados de audiencias, redactar resúmenes, gestionar agenda. Puede también tener permisos de administrador total (textualmente: "yo también puedo ser administrador total"). No gestiona la configuración técnica del sistema. |
 | **Auxiliar** | Daniela | Permisos de lectura y escritura operativa: radicar procesos, subir documentos/soportes, actualizar la agenda de audiencias, cargar comprobantes de pago recibidos. **Restricción en información financiera** (ver nota abajo). |
 
-**Nota sobre los permisos de la auxiliar respecto a pagos:**
-- La abogada expresó claramente que la auxiliar **no debería** tener acceso a los valores/montos económicos: "siento que la auxiliar no tendría que ver el tema de los valores" / "¿se podría que el auxiliar no pueda revisar eso?"
-- Sin embargo, **no quedó resuelto** si la restricción es solo de **edición** (puede ver pero no modificar montos) o también de **visualización** (no puede ver cuánto debe un cliente en absoluto). La pregunta original ("no pueda **revisar** eso") apunta a ocultar también la lectura.
-- La auxiliar **sí puede cargar soportes/comprobantes** de pago al sistema, pero **no debería poder asignar ni editar los saldos finales**.
-
-**[PENDIENTE — crítico para el diseño de permisos]** Confirmar exactamente:
-1. ¿La auxiliar puede **ver** los montos de honorarios y saldos, o esos campos le quedan completamente ocultos?
-2. ¿La auxiliar puede **eliminar** información, o solo ingresar/actualizar?
+**[DECISIÓN TOMADA] Matriz y Panel Administrable de Permisos (RBAC):**
+- **Regla por defecto para Auxiliar:** La auxiliar **no puede eliminar ningún registro** (procesos, documentos, finanzas o bitácoras). Únicamente tiene permisos de creación, lectura y actualización según corresponda.
+- **Panel de Administración de Permisos:** El alcance exacto de los permisos (tanto para Abogados, Auxiliar y futuros nuevos perfiles) será completamente **configurable desde un panel de administración** administrado por Edwin/Administrador principal. Esto permite ajustar dinámicamente si la auxiliar o un perfil específico puede ver, crear, editar o eliminar campos o información financiera.
 
 **Escalabilidad de roles:**
-- El sistema debe permitir crear roles adicionales a futuro. Textualmente: "más adelante pueden ser más [personas], pero por ahora son 3."
-- El desarrollador confirmó: "sí, podemos hacer diferentes [vistas]. Que si es auxiliar vea una cosa, si es administrador otra."
+- El sistema incluye un módulo dinámico de roles y permisos (RBAC) para añadir y ajustar perfiles según el crecimiento de la oficina.
 
 ### 3.2 Módulo 1: Repositorio de Solicitudes
 
@@ -173,15 +163,20 @@ Contiene toda la información necesaria para elaborar y gestionar las solicitude
 - El desarrollador lo confirmó: "yo estoy acomodando un caso y que ustedes puedan colocar estado y que ese estado sea el mismo color."
 - La abogada mencionó que pueden necesitar **hasta ~20 estados** diferentes: "usted luego me dice quiero 20 estados y yo le meto."
 
-**[PENDIENTE — bloquea el diseño del semáforo]** Definir la lista completa de estados y su color asociado. Sin esta lista cerrada, no se puede completar el componente visual. Estados mencionados hasta ahora en la reunión:
-- Pendiente por presentar
-- Presentado
-- Admitido
-- En espera de respuesta
-- Listo pero no se puede presentar aún (gris)
-- Sin acción aún (amarillo)
-- Activo (verde)
-- Cerrado/archivado (gris)
+**[SISTEMA DE ESTADOS Y COLORES CONSOLIDADO]** (Lista unificada y coherente, extensible a futuro):
+
+| Estado | Color asignado | Propósito / Contexto procesal |
+|---|---|---|
+| **Sin acción aún** | Amarillo | Caso registrado, pendiente de inicio de gestiones |
+| **Pendiente por hacer** | Ámbar / Naranja | Trabajo en preparación (escrito o recolección) |
+| **Pendiente por corregir** | Coral / Rojo suave | Requiere ajustes, corrección o aclaraciones |
+| **Listo pero no se puede presentar aún** | Ocre / Gris cálido | Preparado pero retenido por condición externa |
+| **Pendiente por presentar** | Púrpura / Violeta | Listo para radicar ante entidad |
+| **Presentado / Presentada** | Azul claro | Radicado formalmente ante Centro/Juzgado |
+| **En espera de respuesta** | Cian / Turquesa | En trámite de admisión o pronunciamiento de autoridad |
+| **Admitido** | Verde Menta | Admisión oficial concedida |
+| **Activo** | Verde | Proceso en trámite activo y en audiencias |
+| **Cerrado / Archivado** | Gris | Proceso concluido o inactivado |
 
 #### 3.2.2 Subestructura de cada caso
 
@@ -443,12 +438,11 @@ Idea planteada por el desarrollador para automatizar el avance procesal y reduci
 
 **Beneficio:** "cada paso desbloquea el siguiente, en vez de que todos los campos estén abiertos simultáneamente — esto busca ordenar el flujo de trabajo entre auxiliar y abogada y reducir errores."
 
-### 4.4 Integración con almacenamiento actual
+### 4.4 Integración con almacenamiento actual (OneDrive)
 
-- La oficina actualmente usa **One Drive** para almacenar los repositorios de solicitudes y documentos. Textualmente: "en el Drive tenemos estas carpetas, cada carpeta es de [cada] cliente."
-- También usan **OneDrive** para parte de la información.
-- El desarrollador sugirió la posibilidad de que la plataforma se **conecte con la nube** existente: "puede ser que este [sistema] se conecte a la nube" / "digamos que estés en un caso y entonces que aquí diga: nuevo avance tal al cliente. Y aquí subir archivo. Automáticamente solo subió lo que ya subió [a Drive]. Me parece como que sería ordenado."
-- **[PENDIENTE]** Definir si la plataforma reemplaza el Drive completamente (almacenamiento propio) o se integra con él.
+- La oficina actualmente usa **OneDrive** para almacenar los repositorios de solicitudes y documentos. Textualmente: "en el Drive tenemos estas carpetas, cada carpeta es de [cada] cliente."
+- **[DECISIÓN TOMADA]** Se mantendrá **OneDrive** como motor de almacenamiento de archivos en la nube y se complementará con la plataforma web.
+- **Razón técnica/operativa:** La plataforma se conectará con OneDrive (mediante API o enlaces estructurados) para gestionar y vincular los documentos sin necesidad de montar ni costear un servidor propio de almacenamiento masivo de archivos pesados.
 
 ---
 
@@ -463,7 +457,7 @@ Idea planteada por el desarrollador para automatizar el avance procesal y reduci
 | **Hosting** | ~$15 – $20 USD/mes | Para una web con base de datos ligera. "No se justifica un proveedor tipo AWS mientras el volumen de datos sea bajo." |
 | **Dominio** | Variable (costo anual) | Depende del nombre elegido. "Si no es un dominio tan bonito, no vale tanto." |
 | **Base de datos** | ~$5 USD/mes (adicional) | Mencionado como costo separado: "la base de datos por ahí 5 dólares, no mucho tampoco." |
-| **[NUEVO — sin cotizar]** Servicio OTP por WhatsApp | **Pendiente** | Necesario para el login del cliente. Requiere WhatsApp Business API (Meta Cloud API, Twilio u otro). Tiene costo propio por mensaje o por mes. |
+| **Autenticación (Google Auth)** | $0 USD / Incluido | Implementado mediante Google Auth (OAuth / Google Sign-In / Correo), eliminando costos de API de SMS/WhatsApp. |
 
 ### 5.2 Modelo de cobro
 
@@ -484,42 +478,29 @@ Idea planteada por el desarrollador para automatizar el avance procesal y reduci
 | # | Decisión | Detalle |
 |---|---|---|
 | 1 | Priorizar página web sobre app | Fase 1 es web; app queda para Fase 2 |
-| 2 | Login con cédula + OTP (no solo cédula) | Se descartó acceso solo con cédula por inseguro |
+| 2 | Login con Cédula + Google Auth | Autenticación mediante Google Sign-In / OTP Google ($0 costo de mensajería API) |
 | 3 | Un cliente puede tener múltiples procesos | Cada proceso con su propio radicado |
 | 4 | No se borra información de procesos cerrados | Se archivan visualmente, no se eliminan |
 | 5 | Línea de tiempo visual para avance procesal | Estilo "tracking de pedido" |
 | 6 | El cliente no realiza pagos desde la plataforma | Solo consulta; pagos se registran manualmente por la oficina |
 | 7 | No se incluye link de audiencia en la plataforma (cliente) | Se sigue manejando por WhatsApp |
 | 8 | No se incluye calendario de audiencias para el cliente | No aporta valor adicional al cliente |
-| 9 | La auxiliar tiene restricción sobre información financiera | Alcance exacto pendiente |
+| 9 | Configuración dinámica de roles y permisos (RBAC) | El administrador configura en un panel los permisos de cada rol (Abogados, Auxiliar, etc.). La auxiliar NO tiene permisos de eliminación. |
 | 10 | Repositorio de solicitudes y de liquidación son módulos separados | Etapas procesales distintas |
 | 11 | Tres bases de datos internas independientes | Liquidadores, Acreedores, Seguimiento |
 | 12 | Link de audiencia no se incluye en la agenda de la plataforma | Se sigue por WhatsApp/correo |
 | 13 | IA y automatizaciones fuera del alcance inicial | Fase 3, complejidad alta |
+| 14 | Uso de OneDrive como almacenamiento complementario | Se complementa con la plataforma web sin montar servidor de almacenamiento propio |
+| 15 | Autenticación de clientes sin costo de mensajería API | Implementación con Google Auth (OAuth / Google OTP) sin costo por mensaje |
+| 16 | Carga de documentos centralizada en la oficina | El cliente no sube documentos a la plataforma; los entrega a la oficina por WhatsApp/correo/físico y el personal de la oficina realiza la carga. |
+
 
 ---
 
-## 7. Resumen completo de pendientes por decidir
-
-| # | Pendiente | Impacto | Prioridad |
-|---|---|---|---|
-| 1 | **Paleta completa de colores/estados para los casos** — ¿Cuántos estados existen (hasta ~20) y qué color corresponde a cada uno? | Bloquea el diseño visual del semáforo de estados en repositorios y línea de tiempo. | 🔴 Alta |
-| 2 | **Alcance exacto de permisos de la auxiliar sobre pagos** — ¿Solo restricción de edición, o también de visualización? | Cambia el diseño del módulo de pagos y el sistema de permisos. | 🔴 Alta |
-| 3 | **¿La auxiliar puede eliminar información?** | Afecta permisos CRUD del rol auxiliar. | 🟡 Media |
-| 4 | **Cotización del servicio de mensajería OTP** — Proveedor, costo por mensaje/mes. | Necesario para el login del cliente. Sin esto, no se puede implementar la autenticación. | 🔴 Alta |
-| 5 | **Periodo de retención legal de procesos cerrados** — ¿3 años? ¿6 años? ¿Otro? | Obligación legal, no preferencia de producto. Implicaciones de cumplimiento normativo. | 🟡 Media |
-| 6 | **Costo definitivo del dominio** — Depende del nombre elegido. | Presupuesto final. | 🟢 Baja |
-| 7 | **Valores definitivos de pago inicial y mensualidad** | Negociación comercial con Edwin. | 🔴 Alta |
-| 8 | **¿Se cotizan Fase 2 y Fase 3 ahora o se dejan para después?** | Planificación y expectativas del cliente. | 🟡 Media |
-| 9 | **¿El cliente podrá subir documentos (checklist)?** | Diseño de la interfaz del cliente; si se añade, implica un módulo de carga con control de acceso. | 🟡 Media |
-| 10 | **¿La plataforma reemplaza Drive o se integra con él?** | Arquitectura de almacenamiento de archivos. | 🟡 Media |
-
----
-
-## 8. Próximos pasos acordados en la reunión
+## 7. Próximos pasos acordados en la reunión
 
 1. **El desarrollador** elabora un diagrama de bloques interconectando todos los módulos: "yo voy a hacer un diagrama de bloques, interconectar todo."
 2. **La abogada** presenta la complejidad del proyecto a Edwin para que comprenda el alcance y el costo: "yo le voy a mostrar hoy toda la complejidad" / "cuesta plata."
 3. **Antes de construir**, el desarrollador prepara demos visuales: "antes de ponerte a crear todo, más bien revísate, fija tus ideas, si puede hacer demos nomás de lo que dice."
 4. **Se itera sobre el diseño** antes de empezar el desarrollo: "podemos ir cuadrando y modificando."
-5. **El presupuesto final** se presenta a Edwin con todas las líneas de costo (incluyendo OTP, hosting, dominio, desarrollo y mantenimiento).
+5. **El presupuesto final** se presenta a Edwin con las líneas de costo principales (hosting, dominio, desarrollo y mantenimiento).
