@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   LogOut, 
-  X, 
   CircleCheck, 
   ChevronRight, 
   ChevronDown, 
@@ -19,10 +18,14 @@ import {
 import { 
   fetchAsuntos, 
   fetchEstadosAPI, 
+  fetchClientesAPI,
+  crearClienteAPI,
+  crearAsuntoAPI,
   crearNovedadAPI, 
   actualizarEstadoAPI, 
   AsuntoAPI, 
-  EstadoProcesalAPI 
+  EstadoProcesalAPI,
+  ClienteAPI
 } from '@/features/asuntos/api/asuntos';
 import { ClienteOTPLogin } from '@/features/auth/components/ClienteOTPLogin';
 import { OficinaLogin } from '@/features/auth/components/OficinaLogin';
@@ -75,7 +78,7 @@ interface ClienteData {
 
 const mockClientesFallback: ClienteData[] = [
   {
-    id: 'carlos-gomez',
+    id: '00000000-0000-0000-0000-000000000020',
     nombre: 'Carlos Gómez Restrepo',
     contacto: 'Carlos Gómez',
     email: 'carlos.gomez@email.com',
@@ -108,7 +111,7 @@ const mockClientesFallback: ClienteData[] = [
             estadoBadge: 'Actual',
             estadoItem: 'current',
             detalle: 'Estamos esperando el certificado de ingresos y extracto bancario actualizado para radicar observaciones.',
-            subtexto: 'Cuando cargues el soporte en PDF, la abogada responsable lo revisará para continuar.',
+            subtexto: 'Cuando envíes el soporte en PDF, la abogada responsable lo revisará para continuar.',
             requiereDocumento: true
           }
         ],
@@ -132,7 +135,7 @@ export default function App() {
   // Usuario autenticado (null = muestra formulario de login)
   const [usuarioAutenticado, setUsuarioAutenticado] = useState<any>(null);
   const [view, setView] = useState<'cliente' | 'firma'>('firma');
-  const [clienteIdSeleccionado, setClienteIdSeleccionado] = useState<string>('carlos-gomez');
+  const [clienteIdSeleccionado, setClienteIdSeleccionado] = useState<string>('00000000-0000-0000-0000-000000000020');
   const [casoIdSeleccionado, setCasoIdSeleccionado] = useState<string>('00000000-0000-0000-0000-000000000201');
   const [milestoneAbiertoId, setMilestoneAbiertoId] = useState<number | null>(2);
 
@@ -148,6 +151,33 @@ export default function App() {
     queryKey: ['estados'],
     queryFn: fetchEstadosAPI,
     retry: 1,
+  });
+
+  // Consulta Clientes
+  const { data: clientesAPI } = useQuery({
+    queryKey: ['clientes'],
+    queryFn: fetchClientesAPI,
+    retry: 1,
+  });
+
+  // Mutación para Crear Cliente
+  const mutacionNuevoCliente = useMutation({
+    mutationFn: (payload: { nombre: string; cedula: string; email: string }) => crearClienteAPI(payload),
+    onSuccess: (newClient) => {
+      queryClient.invalidateQueries({ queryKey: ['clientes'] });
+      setClienteIdSeleccionado(newClient.id);
+      alert(`¡Cliente ${newClient.nombre} creado exitosamente en PostgreSQL!`);
+    }
+  });
+
+  // Mutación para Crear Asunto
+  const mutacionNuevoAsunto = useMutation({
+    mutationFn: (payload: { radicado: string; cliente_id: string; etapa_actual?: string; siguiente_paso?: string }) => crearAsuntoAPI(payload),
+    onSuccess: (newAsunto) => {
+      queryClient.invalidateQueries({ queryKey: ['asuntos'] });
+      setCasoIdSeleccionado(newAsunto.id);
+      alert(`¡Expediente ${newAsunto.radicado} creado exitosamente en PostgreSQL!`);
+    }
   });
 
   // Mutación para Novedad
@@ -169,18 +199,20 @@ export default function App() {
     },
   });
 
-  // Mapear datos reales
+  // Mapear datos reales de la BD
   const clientes: ClienteData[] = React.useMemo(() => {
-    if (!asuntosAPI || asuntosAPI.length === 0) return mockClientesFallback;
+    if (!clientesAPI || clientesAPI.length === 0) return mockClientesFallback;
 
-    return [
-      {
-        id: 'carlos-gomez',
-        nombre: 'Carlos Gómez Restrepo',
-        contacto: 'Carlos Gómez',
-        email: 'carlos.gomez@email.com',
-        identificacion: '1.094.852.140',
-        casos: asuntosAPI.map((as: AsuntoAPI) => ({
+    return clientesAPI.map((cli: ClienteAPI) => {
+      const casosDelCliente = (asuntosAPI || []).filter((as: AsuntoAPI) => as.cliente_id === cli.id);
+
+      return {
+        id: cli.id,
+        nombre: cli.nombre,
+        contacto: cli.nombre.split(' ')[0],
+        email: cli.email,
+        identificacion: cli.cedula,
+        casos: casosDelCliente.map((as: AsuntoAPI) => ({
           id: as.id,
           codigo: as.radicado,
           nombre: 'Insolvencia Persona Natural',
@@ -220,12 +252,23 @@ export default function App() {
             visibilidad: nov.publicado_al_cliente ? 'Cliente' : 'Interno'
           }))
         }))
-      }
-    ];
-  }, [asuntosAPI]);
+      };
+    });
+  }, [clientesAPI, asuntosAPI]);
 
-  const clienteActivo = clientes.find(c => c.id === clienteIdSeleccionado) || clientes[0];
-  const casoActivo = clienteActivo.casos.find(c => c.id === casoIdSeleccionado) || clienteActivo.casos[0];
+  const clienteActivo = clientes.find(c => c.id === clienteIdSeleccionado) || clientes[0] || mockClientesFallback[0];
+  const casoActivo = (clienteActivo.casos && clienteActivo.casos.find(c => c.id === casoIdSeleccionado)) || clienteActivo.casos[0] || {
+    id: '00000000-0000-0000-0000-000000000201',
+    codigo: 'AS-2026-001',
+    nombre: 'Insolvencia Persona Natural',
+    responsable: 'Dra. Daniela Torres',
+    estadoBadge: 'Sin casos activos',
+    estadoTipo: 'neutral',
+    prioridad: 'normal',
+    proximoPaso: 'Crear nuevo expediente para este cliente',
+    milestones: [],
+    novedades: []
+  };
 
   // Estado formulario de edición
   const [estadoSeleccionadoId, setEstadoSeleccionadoId] = useState<string>('');
@@ -234,6 +277,29 @@ export default function App() {
   // Estado nuevo avance
   const [nuevoAvanceTexto, setNuevoAvanceTexto] = useState('');
   const [nuevoAvanceVisibilidad, setNuevoAvanceVisibilidad] = useState<'client' | 'internal'>('client');
+
+  const handleCrearClientePrompt = () => {
+    const nombre = prompt('Nombre completo del nuevo cliente:');
+    if (!nombre) return;
+    const cedula = prompt('Número de cédula / NIT:');
+    if (!cedula) return;
+    const email = prompt('Correo electrónico del cliente:');
+    if (!email) return;
+
+    mutacionNuevoCliente.mutate({ nombre, cedula, email });
+  };
+
+  const handleCrearAsuntoPrompt = () => {
+    const radicado = prompt(`Número de radicado para ${clienteActivo.nombre} (Ej: AS-2026-003):`);
+    if (!radicado) return;
+    const paso = prompt('Próximo paso inicial:', 'Revisión de documentación inicial');
+
+    mutacionNuevoAsunto.mutate({
+      radicado,
+      cliente_id: clienteActivo.id,
+      siguiente_paso: paso || 'Revisión inicial de documentación'
+    });
+  };
 
   const handleGuardarEstado = (e: React.FormEvent) => {
     e.preventDefault();
@@ -353,10 +419,6 @@ export default function App() {
               <h2>{casoActivo.nombre}</h2>
               <p className="muted">{clienteActivo.nombre} · Responsable: {casoActivo.responsable}</p>
             </div>
-            <button className="secondary-button" type="button">
-              <X size={16} />
-              Consultar otro
-            </button>
           </div>
 
           {casoActivo.solicitudPendiente && (
@@ -463,8 +525,8 @@ export default function App() {
           <aside className="sidebar">
             <div className="sidebar-inner">
               <div className="section-title">
-                <h3>Clientes</h3>
-                <button className="icon-button" type="button">
+                <h3>Clientes ({clientes.length})</h3>
+                <button className="icon-button" type="button" onClick={handleCrearClientePrompt} title="Nuevo Cliente">
                   <Plus size={16} />
                 </button>
               </div>
@@ -474,10 +536,15 @@ export default function App() {
                     key={cli.id}
                     className={`client-entry ${cli.id === clienteActivo.id ? 'active' : ''}`}
                     type="button"
-                    onClick={() => setClienteIdSeleccionado(cli.id)}
+                    onClick={() => {
+                      setClienteIdSeleccionado(cli.id);
+                      if (cli.casos && cli.casos.length > 0) {
+                        setCasoIdSeleccionado(cli.casos[0].id);
+                      }
+                    }}
                   >
                     <strong>{cli.nombre}</strong>
-                    <span className="muted small">{cli.contacto}</span>
+                    <span className="muted small">{cli.contacto} ({cli.casos ? cli.casos.length : 0} casos)</span>
                   </button>
                 ))}
               </div>
@@ -488,22 +555,22 @@ export default function App() {
             <div className="toolbar">
               <div>
                 <h2>{clienteActivo.nombre}</h2>
-                <span className="muted">{clienteActivo.email}</span>
+                <span className="muted">{clienteActivo.email} · Cédula/NIT: {clienteActivo.identificacion}</span>
               </div>
-              <button className="primary-button" type="button">
+              <button className="primary-button" type="button" onClick={handleCrearAsuntoPrompt}>
                 <Plus size={16} />
-                Nuevo caso
+                Nuevo caso para este cliente
               </button>
             </div>
 
             <div className="grid metrics">
               <div className="metric">
-                <span>Clientes</span>
+                <span>Clientes Registrados</span>
                 <strong>{clientes.length}</strong>
               </div>
               <div className="metric">
-                <span>Casos abiertos</span>
-                <strong>{clientes.reduce((acc, curr) => acc + curr.casos.length, 0)}</strong>
+                <span>Casos Activos</span>
+                <strong>{clientes.reduce((acc, curr) => acc + (curr.casos ? curr.casos.length : 0), 0)}</strong>
               </div>
               <div className="metric">
                 <span>Acción cliente</span>
@@ -519,27 +586,33 @@ export default function App() {
               <section className="panel case-nav-panel">
                 <div className="section-title">
                   <h3>Casos de {clienteActivo.nombre}</h3>
-                  <span className="muted small">{clienteActivo.casos.length} activos</span>
+                  <span className="muted small">{clienteActivo.casos ? clienteActivo.casos.length : 0} activos</span>
                 </div>
                 <div className="case-list">
-                  {clienteActivo.casos.map(cs => (
-                    <button 
-                      key={cs.id}
-                      className={`case-card ${cs.id === casoActivo.id ? 'active' : ''}`}
-                      type="button"
-                      onClick={() => setCasoIdSeleccionado(cs.id)}
-                    >
-                      <div className="case-card-header">
-                        <div>
-                          <strong>{cs.nombre}</strong>
-                          <span className="muted small">Radicado: {cs.codigo}</span>
+                  {clienteActivo.casos && clienteActivo.casos.length > 0 ? (
+                    clienteActivo.casos.map(cs => (
+                      <button 
+                        key={cs.id}
+                        className={`case-card ${cs.id === casoActivo.id ? 'active' : ''}`}
+                        type="button"
+                        onClick={() => setCasoIdSeleccionado(cs.id)}
+                      >
+                        <div className="case-card-header">
+                          <div>
+                            <strong>{cs.nombre}</strong>
+                            <span className="muted small">Radicado: {cs.codigo}</span>
+                          </div>
+                          <div className="case-card-badges">
+                            <span className={`badge ${cs.estadoTipo}`}>{cs.estadoBadge}</span>
+                          </div>
                         </div>
-                        <div className="case-card-badges">
-                          <span className={`badge ${cs.estadoTipo}`}>{cs.estadoBadge}</span>
-                        </div>
-                      </div>
-                    </button>
-                  ))}
+                      </button>
+                    ))
+                  ) : (
+                    <div className="muted small" style={{ padding: '16px' }}>
+                      Este cliente no tiene expedientes registrados aún. Haz clic en "Nuevo caso para este cliente".
+                    </div>
+                  )}
                 </div>
               </section>
 
@@ -638,23 +711,29 @@ export default function App() {
                   </div>
 
                   <div className="timeline">
-                    {casoActivo.novedades.map((n) => (
-                      <div key={n.id} className="timeline-item">
-                        <div className="timeline-dot">
-                          <Clock3 size={14} />
-                        </div>
-                        <div className="timeline-body">
-                          <div className="row between">
-                            <strong>{n.autor}</strong>
-                            <span className="muted small">{n.fecha}</span>
+                    {casoActivo.novedades && casoActivo.novedades.length > 0 ? (
+                      casoActivo.novedades.map((n) => (
+                        <div key={n.id} className="timeline-item">
+                          <div className="timeline-dot">
+                            <Clock3 size={14} />
                           </div>
-                          <p style={{ margin: '4px 0' }}>{n.texto}</p>
-                          <span className={`badge ${n.visibilidad === 'Cliente' ? 'neutral' : 'warning'}`}>
-                            {n.visibilidad}
-                          </span>
+                          <div className="timeline-body">
+                            <div className="row between">
+                              <strong>{n.autor}</strong>
+                              <span className="muted small">{n.fecha}</span>
+                            </div>
+                            <p style={{ margin: '4px 0' }}>{n.texto}</p>
+                            <span className={`badge ${n.visibilidad === 'Cliente' ? 'neutral' : 'warning'}`}>
+                              {n.visibilidad}
+                            </span>
+                          </div>
                         </div>
+                      ))
+                    ) : (
+                      <div className="muted small" style={{ padding: '12px' }}>
+                        No hay avances registrados para este expediente aún.
                       </div>
-                    ))}
+                    )}
                   </div>
                 </div>
               </section>

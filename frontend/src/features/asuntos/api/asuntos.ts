@@ -6,6 +6,16 @@ export interface EstadoProcesalAPI {
   color_tipo: string;
 }
 
+export interface ClienteAPI {
+  id: string;
+  nombre: string;
+  cedula: string;
+  email: string;
+  telefono?: string;
+  rol: string;
+  created_at: string;
+}
+
 export interface AsuntoAPI {
   id: string;
   radicado: string;
@@ -33,6 +43,21 @@ export const fetchAsuntos = async (): Promise<AsuntoAPI[]> => {
 
 export const fetchEstadosAPI = async (): Promise<EstadoProcesalAPI[]> => {
   const response = await apiClient.get<EstadoProcesalAPI[]>('/estados');
+  return response.data;
+};
+
+export const fetchClientesAPI = async (): Promise<ClienteAPI[]> => {
+  const response = await apiClient.get<ClienteAPI[]>('/clientes');
+  return response.data;
+};
+
+export const crearClienteAPI = async (payload: { nombre: string; cedula: string; email: string; telefono?: string }) => {
+  const response = await apiClient.post<ClienteAPI>('/clientes', payload);
+  return response.data;
+};
+
+export const crearAsuntoAPI = async (payload: { radicado: string; cliente_id: string; estado_id?: string; etapa_actual?: string; siguiente_paso?: string }) => {
+  const response = await apiClient.post<AsuntoAPI>('/asuntos', payload);
   return response.data;
 };
 
