@@ -174,7 +174,7 @@ export default function App() {
         casos: asuntosAPI.map((as: AsuntoAPI) => ({
           id: as.id,
           codigo: as.radicado,
-          nombre: `Insolvencia Persona Natural (${as.radicado})`,
+          nombre: 'Insolvencia Persona Natural',
           responsable: 'Dra. Daniela Torres',
           estadoBadge: as.estado?.nombre || 'En trámite',
           estadoTipo: (as.estado?.color_tipo as any) || 'mint',
