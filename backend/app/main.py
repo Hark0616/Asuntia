@@ -27,7 +27,8 @@ async def health_check():
         "service": "asuntia-api"
     }
 
+from app.api.v1.api import api_router
+
 # Router principal v1
-@app.get("/api/v1/ping", tags=["Ping"])
-async def ping_v1():
-    return {"message": "pong v1"}
+app.include_router(api_router, prefix="/api/v1")
+

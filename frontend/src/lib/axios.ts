@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 export const apiClient = axios.create({
   baseURL: `${API_URL}/api/v1`,
@@ -15,7 +15,6 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Manejo de sesión vencida
       console.warn('Sesión expirada o no autorizada');
     }
     return Promise.reject(error);

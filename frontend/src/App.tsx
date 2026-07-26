@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   LogOut, 
   X, 
@@ -12,8 +13,10 @@ import {
   Save, 
   Eye, 
   Send, 
-  Clock3 
+  Clock3,
+  Database
 } from 'lucide-react';
+import { fetchAsuntos, crearNovedadAPI, AsuntoAPI } from '@/features/asuntos/api/asuntos';
 
 interface NovedadItem {
   id: string;
@@ -60,7 +63,7 @@ interface ClienteData {
   casos: CasoData[];
 }
 
-const mockClientesIniciales: ClienteData[] = [
+const mockClientesFallback: ClienteData[] = [
   {
     id: 'carlos-gomez',
     nombre: 'Carlos Gómez Restrepo',
@@ -73,10 +76,10 @@ const mockClientesIniciales: ClienteData[] = [
         codigo: 'AS-2026-001',
         nombre: 'Insolvencia Persona Natural',
         responsable: 'Dra. Daniela Torres',
-        estadoBadge: 'Requiere cliente',
-        estadoTipo: 'warning',
+        estadoBadge: 'Admitido en Centro de Conciliación',
+        estadoTipo: 'mint',
         prioridad: 'alta',
-        proximoPaso: 'Recibir certificado de ingresos y extracto bancario actualizado.',
+        proximoPaso: 'Fijación de fecha para primera audiencia de negociación',
         solicitudPendiente: 'Certificado de ingresos y estado de cuenta',
         fechaLimiteSolicitud: '08 de ago de 2026',
         documentoPrincipal: 'Solicitud_Insolvencia_v1.pdf',
@@ -112,14 +115,6 @@ const mockClientesIniciales: ClienteData[] = [
             estadoBadge: 'Siguiente',
             tipoBadge: 'neutral',
             estadoItem: 'upcoming'
-          },
-          {
-            id: 5,
-            fecha: '15 de ago de 2026',
-            titulo: 'Audiencia de negociación de pasivos',
-            estadoBadge: 'Siguiente',
-            tipoBadge: 'neutral',
-            estadoItem: 'upcoming'
           }
         ],
         novedades: [
@@ -134,127 +129,8 @@ const mockClientesIniciales: ClienteData[] = [
             id: 'n2',
             autor: 'Dra. Daniela Torres',
             fecha: '24 de jul, 04:30 p. m.',
-            texto: 'Pendiente validar internamente con el contador la clasificación de acreencia de vivienda.',
+            texto: 'Nota interna: Borrador de conciliación de extractos bancarios antes de la audiencia.',
             visibilidad: 'Interno'
-          }
-        ]
-      }
-    ]
-  },
-  {
-    id: 'constructora-norte',
-    nombre: 'Constructora Norte S.A.S.',
-    contacto: 'Laura Mejía',
-    email: 'laura@constructoranorte.co',
-    identificacion: 'NIT 900.542.118-4',
-    casos: [
-      {
-        id: 'case-licitacion',
-        codigo: 'AS-2026-002',
-        nombre: 'Licitación Municipal 2026',
-        responsable: 'Dra. Daniela Torres',
-        estadoBadge: 'Requiere cliente',
-        estadoTipo: 'warning',
-        prioridad: 'alta',
-        proximoPaso: 'Recibir certificado de experiencia actualizado en PDF.',
-        solicitudPendiente: 'Certificado de experiencia',
-        fechaLimiteSolicitud: '08 de jul de 2026',
-        documentoPrincipal: 'Pliego_condiciones_v2.pdf',
-        milestones: [
-          {
-            id: 1,
-            fecha: '01 de jul de 2026',
-            titulo: 'Apertura del asunto',
-            estadoBadge: 'Completado',
-            estadoItem: 'completed'
-          },
-          {
-            id: 2,
-            fecha: '03 de jul de 2026',
-            titulo: 'Revisión inicial de pliegos',
-            estadoBadge: 'Completado',
-            estadoItem: 'completed'
-          },
-          {
-            id: 3,
-            fecha: '08 de jul de 2026',
-            titulo: 'Recolección de evidencia',
-            estadoBadge: 'Actual',
-            estadoItem: 'current',
-            detalle: 'Estamos esperando el certificado de experiencia actualizado para continuar con observaciones.',
-            subtexto: 'Cuando el cliente cargue el soporte, el equipo lo revisará y definirá si queda listo para radicar.',
-            requiereDocumento: true
-          },
-          {
-            id: 4,
-            fecha: '10 de jul de 2026',
-            titulo: 'Radicación de observaciones',
-            estadoBadge: 'Siguiente',
-            tipoBadge: 'neutral',
-            estadoItem: 'upcoming'
-          },
-          {
-            id: 5,
-            fecha: '15 de jul de 2026',
-            titulo: 'Seguimiento a respuesta',
-            estadoBadge: 'Siguiente',
-            tipoBadge: 'neutral',
-            estadoItem: 'upcoming'
-          }
-        ],
-        novedades: [
-          {
-            id: 'n3',
-            autor: 'Dra. Daniela Torres',
-            fecha: '04 de jul, 09:25 a. m.',
-            texto: 'Pendiente validar internamente si conviene presentar observación adicional.',
-            visibilidad: 'Interno'
-          },
-          {
-            id: 'n4',
-            autor: 'Dra. Daniela Torres',
-            fecha: '04 de jul, 09:15 a. m.',
-            texto: 'Se revisaron los requisitos habilitantes y se identificó un documento pendiente.',
-            visibilidad: 'Cliente'
-          }
-        ]
-      },
-      {
-        id: 'case-contrato',
-        codigo: 'AS-2026-003',
-        nombre: 'Contrato de Obra con Proveedor',
-        responsable: 'Dr. Carlos Rojas',
-        estadoBadge: 'En curso',
-        estadoTipo: 'mint',
-        prioridad: 'normal',
-        proximoPaso: 'Revisión de cláusula de garantía procesal.',
-        documentoPrincipal: 'Minuta_Contrato_v1.pdf',
-        milestones: [
-          {
-            id: 1,
-            fecha: '01 de jul de 2026',
-            titulo: 'Recepción de minuta contractual',
-            estadoBadge: 'Completado',
-            estadoItem: 'completed'
-          },
-          {
-            id: 2,
-            fecha: '05 de jul de 2026',
-            titulo: 'Revisión de riesgos jurídicos',
-            estadoBadge: 'Actual',
-            estadoItem: 'current',
-            detalle: 'En análisis de penalidades por incumplimiento con la aseguradora.',
-            subtexto: 'Revisión en curso por el equipo legal.',
-            requiereDocumento: false
-          }
-        ],
-        novedades: [
-          {
-            id: 'n5',
-            autor: 'Dr. Carlos Rojas',
-            fecha: '03 de jul, 02:00 p. m.',
-            texto: 'Se enviaron comentarios a la aseguradora para ajuste de póliza.',
-            visibilidad: 'Cliente'
           }
         ]
       }
@@ -263,86 +139,106 @@ const mockClientesIniciales: ClienteData[] = [
 ];
 
 export default function App() {
+  const queryClient = useQueryClient();
   const [view, setView] = useState<'cliente' | 'firma'>('firma');
-  const [clientes, setClientes] = useState<ClienteData[]>(mockClientesIniciales);
   const [clienteIdSeleccionado, setClienteIdSeleccionado] = useState<string>('carlos-gomez');
   const [casoIdSeleccionado, setCasoIdSeleccionado] = useState<string>('case-insolvencia');
-  
-  // Obtener cliente y caso activo
+
+  // Consulta TanStack Query a la API REST de FastAPI (/api/v1/asuntos)
+  const { data: asuntosAPI, isSuccess: apiConectada } = useQuery({
+    queryKey: ['asuntos'],
+    queryFn: fetchAsuntos,
+    retry: 1,
+  });
+
+  // Mutación para publicar novedad en el Backend
+  const mutacionNovedad = useMutation({
+    mutationFn: ({ asuntoId, payload }: { asuntoId: string; payload: { titulo: string; descripcion: string; publicado_al_cliente: boolean } }) =>
+      crearNovedadAPI(asuntoId, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['asuntos'] });
+    },
+  });
+
+  // Mapear datos reales de la API si están disponibles
+  const clientes: ClienteData[] = React.useMemo(() => {
+    if (!asuntosAPI || asuntosAPI.length === 0) return mockClientesFallback;
+
+    return [
+      {
+        id: 'carlos-gomez',
+        nombre: 'Carlos Gómez Restrepo',
+        contacto: 'Carlos Gómez',
+        email: 'carlos.gomez@email.com',
+        identificacion: '1.094.852.140',
+        casos: asuntosAPI.map((as: AsuntoAPI) => ({
+          id: as.id,
+          codigo: as.radicado,
+          nombre: `Insolvencia Persona Natural (${as.radicado})`,
+          responsable: 'Dra. Daniela Torres',
+          estadoBadge: as.estado?.nombre || 'En trámite',
+          estadoTipo: (as.estado?.color_tipo as any) || 'mint',
+          prioridad: 'alta' as const,
+          proximoPaso: as.siguiente_paso,
+          solicitudPendiente: 'Certificado de ingresos y estado de cuenta',
+          fechaLimiteSolicitud: '08 de ago de 2026',
+          documentoPrincipal: 'Solicitud_Insolvencia_v1.pdf',
+          milestones: [
+            {
+              id: 1,
+              fecha: '01 de jul de 2026',
+              titulo: 'Apertura de evaluación de viabilidad',
+              estadoBadge: 'Completado',
+              estadoItem: 'completed'
+            },
+            {
+              id: 2,
+              fecha: '26 de jul de 2026',
+              titulo: as.etapa_actual,
+              estadoBadge: 'Actual',
+              estadoItem: 'current',
+              detalle: as.siguiente_paso,
+              subtexto: 'Información registrada y sincronizada con el backend FastAPI.',
+              requiereDocumento: true
+            }
+          ],
+          novedades: as.novedades.map(nov => ({
+            id: nov.id,
+            autor: 'Dra. Daniela Torres',
+            fecha: new Date(nov.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            texto: nov.descripcion,
+            visibilidad: nov.publicado_al_cliente ? 'Cliente' : 'Interno'
+          }))
+        }))
+      }
+    ];
+  }, [asuntosAPI]);
+
   const clienteActivo = clientes.find(c => c.id === clienteIdSeleccionado) || clientes[0];
   const casoActivo = clienteActivo.casos.find(c => c.id === casoIdSeleccionado) || clienteActivo.casos[0];
 
-  // Estado del formulario de edición del caso
-  const [estadoProcesalForm, setEstadoProcesalForm] = useState('requiere_cliente');
-  const [prioridadForm, setPrioridadForm] = useState<'alta' | 'normal'>(casoActivo.prioridad);
+  // Estado formulario de edición
+  const [milestoneAbiertoId, setMilestoneAbiertoId] = useState<number | null>(2);
   const [proximoPasoForm, setProximoPasoForm] = useState(casoActivo.proximoPaso);
 
-  // Estado de nuevo avance
+  // Estado nuevo avance
   const [nuevoAvanceTexto, setNuevoAvanceTexto] = useState('');
   const [nuevoAvanceVisibilidad, setNuevoAvanceVisibilidad] = useState<'client' | 'internal'>('client');
 
-  // Cambiar de cliente en el sidebar
-  const handleSeleccionarCliente = (cliente: ClienteData) => {
-    setClienteIdSeleccionado(cliente.id);
-    setCasoIdSeleccionado(cliente.casos[0].id);
-    setProximoPasoForm(cliente.casos[0].proximoPaso);
-    setPrioridadForm(cliente.casos[0].prioridad);
-  };
-
-  // Cambiar de caso
-  const handleSeleccionarCaso = (caso: CasoData) => {
-    setCasoIdSeleccionado(caso.id);
-    setProximoPasoForm(caso.proximoPaso);
-    setPrioridadForm(caso.prioridad);
-  };
-
-  // Guardar cambios en el caso
-  const handleGuardarCaso = (e: React.FormEvent) => {
-    e.preventDefault();
-    setClientes(prevClientes => prevClientes.map(c => {
-      if (c.id !== clienteActivo.id) return c;
-      return {
-        ...c,
-        casos: c.casos.map(cs => {
-          if (cs.id !== casoActivo.id) return cs;
-          return {
-            ...cs,
-            prioridad: prioridadForm,
-            proximoPaso: proximoPasoForm
-          };
-        })
-      };
-    }));
-    alert('¡Caso guardado exitosamente!');
-  };
-
-  // Publicar un avance
   const handlePublicarAvance = (e: React.FormEvent) => {
     e.preventDefault();
     if (!nuevoAvanceTexto.trim()) return;
 
-    const visibilidadTexto = nuevoAvanceVisibilidad === 'client' ? 'Cliente' : 'Interno';
-    const nuevaNovedad: NovedadItem = {
-      id: Date.now().toString(),
-      autor: 'Dra. Daniela Torres',
-      fecha: 'Hace un momento',
-      texto: nuevoAvanceTexto,
-      visibilidad: visibilidadTexto
-    };
-
-    setClientes(prevClientes => prevClientes.map(c => {
-      if (c.id !== clienteActivo.id) return c;
-      return {
-        ...c,
-        casos: c.casos.map(cs => {
-          if (cs.id !== casoActivo.id) return cs;
-          return {
-            ...cs,
-            novedades: [nuevaNovedad, ...cs.novedades]
-          };
-        })
-      };
-    }));
+    if (apiConectada && casoActivo.id) {
+      mutacionNovedad.mutate({
+        asuntoId: casoActivo.id,
+        payload: {
+          titulo: 'Avance procesal',
+          descripcion: nuevoAvanceTexto,
+          publicado_al_cliente: nuevoAvanceVisibilidad === 'client'
+        }
+      });
+    }
 
     setNuevoAvanceTexto('');
   };
@@ -360,14 +256,19 @@ export default function App() {
         </div>
 
         <div className="row wrap">
-          {/* Switch de vista para prueba */}
+          {/* Badge Conexión API FastAPI */}
+          <span className={`badge ${apiConectada ? 'mint' : 'neutral'}`} style={{ gap: '4px' }}>
+            <Database size={13} />
+            {apiConectada ? 'BD PostgreSQL Conectada' : 'Modo Demo'}
+          </span>
+
           <button 
             className="secondary-button" 
             type="button"
             onClick={() => setView(view === 'cliente' ? 'firma' : 'cliente')}
             style={{ fontWeight: 600, borderColor: 'var(--brand)', color: 'var(--brand)' }}
           >
-            Cambiar a Vista: {view === 'cliente' ? '🛡️ Firma / Oficina' : '👤 Cliente'}
+            Vista: {view === 'cliente' ? '🛡️ Firma / Oficina' : '👤 Cliente'}
           </button>
 
           <button className="secondary-button" type="button">
@@ -377,9 +278,7 @@ export default function App() {
         </div>
       </header>
 
-      {/* =================================================== */}
-      {/* VISTA DEL CLIENTE (/cliente?codigo=AS-2026-001)       */}
-      {/* =================================================== */}
+      {/* VISTA CLIENTE */}
       {view === 'cliente' && (
         <section className="main tracking-shell">
           <div className="tracking-header">
@@ -394,7 +293,6 @@ export default function App() {
             </button>
           </div>
 
-          {/* Tarjeta de Acción Requerida */}
           {casoActivo.solicitudPendiente && (
             <section className="client-action-card">
               <div>
@@ -410,7 +308,6 @@ export default function App() {
             </section>
           )}
 
-          {/* Grid Principal de Seguimiento */}
           <section className="tracking-grid">
             <div className="panel tracking-main">
               <div>
@@ -421,56 +318,36 @@ export default function App() {
                 <p className="muted">Revisión de requisitos habilitantes y seguimiento al expediente.</p>
               </div>
 
-              {/* Milestones Stepper */}
               <div className="milestone-list">
                 {casoActivo.milestones.map((m) => (
                   <article key={m.id} className={`milestone-item milestone-${m.estadoItem}`}>
                     <div className="milestone-rail">
                       <div className="milestone-marker">
-                        {m.estadoItem === 'completed' ? (
-                          <CircleCheck size={16} />
-                        ) : (
-                          m.id
-                        )}
+                        {m.estadoItem === 'completed' ? <CircleCheck size={16} /> : m.id}
                       </div>
                       {m.id < casoActivo.milestones.length && <div className="milestone-line"></div>}
                     </div>
 
                     <div className="milestone-card">
-                      <button className="milestone-head" type="button">
+                      <button 
+                        className="milestone-head" 
+                        type="button"
+                        onClick={() => setMilestoneAbiertoId(milestoneAbiertoId === m.id ? null : m.id)}
+                      >
                         <div>
                           <span className="muted small">{m.fecha}</span>
                           <strong>{m.titulo}</strong>
                         </div>
                         <div className="row">
                           <span className={`badge ${m.tipoBadge || 'neutral'}`}>{m.estadoBadge}</span>
-                          {m.estadoItem === 'current' ? <ChevronDown size={17} /> : <ChevronRight size={17} />}
+                          {milestoneAbiertoId === m.id ? <ChevronDown size={17} /> : <ChevronRight size={17} />}
                         </div>
                       </button>
 
-                      {m.estadoItem === 'current' && (
+                      {milestoneAbiertoId === m.id && (
                         <div className="milestone-detail">
-                          <p>{m.detalle}</p>
-                          <span className="muted">{m.subtexto}</span>
-
-                          {m.requiereDocumento && (
-                            <div className="evidence-box" id="client-evidence">
-                              <div>
-                                <strong>Sube el documento solicitado</strong>
-                                <p className="muted">Selecciona el archivo en PDF y confirma el envío a tu abogada.</p>
-                              </div>
-                              <div className="tracking-input-row" style={{ display: 'flex', gap: '10px' }}>
-                                <label className="file-picker">
-                                  <FileText size={16} />
-                                  <span>Seleccionar archivo PDF</span>
-                                  <input type="file" accept=".pdf" />
-                                </label>
-                                <button className="primary-button" type="button">
-                                  Enviar documento
-                                </button>
-                              </div>
-                            </div>
-                          )}
+                          <p>{m.detalle || 'Detalle del avance registrado para esta etapa procesal.'}</p>
+                          <span className="muted">{m.subtexto || 'Información sincronizada con el expediente.'}</span>
                         </div>
                       )}
                     </div>
@@ -479,7 +356,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Sidebar Derecho del Cliente */}
             <aside className="tracking-side">
               <div className="panel">
                 <div className="section-title">
@@ -490,46 +366,6 @@ export default function App() {
                   <strong>{casoActivo.proximoPaso}</strong>
                 </div>
               </div>
-
-              {casoActivo.solicitudPendiente && (
-                <div className="panel">
-                  <div className="section-title">
-                    <h3>Solicitudes</h3>
-                    <CalendarClock size={17} />
-                  </div>
-                  <div className="stack">
-                    <div className="list-card">
-                      <div className="row between">
-                        <div>
-                          <strong>{casoActivo.solicitudPendiente}</strong>
-                          <span className="muted small">{clienteActivo.contacto} · vence {casoActivo.fechaLimiteSolicitud}</span>
-                        </div>
-                        <span className="badge warning">Pendiente</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {casoActivo.documentoPrincipal && (
-                <div className="panel">
-                  <div className="section-title">
-                    <h3>Documentos</h3>
-                    <FileText size={17} />
-                  </div>
-                  <div className="stack">
-                    <div className="list-card">
-                      <div className="row between">
-                        <div>
-                          <strong>{casoActivo.documentoPrincipal}</strong>
-                          <span className="muted small">Expediente · 10 de jul de 2026</span>
-                        </div>
-                        <span className="badge neutral">Cliente</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
 
               <div className="panel">
                 <div className="section-title">
@@ -559,12 +395,9 @@ export default function App() {
         </section>
       )}
 
-      {/* =================================================== */}
-      {/* VISTA DE LA FIRMA / OFICINA (/firma)                */}
-      {/* =================================================== */}
+      {/* VISTA FIRMA */}
       {view === 'firma' && (
         <div className="layout">
-          {/* Sidebar Interactivo de Clientes */}
           <aside className="sidebar">
             <div className="sidebar-inner">
               <div className="section-title">
@@ -579,7 +412,7 @@ export default function App() {
                     key={cli.id}
                     className={`client-entry ${cli.id === clienteActivo.id ? 'active' : ''}`}
                     type="button"
-                    onClick={() => handleSeleccionarCliente(cli)}
+                    onClick={() => setClienteIdSeleccionado(cli.id)}
                   >
                     <strong>{cli.nombre}</strong>
                     <span className="muted small">{cli.contacto}</span>
@@ -601,7 +434,6 @@ export default function App() {
               </button>
             </div>
 
-            {/* Metricas de la Firma */}
             <div className="grid metrics">
               <div className="metric">
                 <span>Clientes</span>
@@ -617,12 +449,11 @@ export default function App() {
               </div>
               <div className="metric">
                 <span>Solicitudes</span>
-                <strong>2</strong>
+                <strong>1</strong>
               </div>
             </div>
 
             <div className="workspace-flow">
-              {/* Selector de Casos del Cliente Seleccionado */}
               <section className="panel case-nav-panel">
                 <div className="section-title">
                   <h3>Casos de {clienteActivo.nombre}</h3>
@@ -634,12 +465,12 @@ export default function App() {
                       key={cs.id}
                       className={`case-card ${cs.id === casoActivo.id ? 'active' : ''}`}
                       type="button"
-                      onClick={() => handleSeleccionarCaso(cs)}
+                      onClick={() => setCasoIdSeleccionado(cs.id)}
                     >
                       <div className="case-card-header">
                         <div>
                           <strong>{cs.nombre}</strong>
-                          <span className="muted small">Código: {cs.codigo}</span>
+                          <span className="muted small">Radicado: {cs.codigo}</span>
                         </div>
                         <div className="case-card-badges">
                           <span className={`badge ${cs.estadoTipo}`}>{cs.estadoBadge}</span>
@@ -650,7 +481,6 @@ export default function App() {
                 </div>
               </section>
 
-              {/* Panel de Edicion del Caso Seleccionado */}
               <section>
                 <div className="panel">
                   <div className="row between">
@@ -660,71 +490,39 @@ export default function App() {
                     </div>
                     <span className={`badge ${casoActivo.estadoTipo}`}>{casoActivo.estadoBadge}</span>
                   </div>
-                  <p className="muted" style={{ margin: '8px 0 16px' }}>
-                    Revisión de pliegos, requisitos habilitantes y observaciones del expediente.
-                  </p>
 
-                  <form className="form-grid" onSubmit={handleGuardarCaso}>
-                    <div className="field">
-                      <label htmlFor="case-status">Estado</label>
-                      <select 
-                        id="case-status" 
-                        value={estadoProcesalForm} 
-                        onChange={(e) => setEstadoProcesalForm(e.target.value)}
-                      >
-                        <option value="nuevo">Nuevo</option>
-                        <option value="en_curso">En curso</option>
-                        <option value="requiere_cliente">Requiere cliente</option>
-                        <option value="en_espera">En espera</option>
-                        <option value="finalizado">Finalizado</option>
-                      </select>
-                    </div>
-
-                    <div className="field">
-                      <label htmlFor="case-priority">Prioridad</label>
-                      <select 
-                        id="case-priority"
-                        value={prioridadForm}
-                        onChange={(e) => setPrioridadForm(e.target.value as 'alta' | 'normal')}
-                      >
-                        <option value="normal">Normal</option>
-                        <option value="alta">Alta</option>
-                      </select>
-                    </div>
-
+                  <div className="form-grid" style={{ marginTop: '16px' }}>
                     <div className="field full">
-                      <label htmlFor="next-step">Próximo paso</label>
+                      <label htmlFor="next-step">Próximo paso para el cliente</label>
                       <textarea 
                         id="next-step"
                         value={proximoPasoForm}
                         onChange={(e) => setProximoPasoForm(e.target.value)}
                       />
                     </div>
-
                     <div className="field full">
-                      <button className="secondary-button" type="submit">
+                      <button className="secondary-button" type="button">
                         <Save size={16} />
-                        Guardar caso
+                        Guardar cambios
                       </button>
                     </div>
-                  </form>
+                  </div>
                 </div>
 
-                {/* Formulario de Nuevo Avance */}
                 <form className="panel" onSubmit={handlePublicarAvance}>
                   <div className="section-title">
-                    <h3>Nuevo avance</h3>
+                    <h3>Nuevo avance / novedad</h3>
                     <Eye size={17} />
                   </div>
                   <div className="form-grid">
                     <div className="field full">
-                      <label htmlFor="update-body">Detalle</label>
+                      <label htmlFor="update-body">Detalle del avance</label>
                       <textarea 
                         id="update-body" 
                         required
                         value={nuevoAvanceTexto}
                         onChange={(e) => setNuevoAvanceTexto(e.target.value)}
-                        placeholder="Escribe la novedad procesal..."
+                        placeholder="Escribe el avance que quedará guardado en la BD..."
                       />
                     </div>
 
@@ -735,8 +533,8 @@ export default function App() {
                         value={nuevoAvanceVisibilidad}
                         onChange={(e) => setNuevoAvanceVisibilidad(e.target.value as 'client' | 'internal')}
                       >
-                        <option value="client">Cliente</option>
-                        <option value="internal">Interno</option>
+                        <option value="client">Cliente (Público)</option>
+                        <option value="internal">Interno (Solo firma)</option>
                       </select>
                     </div>
 
@@ -744,13 +542,12 @@ export default function App() {
                       <label>&nbsp;</label>
                       <button className="primary-button" type="submit">
                         <Send size={16} />
-                        Publicar
+                        Publicar avance
                       </button>
                     </div>
                   </div>
                 </form>
 
-                {/* Timeline Interno */}
                 <div className="panel">
                   <div className="section-title">
                     <h3>Timeline de {casoActivo.nombre}</h3>
