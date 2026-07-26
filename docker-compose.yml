@@ -1,0 +1,29 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: asuntia_db
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-asuntia}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-asuntia_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-asuntia_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-asuntia} -d ${POSTGRES_DB:-asuntia_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: asuntia_mailpit
+    restart: always
+    ports:
+      - "8025:8025" # UI Web
+      - "1025:1025" # SMTP Port
+
+volumes:
+  postgres_data:
