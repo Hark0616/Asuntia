@@ -12,7 +12,6 @@ import {
   Eye, 
   Send, 
   Clock3,
-  Database,
   UserCheck
 } from 'lucide-react';
 import { 
@@ -29,6 +28,7 @@ import {
 } from '@/features/asuntos/api/asuntos';
 import { ClienteOTPLogin } from '@/features/auth/components/ClienteOTPLogin';
 import { OficinaLogin } from '@/features/auth/components/OficinaLogin';
+import { Tooltip } from '@/components/ui/Tooltip';
 
 interface NovedadItem {
   id: string;
@@ -47,7 +47,6 @@ interface Milestone {
   estadoItem: 'completed' | 'current' | 'upcoming';
   detalle?: string;
   subtexto?: string;
-  requiereDocumento?: boolean;
 }
 
 interface CasoData {
@@ -62,7 +61,6 @@ interface CasoData {
   proximoPaso: string;
   solicitudPendiente?: string;
   fechaLimiteSolicitud?: string;
-  documentoPrincipal?: string;
   milestones: Milestone[];
   novedades: NovedadItem[];
 }
@@ -95,12 +93,11 @@ const mockClientesFallback: ClienteData[] = [
         proximoPaso: 'Fijación de fecha para primera audiencia de negociación',
         solicitudPendiente: 'Certificado de ingresos y estado de cuenta',
         fechaLimiteSolicitud: '08 de ago de 2026',
-        documentoPrincipal: 'Solicitud_Insolvencia_v1.pdf',
         milestones: [
           {
             id: 1,
             fecha: '01 de jul de 2026',
-            titulo: 'Apertura de la evaluación de viabilidad',
+            titulo: 'Apertura de evaluación de viabilidad',
             estadoBadge: 'Completado',
             estadoItem: 'completed'
           },
@@ -110,9 +107,7 @@ const mockClientesFallback: ClienteData[] = [
             titulo: 'Etapa 2: Negociación de Pasivos',
             estadoBadge: 'Actual',
             estadoItem: 'current',
-            detalle: 'Estamos esperando el certificado de ingresos y extracto bancario actualizado para radicar observaciones.',
-            subtexto: 'Cuando envíes el soporte en PDF, la abogada responsable lo revisará para continuar.',
-            requiereDocumento: true
+            detalle: 'Esperando soporte de ingresos y extracto bancario para observaciones.'
           }
         ],
         novedades: [
@@ -132,55 +127,34 @@ const mockClientesFallback: ClienteData[] = [
 export default function App() {
   const queryClient = useQueryClient();
   
-  // Usuario autenticado (null = muestra formulario de login)
   const [usuarioAutenticado, setUsuarioAutenticado] = useState<any>(null);
   const [view, setView] = useState<'cliente' | 'firma'>('firma');
   const [clienteIdSeleccionado, setClienteIdSeleccionado] = useState<string>('00000000-0000-0000-0000-000000000020');
   const [casoIdSeleccionado, setCasoIdSeleccionado] = useState<string>('00000000-0000-0000-0000-000000000201');
   const [milestoneAbiertoId, setMilestoneAbiertoId] = useState<number | null>(2);
 
-  // Consulta Asuntos
-  const { data: asuntosAPI, isSuccess: apiConectada } = useQuery({
-    queryKey: ['asuntos'],
-    queryFn: fetchAsuntos,
-    retry: 1,
-  });
+  // Consultas API
+  const { data: asuntosAPI, isSuccess: apiConectada } = useQuery({ queryKey: ['asuntos'], queryFn: fetchAsuntos, retry: 1 });
+  const { data: estadosAPI } = useQuery({ queryKey: ['estados'], queryFn: fetchEstadosAPI, retry: 1 });
+  const { data: clientesAPI } = useQuery({ queryKey: ['clientes'], queryFn: fetchClientesAPI, retry: 1 });
 
-  // Consulta Estados Procesales Oficiales
-  const { data: estadosAPI } = useQuery({
-    queryKey: ['estados'],
-    queryFn: fetchEstadosAPI,
-    retry: 1,
-  });
-
-  // Consulta Clientes
-  const { data: clientesAPI } = useQuery({
-    queryKey: ['clientes'],
-    queryFn: fetchClientesAPI,
-    retry: 1,
-  });
-
-  // Mutación para Crear Cliente
+  // Mutaciones
   const mutacionNuevoCliente = useMutation({
     mutationFn: (payload: { nombre: string; cedula: string; email: string }) => crearClienteAPI(payload),
     onSuccess: (newClient) => {
       queryClient.invalidateQueries({ queryKey: ['clientes'] });
       setClienteIdSeleccionado(newClient.id);
-      alert(`¡Cliente ${newClient.nombre} creado exitosamente en PostgreSQL!`);
     }
   });
 
-  // Mutación para Crear Asunto
   const mutacionNuevoAsunto = useMutation({
     mutationFn: (payload: { radicado: string; cliente_id: string; etapa_actual?: string; siguiente_paso?: string }) => crearAsuntoAPI(payload),
     onSuccess: (newAsunto) => {
       queryClient.invalidateQueries({ queryKey: ['asuntos'] });
       setCasoIdSeleccionado(newAsunto.id);
-      alert(`¡Expediente ${newAsunto.radicado} creado exitosamente en PostgreSQL!`);
     }
   });
 
-  // Mutación para Novedad
   const mutacionNovedad = useMutation({
     mutationFn: ({ asuntoId, payload }: { asuntoId: string; payload: { titulo: string; descripcion: string; publicado_al_cliente: boolean } }) =>
       crearNovedadAPI(asuntoId, payload),
@@ -189,17 +163,15 @@ export default function App() {
     },
   });
 
-  // Mutación para Estado
   const mutacionEstado = useMutation({
     mutationFn: ({ asuntoId, payload }: { asuntoId: string; payload: { estado_id?: string; siguiente_paso?: string } }) =>
       actualizarEstadoAPI(asuntoId, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['asuntos'] });
-      alert('¡Estado procesal y próximo paso actualizados en PostgreSQL!');
     },
   });
 
-  // Mapear datos reales de la BD
+  // Mapeo dinámico
   const clientes: ClienteData[] = React.useMemo(() => {
     if (!clientesAPI || clientesAPI.length === 0) return mockClientesFallback;
 
@@ -224,7 +196,6 @@ export default function App() {
           proximoPaso: as.siguiente_paso,
           solicitudPendiente: 'Certificado de ingresos y estado de cuenta',
           fechaLimiteSolicitud: '08 de ago de 2026',
-          documentoPrincipal: 'Solicitud_Insolvencia_v1.pdf',
           milestones: [
             {
               id: 1,
@@ -239,9 +210,7 @@ export default function App() {
               titulo: as.etapa_actual,
               estadoBadge: 'Actual',
               estadoItem: 'current',
-              detalle: as.siguiente_paso,
-              subtexto: 'Información registrada y sincronizada con el backend FastAPI.',
-              requiereDocumento: true
+              detalle: as.siguiente_paso
             }
           ],
           novedades: as.novedades.map(nov => ({
@@ -265,39 +234,37 @@ export default function App() {
     estadoBadge: 'Sin casos activos',
     estadoTipo: 'neutral',
     prioridad: 'normal',
-    proximoPaso: 'Crear nuevo expediente para este cliente',
+    proximoPaso: 'Crear nuevo expediente',
     milestones: [],
     novedades: []
   };
 
-  // Estado formulario de edición
   const [estadoSeleccionadoId, setEstadoSeleccionadoId] = useState<string>('');
   const [proximoPasoForm, setProximoPasoForm] = useState(casoActivo.proximoPaso);
 
-  // Estado nuevo avance
   const [nuevoAvanceTexto, setNuevoAvanceTexto] = useState('');
   const [nuevoAvanceVisibilidad, setNuevoAvanceVisibilidad] = useState<'client' | 'internal'>('client');
 
   const handleCrearClientePrompt = () => {
-    const nombre = prompt('Nombre completo del nuevo cliente:');
+    const nombre = prompt('Nombre del nuevo cliente:');
     if (!nombre) return;
-    const cedula = prompt('Número de cédula / NIT:');
+    const cedula = prompt('Cédula o NIT:');
     if (!cedula) return;
-    const email = prompt('Correo electrónico del cliente:');
+    const email = prompt('Correo electrónico:');
     if (!email) return;
 
     mutacionNuevoCliente.mutate({ nombre, cedula, email });
   };
 
   const handleCrearAsuntoPrompt = () => {
-    const radicado = prompt(`Número de radicado para ${clienteActivo.nombre} (Ej: AS-2026-003):`);
+    const radicado = prompt(`Radicado para ${clienteActivo.nombre} (Ej: AS-2026-003):`);
     if (!radicado) return;
-    const paso = prompt('Próximo paso inicial:', 'Revisión de documentación inicial');
+    const paso = prompt('Próximo paso:', 'Revisión inicial de documentación');
 
     mutacionNuevoAsunto.mutate({
       radicado,
       cliente_id: clienteActivo.id,
-      siguiente_paso: paso || 'Revisión inicial de documentación'
+      siguiente_paso: paso || 'Revisión inicial'
     });
   };
 
@@ -332,7 +299,6 @@ export default function App() {
     setNuevoAvanceTexto('');
   };
 
-  // Si no se ha iniciado sesión, mostrar pantalla de autenticación según la vista seleccionada
   if (!usuarioAutenticado) {
     return (
       <div className="app-shell">
@@ -341,7 +307,6 @@ export default function App() {
             <div className="brand-mark">A</div>
             <div>
               <h1>Asuntia</h1>
-              <span>Acceso de Usuario</span>
             </div>
           </div>
           <div className="row wrap">
@@ -351,7 +316,7 @@ export default function App() {
               onClick={() => setView(view === 'cliente' ? 'firma' : 'cliente')}
               style={{ fontWeight: 600, borderColor: 'var(--brand)', color: 'var(--brand)' }}
             >
-              Cambiar a Vista: {view === 'cliente' ? '🛡️ Acceso Oficina' : '👤 Acceso Cliente (OTP)'}
+              {view === 'cliente' ? '🛡️ Acceso Oficina' : '👤 Acceso Cliente'}
             </button>
           </div>
         </header>
@@ -378,9 +343,9 @@ export default function App() {
         </div>
 
         <div className="row wrap">
-          <span className={`badge ${apiConectada ? 'mint' : 'neutral'}`} style={{ gap: '4px' }}>
-            <Database size={13} />
-            {apiConectada ? 'BD PostgreSQL Conectada' : 'Modo Demo'}
+          <span className={`badge ${apiConectada ? 'mint' : 'neutral'}`} style={{ gap: '6px' }}>
+            <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: apiConectada ? '#10b981' : '#94a3b8' }}></span>
+            {apiConectada ? 'BD Conectada' : 'Demo'}
           </span>
 
           <span className="badge neutral" style={{ gap: '4px' }}>
@@ -395,7 +360,7 @@ export default function App() {
               onClick={() => setView(view === 'cliente' ? 'firma' : 'cliente')}
               style={{ fontWeight: 600, borderColor: 'var(--brand)', color: 'var(--brand)' }}
             >
-              Vista: {view === 'cliente' ? '🛡️ Firma / Oficina' : '👤 Previsualización Cliente'}
+              {view === 'cliente' ? '🛡️ Oficina' : '👤 Vista Cliente'}
             </button>
           )}
 
@@ -405,7 +370,7 @@ export default function App() {
             onClick={() => setUsuarioAutenticado(null)}
           >
             <LogOut size={16} />
-            Cerrar sesión
+            Salir
           </button>
         </div>
       </header>
@@ -417,17 +382,19 @@ export default function App() {
             <div>
               <span className="badge neutral">{casoActivo.codigo}</span>
               <h2>{casoActivo.nombre}</h2>
-              <p className="muted">{clienteActivo.nombre} · Responsable: {casoActivo.responsable}</p>
+              <p className="muted">{clienteActivo.nombre} · {casoActivo.responsable}</p>
             </div>
           </div>
 
           {casoActivo.solicitudPendiente && (
             <section className="client-action-card">
               <div>
-                <span className="badge warning">Documento solicitado por tu abogada</span>
-                <h3>{casoActivo.solicitudPendiente}</h3>
-                <p>Por favor envía o entrega este soporte a tu abogada asignada para avanzar en el trámite.</p>
-                <span className="muted small">Fecha límite sugerida: {casoActivo.fechaLimiteSolicitud || 'Próximamente'}</span>
+                <div className="row">
+                  <span className="badge warning">Documento requerido</span>
+                  <Tooltip content="Envía este documento a tu abogada para continuar la radicación." />
+                </div>
+                <h3 style={{ marginTop: '6px' }}>{casoActivo.solicitudPendiente}</h3>
+                <span className="muted small">Límite: {casoActivo.fechaLimiteSolicitud || 'Próximamente'}</span>
               </div>
             </section>
           )}
@@ -436,10 +403,12 @@ export default function App() {
             <div className="panel tracking-main">
               <div>
                 <div className="row between">
-                  <h3>Estado del asunto</h3>
+                  <h3>
+                    Estado actual
+                    <Tooltip content="El estado procesal oficial notificado por el juzgado o Centro de Conciliación." />
+                  </h3>
                   <span className={`badge ${casoActivo.estadoTipo}`}>{casoActivo.estadoBadge}</span>
                 </div>
-                <p className="muted">Revisión de requisitos habilitantes y seguimiento al expediente.</p>
               </div>
 
               <div className="milestone-list">
@@ -468,10 +437,9 @@ export default function App() {
                         </div>
                       </button>
 
-                      {milestoneAbiertoId === m.id && (
+                      {milestoneAbiertoId === m.id && m.detalle && (
                         <div className="milestone-detail">
-                          <p>{m.detalle || 'Detalle del avance registrado para esta etapa procesal.'}</p>
-                          <span className="muted">{m.subtexto || 'Información sincronizada con el expediente.'}</span>
+                          <p>{m.detalle}</p>
                         </div>
                       )}
                     </div>
@@ -508,7 +476,6 @@ export default function App() {
                           <span className="muted small">{n.fecha}</span>
                         </div>
                         <p style={{ fontSize: '13px', marginTop: '4px' }}>{n.texto}</p>
-                        <span className="badge neutral" style={{ marginTop: '6px' }}>Cliente</span>
                       </div>
                     </div>
                   ))}
@@ -544,7 +511,7 @@ export default function App() {
                     }}
                   >
                     <strong>{cli.nombre}</strong>
-                    <span className="muted small">{cli.contacto} ({cli.casos ? cli.casos.length : 0} casos)</span>
+                    <span className="muted small">{cli.casos ? cli.casos.length : 0} casos</span>
                   </button>
                 ))}
               </div>
@@ -555,17 +522,17 @@ export default function App() {
             <div className="toolbar">
               <div>
                 <h2>{clienteActivo.nombre}</h2>
-                <span className="muted">{clienteActivo.email} · Cédula/NIT: {clienteActivo.identificacion}</span>
+                <span className="muted">{clienteActivo.email} · CC/NIT: {clienteActivo.identificacion}</span>
               </div>
               <button className="primary-button" type="button" onClick={handleCrearAsuntoPrompt}>
                 <Plus size={16} />
-                Nuevo caso para este cliente
+                Nuevo caso
               </button>
             </div>
 
             <div className="grid metrics">
               <div className="metric">
-                <span>Clientes Registrados</span>
+                <span>Clientes</span>
                 <strong>{clientes.length}</strong>
               </div>
               <div className="metric">
@@ -573,7 +540,7 @@ export default function App() {
                 <strong>{clientes.reduce((acc, curr) => acc + (curr.casos ? curr.casos.length : 0), 0)}</strong>
               </div>
               <div className="metric">
-                <span>Acción cliente</span>
+                <span>Pendientes</span>
                 <strong>1</strong>
               </div>
               <div className="metric">
@@ -585,8 +552,7 @@ export default function App() {
             <div className="workspace-flow">
               <section className="panel case-nav-panel">
                 <div className="section-title">
-                  <h3>Casos de {clienteActivo.nombre}</h3>
-                  <span className="muted small">{clienteActivo.casos ? clienteActivo.casos.length : 0} activos</span>
+                  <h3>Casos ({clienteActivo.casos ? clienteActivo.casos.length : 0})</h3>
                 </div>
                 <div className="case-list">
                   {clienteActivo.casos && clienteActivo.casos.length > 0 ? (
@@ -600,7 +566,7 @@ export default function App() {
                         <div className="case-card-header">
                           <div>
                             <strong>{cs.nombre}</strong>
-                            <span className="muted small">Radicado: {cs.codigo}</span>
+                            <span className="muted small">{cs.codigo}</span>
                           </div>
                           <div className="case-card-badges">
                             <span className={`badge ${cs.estadoTipo}`}>{cs.estadoBadge}</span>
@@ -610,26 +576,28 @@ export default function App() {
                     ))
                   ) : (
                     <div className="muted small" style={{ padding: '16px' }}>
-                      Este cliente no tiene expedientes registrados aún. Haz clic en "Nuevo caso para este cliente".
+                      Sin expedientes. Haz clic en "Nuevo caso".
                     </div>
                   )}
                 </div>
               </section>
 
               <section>
-                {/* Formulario de Edición de Estado Procesal en PostgreSQL */}
                 <form className="panel" onSubmit={handleGuardarEstado}>
                   <div className="row between">
                     <div>
                       <h3>{casoActivo.nombre}</h3>
-                      <span className="muted small">Código: {casoActivo.codigo} · Responsable: {casoActivo.responsable}</span>
+                      <span className="muted small">{casoActivo.codigo} · {casoActivo.responsable}</span>
                     </div>
                     <span className={`badge ${casoActivo.estadoTipo}`}>{casoActivo.estadoBadge}</span>
                   </div>
 
                   <div className="form-grid" style={{ marginTop: '16px' }}>
                     <div className="field">
-                      <label htmlFor="estado-procesal-select">Estado Procesal Oficial (PostgreSQL)</label>
+                      <label htmlFor="estado-procesal-select">
+                        Estado Procesal
+                        <Tooltip content="Cambia el estado público del asunto en la base de datos." />
+                      </label>
                       <select
                         id="estado-procesal-select"
                         value={estadoSeleccionadoId || casoActivo.estadoId || ''}
@@ -659,7 +627,7 @@ export default function App() {
                     <div className="field full">
                       <button className="secondary-button" type="submit">
                         <Save size={16} />
-                        Guardar cambios en BD
+                        Guardar cambios
                       </button>
                     </div>
                   </div>
@@ -667,18 +635,18 @@ export default function App() {
 
                 <form className="panel" onSubmit={handlePublicarAvance}>
                   <div className="section-title">
-                    <h3>Nuevo avance / novedad</h3>
+                    <h3>Nuevo avance</h3>
                     <Eye size={17} />
                   </div>
                   <div className="form-grid">
                     <div className="field full">
-                      <label htmlFor="update-body">Detalle del avance</label>
+                      <label htmlFor="update-body">Detalle de la novedad</label>
                       <textarea 
                         id="update-body" 
                         required
                         value={nuevoAvanceTexto}
                         onChange={(e) => setNuevoAvanceTexto(e.target.value)}
-                        placeholder="Escribe el avance que quedará guardado en la BD..."
+                        placeholder="Avance procesal..."
                       />
                     </div>
 
@@ -706,7 +674,7 @@ export default function App() {
 
                 <div className="panel">
                   <div className="section-title">
-                    <h3>Timeline de {casoActivo.nombre}</h3>
+                    <h3>Timeline</h3>
                     <History size={17} />
                   </div>
 
@@ -731,7 +699,7 @@ export default function App() {
                       ))
                     ) : (
                       <div className="muted small" style={{ padding: '12px' }}>
-                        No hay avances registrados para este expediente aún.
+                        Sin avances registrados.
                       </div>
                     )}
                   </div>

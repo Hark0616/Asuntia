@@ -21,7 +21,7 @@ Guía de arquitectura, convenciones y reglas no negociables para agentes de IA y
 7. **Dominio Raíz Compartido para Cookies & CORS**: En producción, frontend y backend deben compartir el dominio raíz (ej: `app.asuntia.com` y `api.asuntia.com` con `Domain=.asuntia.com`) con `CORSMiddleware` configurado explícitamente en FastAPI con `allow_credentials=True`.
 8. **Seguridad e Inyección de Secretos**: Cero credenciales, claves privadas o archivos `.env` subidos a Git o empaquetados en imágenes Docker. Los secretos se inyectan vía `env_file` en Docker Compose o secretos de CI/CD.
 9. **No Borrado Físico (Soft Deletes & Auditoría)**: Prohibido hacer `DELETE` físico de registros de negocio (asuntos, clientes, novedades, comprobantes). Todos los modelos heredan de `BaseModel` con `firma_id`, `created_at`, `updated_at` y `created_by_id`, manejando borrado lógico (`is_active=False`) o archivado histórico.
-10. **Sin Falsas Promesas Jurídicas en UX**: Las comunicaciones y la interfaz del cliente deben ser informativas y transparentes. Prohibido prometer resultados garantizados o usar expresiones inexactas como "borrado inmediato de listas negras" o "perdón del 100% de deudas" sin el contexto legal del proceso.
+10. **Sin Falsas Promesas Jurídicas ni Sobre-explicaciones en UX**: Las comunicaciones y la interfaz deben ser sobrias, elegantes y concisas. Prohibido incluir párrafos extensos explicativos o patronizing copy en la UI. Toda aclaración o contexto adicional debe encapsularse exclusivamente en el componente de Tooltip `<Tooltip content="..." />` con el icono discreto `(i)` (hover en desktop / tap en móvil).
 
 ## Estructura del Proyecto (Monorepo Layout)
 
@@ -90,6 +90,9 @@ Cuando un agente de IA realice cambios en este proyecto, DEBE cumplir los siguie
 2. **Migración de Base de Datos**: Ejecutar `alembic revision --autogenerate` siempre que cambie un modelo de BD antes de solicitar la verificación.
 3. **Verificación Estricta antes de Terminar**: Nunca dar por completado un cambio sin ejecutar la verificación de compilación del frontend (`npm run build`) y las pruebas del backend (`pytest`).
 4. **Preservar Comentarios y Documentación**: Mantener todos los docstrings y comentarios existentes que no hayan sido obsoleteados explícitamente por el cambio.
+5. **Actualización e Incremento Obligatorio de Pruebas Unitarias**: Cada vez que se agregue una nueva funcionalidad, endpoint REST, regla de negocio o modelo, el agente DEBE actualizar e incrementar la suite de pruebas unitarias en `backend/tests/`. Es OBLIGATORIO incluir tanto el flujo exitoso (*happy path*) como casos borde (*edge cases*), validaciones fallidas (errores HTTP 400, 401, 404, 422) y situaciones que no deberían ocurrir (borrados inexistentes, campos nulos no permitidos, accesos no autorizados).
+6. **Gestión e Inclusión Obligatoria de Dependencias**: Cada vez que un agente o desarrollador instale una nueva librería o paquete en el Backend (Python) o Frontend (Node/React), es OBLIGATORIO registrar e incluir inmediatamente la nueva dependencia en `backend/pyproject.toml`, `backend/requirements.txt` y `frontend/package.json` respectivamente.
+7. **Diseño Sobrio y Sin Sobre-explicaciones**: Al crear o modificar vistas e interfaces del frontend, el agente DEBE mantener una redacción concisa, elegante y directa. Prohibido agregar textos explicativos largos o patronizing copy en la UI; si un campo o sección requiere contexto adicional, usar el componente `<Tooltip content="..." />` con el icono discreto `(i)` (hover en desktop / tap en móvil).
 
 ## Comandos Frecuentes
 
@@ -105,8 +108,9 @@ Cuando un agente de IA realice cambios en este proyecto, DEBE cumplir los siguie
 - **Revertir última migración**: `cd backend && alembic downgrade -1`
 
 ### Pruebas y Linter
-- **Backend Tests**: `cd backend && pytest`
-- **Frontend Build**: `cd frontend && npm run build`
+- **Backend Tests (pytest)**: `cd backend && pytest`
+- **Frontend Tests (Vitest)**: `cd frontend && npm test`
+- **Frontend Build (Vite)**: `cd frontend && npm run build`
 
 ## Contexto de Producto y Fases
 
