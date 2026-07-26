@@ -24,8 +24,11 @@ async def request_otp(payload: OTPRequest):
     otp_code = "123456" # Código por defecto para desarrollo local
     _otp_store[cedula_clean] = otp_code
     
-    # Enviar correo vía Mailpit / SMTP
-    send_otp_email("cliente.demo@asuntia.com", otp_code)
+    # Intentar enviar correo vía Mailpit / SMTP de forma segura sin romper la API
+    try:
+        send_otp_email("cliente.demo@asuntia.com", otp_code)
+    except Exception as err:
+        print(f"[OTP Dev Warning] No se pudo contactar servidor SMTP: {err}")
     
     return {"message": "Código OTP enviado al correo registrado", "cedula": payload.cedula}
 
