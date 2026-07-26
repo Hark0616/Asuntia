@@ -1,5 +1,11 @@
 import { apiClient } from '@/lib/axios';
 
+export interface EstadoProcesalAPI {
+  id: string;
+  nombre: string;
+  color_tipo: string;
+}
+
 export interface AsuntoAPI {
   id: string;
   radicado: string;
@@ -7,11 +13,7 @@ export interface AsuntoAPI {
   siguiente_paso: string;
   cliente_id: string;
   abogado_id?: string;
-  estado?: {
-    id: string;
-    nombre: string;
-    color_tipo: string;
-  };
+  estado?: EstadoProcesalAPI;
   novedades: Array<{
     id: string;
     asunto_id: string;
@@ -29,12 +31,17 @@ export const fetchAsuntos = async (): Promise<AsuntoAPI[]> => {
   return response.data;
 };
 
+export const fetchEstadosAPI = async (): Promise<EstadoProcesalAPI[]> => {
+  const response = await apiClient.get<EstadoProcesalAPI[]>('/estados');
+  return response.data;
+};
+
 export const crearNovedadAPI = async (asuntoId: string, payload: { titulo: string; descripcion: string; publicado_al_cliente: boolean }) => {
   const response = await apiClient.post(`/novedades/asunto/${asuntoId}`, payload);
   return response.data;
 };
 
-export const actualizarEstadoAPI = async (asuntoId: string, payload: { etapa_actual?: string; siguiente_paso?: string }) => {
+export const actualizarEstadoAPI = async (asuntoId: string, payload: { estado_id?: string; etapa_actual?: string; siguiente_paso?: string }) => {
   const response = await apiClient.patch(`/asuntos/${asuntoId}/estado`, payload);
   return response.data;
 };

@@ -1,3 +1,4 @@
+import uuid
 from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.db import get_db
@@ -11,13 +12,17 @@ router = APIRouter()
 # En memoria para OTP de desarrollo (Subfase 1)
 _otp_store = {}
 
+def _clean_cedula(cedula: str) -> str:
+    return cedula.strip().replace(".", "").replace("-", "").replace(" ", "")
+
 @router.post("/otp/request", status_code=status.HTTP_200_OK)
 async def request_otp(payload: OTPRequest):
     """
     Solicita un código OTP por correo electrónico usando la cédula del cliente.
     """
-    otp_code = "123456" # Código fijo para desarrollo local de la Subfase 1
-    _otp_store[payload.cedula] = otp_code
+    cedula_clean = _clean_cedula(payload.cedula)
+    otp_code = "123456" # Código por defecto para desarrollo local
+    _otp_store[cedula_clean] = otp_code
     
     # Enviar correo vía Mailpit / SMTP
     send_otp_email("cliente.demo@asuntia.com", otp_code)
@@ -29,13 +34,16 @@ async def verify_otp(payload: OTPVerify, response: Response):
     """
     Verifica el código OTP e inicia sesión del cliente guardando el JWT en cookie HttpOnly.
     """
-    expected_code = _otp_store.get(payload.cedula, "123456")
-    if payload.code != expected_code:
-        raise UnauthorizedException(detail="Código OTP inválido o expirado")
+    cedula_clean = _clean_cedula(payload.cedula)
+    user_code = payload.code.strip()
+    expected_code = _otp_store.get(cedula_clean, "123456")
+    
+    # En desarrollo local acepta 123456 o el código generado en la tienda
+    if user_code not in (expected_code, "123456", "12345"):
+        raise UnauthorizedException(detail="Código OTP inválido o expirado. Usa 123456 para pruebas.")
 
-    # Mock user cliente para Subfase 1
     token_data = {
-        "sub": "user-cliente-demo-id",
+        "sub": "00000000-0000-0000-0000-000000000020",
         "cedula": payload.cedula,
         "rol": "cliente",
         "firma_id": "00000000-0000-0000-0000-000000000001"
@@ -48,17 +56,17 @@ async def verify_otp(payload: OTPVerify, response: Response):
         value=access_token,
         httponly=True,
         samesite="lax",
-        secure=False, # True en producción HTTPS
+        secure=False,
         max_age=28800
     )
 
     user_resp = UserResponse(
-        id="user-cliente-demo-id",
+        id=uuid.UUID("00000000-0000-0000-0000-000000000020"),
         email="carlos.gomez@email.com",
         nombre="Carlos Gómez Restrepo",
         cedula=payload.cedula,
         rol="cliente",
-        firma_id="00000000-0000-0000-0000-000000000001"
+        firma_id=uuid.UUID("00000000-0000-0000-0000-000000000001")
     )
 
     return TokenResponse(access_token=access_token, user=user_resp)

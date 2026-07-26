@@ -36,3 +36,14 @@ async def create_novedad(asunto_id: uuid.UUID, payload: NovedadCreate, db: Async
 
     nueva_novedad = await repo.create(data)
     return nueva_novedad
+
+@router.delete("/{novedad_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_novedad(novedad_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    """
+    Elimina una novedad del historial.
+    """
+    repo = NovedadRepository(db, DEFAULT_FIRMA_ID)
+    success = await repo.soft_delete(novedad_id)
+    if not success:
+        raise NotFoundException(detail="Novedad no encontrada")
+    return None

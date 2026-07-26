@@ -3,7 +3,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   LogOut, 
   X, 
-  FileText, 
   CircleCheck, 
   ChevronRight, 
   ChevronDown, 
@@ -14,9 +13,19 @@ import {
   Eye, 
   Send, 
   Clock3,
-  Database
+  Database,
+  UserCheck
 } from 'lucide-react';
-import { fetchAsuntos, crearNovedadAPI, AsuntoAPI } from '@/features/asuntos/api/asuntos';
+import { 
+  fetchAsuntos, 
+  fetchEstadosAPI, 
+  crearNovedadAPI, 
+  actualizarEstadoAPI, 
+  AsuntoAPI, 
+  EstadoProcesalAPI 
+} from '@/features/asuntos/api/asuntos';
+import { ClienteOTPLogin } from '@/features/auth/components/ClienteOTPLogin';
+import { OficinaLogin } from '@/features/auth/components/OficinaLogin';
 
 interface NovedadItem {
   id: string;
@@ -45,6 +54,7 @@ interface CasoData {
   responsable: string;
   estadoBadge: string;
   estadoTipo: 'warning' | 'neutral' | 'mint' | 'danger';
+  estadoId?: string;
   prioridad: 'alta' | 'normal';
   proximoPaso: string;
   solicitudPendiente?: string;
@@ -72,7 +82,7 @@ const mockClientesFallback: ClienteData[] = [
     identificacion: '1.094.852.140',
     casos: [
       {
-        id: 'case-insolvencia',
+        id: '00000000-0000-0000-0000-000000000201',
         codigo: 'AS-2026-001',
         nombre: 'Insolvencia Persona Natural',
         responsable: 'Dra. Daniela Torres',
@@ -93,28 +103,13 @@ const mockClientesFallback: ClienteData[] = [
           },
           {
             id: 2,
-            fecha: '10 de jul de 2026',
-            titulo: 'Revisión y consolidación de acreencias',
-            estadoBadge: 'Completado',
-            estadoItem: 'completed'
-          },
-          {
-            id: 3,
             fecha: '26 de jul de 2026',
-            titulo: 'Recolección de evidencia documental',
+            titulo: 'Etapa 2: Negociación de Pasivos',
             estadoBadge: 'Actual',
             estadoItem: 'current',
             detalle: 'Estamos esperando el certificado de ingresos y extracto bancario actualizado para radicar observaciones.',
             subtexto: 'Cuando cargues el soporte en PDF, la abogada responsable lo revisará para continuar.',
             requiereDocumento: true
-          },
-          {
-            id: 4,
-            fecha: '05 de ago de 2026',
-            titulo: 'Radicación de la solicitud de negociación',
-            estadoBadge: 'Siguiente',
-            tipoBadge: 'neutral',
-            estadoItem: 'upcoming'
           }
         ],
         novedades: [
@@ -124,13 +119,6 @@ const mockClientesFallback: ClienteData[] = [
             fecha: '26 de jul, 09:15 a. m.',
             texto: 'El Centro de Conciliación admitió la solicitud de negociación de pasivos de acuerdo con la Ley 2445.',
             visibilidad: 'Cliente'
-          },
-          {
-            id: 'n2',
-            autor: 'Dra. Daniela Torres',
-            fecha: '24 de jul, 04:30 p. m.',
-            texto: 'Nota interna: Borrador de conciliación de extractos bancarios antes de la audiencia.',
-            visibilidad: 'Interno'
           }
         ]
       }
@@ -140,18 +128,29 @@ const mockClientesFallback: ClienteData[] = [
 
 export default function App() {
   const queryClient = useQueryClient();
+  
+  // Usuario autenticado (null = muestra formulario de login)
+  const [usuarioAutenticado, setUsuarioAutenticado] = useState<any>(null);
   const [view, setView] = useState<'cliente' | 'firma'>('firma');
   const [clienteIdSeleccionado, setClienteIdSeleccionado] = useState<string>('carlos-gomez');
-  const [casoIdSeleccionado, setCasoIdSeleccionado] = useState<string>('case-insolvencia');
+  const [casoIdSeleccionado, setCasoIdSeleccionado] = useState<string>('00000000-0000-0000-0000-000000000201');
+  const [milestoneAbiertoId, setMilestoneAbiertoId] = useState<number | null>(2);
 
-  // Consulta TanStack Query a la API REST de FastAPI (/api/v1/asuntos)
+  // Consulta Asuntos
   const { data: asuntosAPI, isSuccess: apiConectada } = useQuery({
     queryKey: ['asuntos'],
     queryFn: fetchAsuntos,
     retry: 1,
   });
 
-  // Mutación para publicar novedad en el Backend
+  // Consulta Estados Procesales Oficiales
+  const { data: estadosAPI } = useQuery({
+    queryKey: ['estados'],
+    queryFn: fetchEstadosAPI,
+    retry: 1,
+  });
+
+  // Mutación para Novedad
   const mutacionNovedad = useMutation({
     mutationFn: ({ asuntoId, payload }: { asuntoId: string; payload: { titulo: string; descripcion: string; publicado_al_cliente: boolean } }) =>
       crearNovedadAPI(asuntoId, payload),
@@ -160,7 +159,17 @@ export default function App() {
     },
   });
 
-  // Mapear datos reales de la API si están disponibles
+  // Mutación para Estado
+  const mutacionEstado = useMutation({
+    mutationFn: ({ asuntoId, payload }: { asuntoId: string; payload: { estado_id?: string; siguiente_paso?: string } }) =>
+      actualizarEstadoAPI(asuntoId, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['asuntos'] });
+      alert('¡Estado procesal y próximo paso actualizados en PostgreSQL!');
+    },
+  });
+
+  // Mapear datos reales
   const clientes: ClienteData[] = React.useMemo(() => {
     if (!asuntosAPI || asuntosAPI.length === 0) return mockClientesFallback;
 
@@ -178,6 +187,7 @@ export default function App() {
           responsable: 'Dra. Daniela Torres',
           estadoBadge: as.estado?.nombre || 'En trámite',
           estadoTipo: (as.estado?.color_tipo as any) || 'mint',
+          estadoId: as.estado?.id,
           prioridad: 'alta' as const,
           proximoPaso: as.siguiente_paso,
           solicitudPendiente: 'Certificado de ingresos y estado de cuenta',
@@ -218,12 +228,25 @@ export default function App() {
   const casoActivo = clienteActivo.casos.find(c => c.id === casoIdSeleccionado) || clienteActivo.casos[0];
 
   // Estado formulario de edición
-  const [milestoneAbiertoId, setMilestoneAbiertoId] = useState<number | null>(2);
+  const [estadoSeleccionadoId, setEstadoSeleccionadoId] = useState<string>('');
   const [proximoPasoForm, setProximoPasoForm] = useState(casoActivo.proximoPaso);
 
   // Estado nuevo avance
   const [nuevoAvanceTexto, setNuevoAvanceTexto] = useState('');
   const [nuevoAvanceVisibilidad, setNuevoAvanceVisibilidad] = useState<'client' | 'internal'>('client');
+
+  const handleGuardarEstado = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (apiConectada && casoActivo.id) {
+      mutacionEstado.mutate({
+        asuntoId: casoActivo.id,
+        payload: {
+          estado_id: estadoSeleccionadoId || casoActivo.estadoId,
+          siguiente_paso: proximoPasoForm
+        }
+      });
+    }
+  };
 
   const handlePublicarAvance = (e: React.FormEvent) => {
     e.preventDefault();
@@ -243,6 +266,39 @@ export default function App() {
     setNuevoAvanceTexto('');
   };
 
+  // Si no se ha iniciado sesión, mostrar pantalla de autenticación según la vista seleccionada
+  if (!usuarioAutenticado) {
+    return (
+      <div className="app-shell">
+        <header className="topbar">
+          <div className="brand">
+            <div className="brand-mark">A</div>
+            <div>
+              <h1>Asuntia</h1>
+              <span>Acceso de Usuario</span>
+            </div>
+          </div>
+          <div className="row wrap">
+            <button 
+              className="secondary-button" 
+              type="button"
+              onClick={() => setView(view === 'cliente' ? 'firma' : 'cliente')}
+              style={{ fontWeight: 600, borderColor: 'var(--brand)', color: 'var(--brand)' }}
+            >
+              Cambiar a Vista: {view === 'cliente' ? '🛡️ Acceso Oficina' : '👤 Acceso Cliente (OTP)'}
+            </button>
+          </div>
+        </header>
+
+        {view === 'cliente' ? (
+          <ClienteOTPLogin onSuccess={(user) => { setUsuarioAutenticado(user); setView('cliente'); }} />
+        ) : (
+          <OficinaLogin onSuccess={(user) => { setUsuarioAutenticado(user); setView('firma'); }} />
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="app-shell">
       {/* Topbar */}
@@ -256,24 +312,34 @@ export default function App() {
         </div>
 
         <div className="row wrap">
-          {/* Badge Conexión API FastAPI */}
           <span className={`badge ${apiConectada ? 'mint' : 'neutral'}`} style={{ gap: '4px' }}>
             <Database size={13} />
             {apiConectada ? 'BD PostgreSQL Conectada' : 'Modo Demo'}
           </span>
 
+          <span className="badge neutral" style={{ gap: '4px' }}>
+            <UserCheck size={13} />
+            {usuarioAutenticado.nombre}
+          </span>
+
+          {usuarioAutenticado.rol !== 'cliente' && (
+            <button 
+              className="secondary-button" 
+              type="button"
+              onClick={() => setView(view === 'cliente' ? 'firma' : 'cliente')}
+              style={{ fontWeight: 600, borderColor: 'var(--brand)', color: 'var(--brand)' }}
+            >
+              Vista: {view === 'cliente' ? '🛡️ Firma / Oficina' : '👤 Previsualización Cliente'}
+            </button>
+          )}
+
           <button 
             className="secondary-button" 
             type="button"
-            onClick={() => setView(view === 'cliente' ? 'firma' : 'cliente')}
-            style={{ fontWeight: 600, borderColor: 'var(--brand)', color: 'var(--brand)' }}
+            onClick={() => setUsuarioAutenticado(null)}
           >
-            Vista: {view === 'cliente' ? '🛡️ Firma / Oficina' : '👤 Cliente'}
-          </button>
-
-          <button className="secondary-button" type="button">
             <LogOut size={16} />
-            {view === 'cliente' ? 'Cerrar consulta' : 'Salir'}
+            Cerrar sesión
           </button>
         </div>
       </header>
@@ -296,15 +362,11 @@ export default function App() {
           {casoActivo.solicitudPendiente && (
             <section className="client-action-card">
               <div>
-                <span className="badge warning">Requiere cliente</span>
+                <span className="badge warning">Documento solicitado por tu abogada</span>
                 <h3>{casoActivo.solicitudPendiente}</h3>
-                <p>Por favor adjunta el documento actualizado en formato PDF para avanzar.</p>
-                <span className="muted small">Fecha límite: {casoActivo.fechaLimiteSolicitud || 'Próximamente'}</span>
+                <p>Por favor envía o entrega este soporte a tu abogada asignada para avanzar en el trámite.</p>
+                <span className="muted small">Fecha límite sugerida: {casoActivo.fechaLimiteSolicitud || 'Próximamente'}</span>
               </div>
-              <a className="primary-button" href="#client-evidence">
-                <FileText size={16} />
-                Subir documento
-              </a>
             </section>
           )}
 
@@ -482,7 +544,8 @@ export default function App() {
               </section>
 
               <section>
-                <div className="panel">
+                {/* Formulario de Edición de Estado Procesal en PostgreSQL */}
+                <form className="panel" onSubmit={handleGuardarEstado}>
                   <div className="row between">
                     <div>
                       <h3>{casoActivo.nombre}</h3>
@@ -492,6 +555,25 @@ export default function App() {
                   </div>
 
                   <div className="form-grid" style={{ marginTop: '16px' }}>
+                    <div className="field">
+                      <label htmlFor="estado-procesal-select">Estado Procesal Oficial (PostgreSQL)</label>
+                      <select
+                        id="estado-procesal-select"
+                        value={estadoSeleccionadoId || casoActivo.estadoId || ''}
+                        onChange={(e) => setEstadoSeleccionadoId(e.target.value)}
+                      >
+                        {estadosAPI && estadosAPI.length > 0 ? (
+                          estadosAPI.map((est: EstadoProcesalAPI) => (
+                            <option key={est.id} value={est.id}>
+                              {est.nombre}
+                            </option>
+                          ))
+                        ) : (
+                          <option value="">{casoActivo.estadoBadge}</option>
+                        )}
+                      </select>
+                    </div>
+
                     <div className="field full">
                       <label htmlFor="next-step">Próximo paso para el cliente</label>
                       <textarea 
@@ -500,14 +582,15 @@ export default function App() {
                         onChange={(e) => setProximoPasoForm(e.target.value)}
                       />
                     </div>
+                    
                     <div className="field full">
-                      <button className="secondary-button" type="button">
+                      <button className="secondary-button" type="submit">
                         <Save size={16} />
-                        Guardar cambios
+                        Guardar cambios en BD
                       </button>
                     </div>
                   </div>
-                </div>
+                </form>
 
                 <form className="panel" onSubmit={handlePublicarAvance}>
                   <div className="section-title">

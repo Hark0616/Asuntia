@@ -10,6 +10,14 @@ class EstadoProcesalResponse(BaseSchemaResponse):
     nombre: str
     color_tipo: str
 
+class AsuntoCreate(BaseModel):
+    radicado: str
+    cliente_id: uuid.UUID
+    abogado_id: Optional[uuid.UUID] = None
+    estado_id: Optional[uuid.UUID] = None
+    etapa_actual: str = "Etapa 1: Evaluación y Radicación"
+    siguiente_paso: str = "Revisión inicial de documentación"
+
 class AsuntoUpdateEstado(BaseModel):
     estado_id: Optional[uuid.UUID] = None
     etapa_actual: Optional[str] = None
