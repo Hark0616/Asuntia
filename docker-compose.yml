@@ -22,8 +22,27 @@ services:
     container_name: asuntia_mailpit
     restart: always
     ports:
-      - "8025:8025" # UI Web
-      - "1025:1025" # SMTP Port
+      - "8025:8025" # UI Web Mailpit
+      - "1025:1025" # Puerto SMTP
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: asuntia_backend
+    restart: always
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://asuntia:asuntia_dev@db:5432/asuntia_db
+      - SMTP_HOST=mailpit
+      - SMTP_PORT=1025
+      - JWT_SECRET=dev_secret_key_asuntia_2026
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
 
 volumes:
   postgres_data:
