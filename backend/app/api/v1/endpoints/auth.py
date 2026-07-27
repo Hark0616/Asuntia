@@ -7,6 +7,9 @@ from app.core.mail import send_otp_email
 from app.core.security import create_access_token, verify_password, get_password_hash
 from app.core.exceptions import UnauthorizedException, NotFoundException
 
+from sqlalchemy import select
+from app.models.user import User
+
 router = APIRouter()
 
 # En memoria para OTP de desarrollo (Subfase 1)
@@ -33,7 +36,7 @@ async def request_otp(payload: OTPRequest):
     return {"message": "Código OTP enviado al correo registrado", "cedula": payload.cedula}
 
 @router.post("/otp/verify", response_model=TokenResponse)
-async def verify_otp(payload: OTPVerify, response: Response):
+async def verify_otp(payload: OTPVerify, response: Response, db: AsyncSession = Depends(get_db)):
     """
     Verifica el código OTP e inicia sesión del cliente guardando el JWT en cookie HttpOnly.
     """
@@ -45,11 +48,28 @@ async def verify_otp(payload: OTPVerify, response: Response):
     if user_code not in (expected_code, "123456", "12345"):
         raise UnauthorizedException(detail="Código OTP inválido o expirado. Usa 123456 para pruebas.")
 
+    # Buscar usuario real en la BD por cédula
+    stmt = select(User).where(User.cedula == payload.cedula).where(User.is_active == True)
+    result = await db.execute(stmt)
+    user = result.scalars().first()
+
+    if not user:
+        # Intento de fallback limpiando caracteres si venía formateada o viceversa
+        stmt_all = select(User).where(User.is_active == True)
+        all_users = (await db.execute(stmt_all)).scalars().all()
+        for u in all_users:
+            if _clean_cedula(u.cedula) == cedula_clean:
+                user = u
+                break
+
+    if not user:
+        raise NotFoundException(detail=f"No se encontró un cliente registrado con la cédula {payload.cedula}")
+
     token_data = {
-        "sub": "00000000-0000-0000-0000-000000000020",
-        "cedula": payload.cedula,
-        "rol": "cliente",
-        "firma_id": "00000000-0000-0000-0000-000000000001"
+        "sub": str(user.id),
+        "cedula": user.cedula,
+        "rol": user.rol,
+        "firma_id": str(user.firma_id)
     }
     access_token = create_access_token(data=token_data)
 
@@ -64,12 +84,13 @@ async def verify_otp(payload: OTPVerify, response: Response):
     )
 
     user_resp = UserResponse(
-        id=uuid.UUID("00000000-0000-0000-0000-000000000020"),
-        email="carlos.gomez@email.com",
-        nombre="Carlos Gómez Restrepo",
-        cedula=payload.cedula,
-        rol="cliente",
-        firma_id=uuid.UUID("00000000-0000-0000-0000-000000000001")
+        id=user.id,
+        email=user.email,
+        nombre=user.nombre,
+        cedula=user.cedula,
+        rol=user.rol,
+        firma_id=user.firma_id
     )
 
     return TokenResponse(access_token=access_token, user=user_resp)
+

@@ -12,7 +12,8 @@ import {
   Eye, 
   Send, 
   Clock3,
-  UserCheck
+  UserCheck,
+  HardDrive
 } from 'lucide-react';
 import { 
   fetchAsuntos, 
@@ -29,6 +30,8 @@ import {
 import { ClienteOTPLogin } from '@/features/auth/components/ClienteOTPLogin';
 import { OficinaLogin } from '@/features/auth/components/OficinaLogin';
 import { Tooltip } from '@/components/ui/Tooltip';
+import { DocumentosTab } from '@/features/documentos/components/DocumentosTab';
+import { ConfiguracionAlmacenamiento } from '@/features/firma/components/ConfiguracionAlmacenamiento';
 
 interface NovedadItem {
   id: string;
@@ -129,8 +132,9 @@ export default function App() {
   
   const [usuarioAutenticado, setUsuarioAutenticado] = useState<any>(null);
   const [view, setView] = useState<'cliente' | 'firma'>('firma');
-  const [clienteIdSeleccionado, setClienteIdSeleccionado] = useState<string>('00000000-0000-0000-0000-000000000020');
-  const [casoIdSeleccionado, setCasoIdSeleccionado] = useState<string>('00000000-0000-0000-0000-000000000201');
+  const [seccionFirma, setSeccionFirma] = useState<'expedientes' | 'config_almacenamiento'>('expedientes');
+  const [clienteIdSeleccionado, setClienteIdSeleccionado] = useState<string>('');
+  const [casoIdSeleccionado, setCasoIdSeleccionado] = useState<string>('');
   const [milestoneAbiertoId, setMilestoneAbiertoId] = useState<number | null>(2);
 
   // Consultas API
@@ -171,9 +175,9 @@ export default function App() {
     },
   });
 
-  // Mapeo dinámico
+  // Mapeo dinámico (Maneja BD vacía sin datos de prueba)
   const clientes: ClienteData[] = React.useMemo(() => {
-    if (!clientesAPI || clientesAPI.length === 0) return mockClientesFallback;
+    if (!clientesAPI) return apiConectada ? [] : mockClientesFallback;
 
     return clientesAPI.map((cli: ClienteAPI) => {
       const casosDelCliente = (asuntosAPI || []).filter((as: AsuntoAPI) => as.cliente_id === cli.id);
@@ -223,24 +227,20 @@ export default function App() {
         }))
       };
     });
-  }, [clientesAPI, asuntosAPI]);
+  }, [clientesAPI, asuntosAPI, apiConectada]);
 
-  const clienteActivo = clientes.find(c => c.id === clienteIdSeleccionado) || clientes[0] || mockClientesFallback[0];
-  const casoActivo = (clienteActivo.casos && clienteActivo.casos.find(c => c.id === casoIdSeleccionado)) || clienteActivo.casos[0] || {
-    id: '00000000-0000-0000-0000-000000000201',
-    codigo: 'AS-2026-001',
-    nombre: 'Insolvencia Persona Natural',
-    responsable: 'Dra. Daniela Torres',
-    estadoBadge: 'Sin casos activos',
-    estadoTipo: 'neutral',
-    prioridad: 'normal',
-    proximoPaso: 'Crear nuevo expediente',
-    milestones: [],
-    novedades: []
-  };
+  // Selección activa
+  const clienteActivo = clientes.find(c => c.id === clienteIdSeleccionado) || clientes[0] || null;
+  const casoActivo = clienteActivo && clienteActivo.casos ? (clienteActivo.casos.find(c => c.id === casoIdSeleccionado) || clienteActivo.casos[0] || null) : null;
 
   const [estadoSeleccionadoId, setEstadoSeleccionadoId] = useState<string>('');
-  const [proximoPasoForm, setProximoPasoForm] = useState(casoActivo.proximoPaso);
+  const [proximoPasoForm, setProximoPasoForm] = useState(casoActivo?.proximoPaso || '');
+
+  React.useEffect(() => {
+    if (casoActivo) {
+      setProximoPasoForm(casoActivo.proximoPaso);
+    }
+  }, [casoActivo?.id]);
 
   const [nuevoAvanceTexto, setNuevoAvanceTexto] = useState('');
   const [nuevoAvanceVisibilidad, setNuevoAvanceVisibilidad] = useState<'client' | 'internal'>('client');
@@ -257,6 +257,10 @@ export default function App() {
   };
 
   const handleCrearAsuntoPrompt = () => {
+    if (!clienteActivo) {
+      alert('Debes crear un cliente primero.');
+      return;
+    }
     const radicado = prompt(`Radicado para ${clienteActivo.nombre} (Ej: AS-2026-003):`);
     if (!radicado) return;
     const paso = prompt('Próximo paso:', 'Revisión inicial de documentación');
@@ -270,7 +274,7 @@ export default function App() {
 
   const handleGuardarEstado = (e: React.FormEvent) => {
     e.preventDefault();
-    if (apiConectada && casoActivo.id) {
+    if (apiConectada && casoActivo) {
       mutacionEstado.mutate({
         asuntoId: casoActivo.id,
         payload: {
@@ -285,7 +289,7 @@ export default function App() {
     e.preventDefault();
     if (!nuevoAvanceTexto.trim()) return;
 
-    if (apiConectada && casoActivo.id) {
+    if (apiConectada && casoActivo) {
       mutacionNovedad.mutate({
         asuntoId: casoActivo.id,
         payload: {
@@ -338,7 +342,7 @@ export default function App() {
           <div className="brand-mark">A</div>
           <div>
             <h1>Asuntia</h1>
-            <span>{view === 'cliente' ? casoActivo.codigo : 'Firma'}</span>
+            <span>{view === 'cliente' ? (casoActivo?.codigo || 'Cliente') : 'Firma'}</span>
           </div>
         </div>
 
@@ -354,14 +358,26 @@ export default function App() {
           </span>
 
           {usuarioAutenticado.rol !== 'cliente' && (
-            <button 
-              className="secondary-button" 
-              type="button"
-              onClick={() => setView(view === 'cliente' ? 'firma' : 'cliente')}
-              style={{ fontWeight: 600, borderColor: 'var(--brand)', color: 'var(--brand)' }}
-            >
-              {view === 'cliente' ? '🛡️ Oficina' : '👤 Vista Cliente'}
-            </button>
+            <>
+              <button 
+                className="secondary-button" 
+                type="button"
+                onClick={() => setSeccionFirma(seccionFirma === 'expedientes' ? 'config_almacenamiento' : 'expedientes')}
+                style={{ fontWeight: 600 }}
+              >
+                <HardDrive size={15} />
+                {seccionFirma === 'expedientes' ? 'Almacenamiento' : 'Ver Expedientes'}
+              </button>
+
+              <button 
+                className="secondary-button" 
+                type="button"
+                onClick={() => setView(view === 'cliente' ? 'firma' : 'cliente')}
+                style={{ fontWeight: 600, borderColor: 'var(--brand)', color: 'var(--brand)' }}
+              >
+                {view === 'cliente' ? '🛡️ Oficina' : '👤 Vista Cliente'}
+              </button>
+            </>
           )}
 
           <button 
@@ -378,111 +394,140 @@ export default function App() {
       {/* VISTA CLIENTE */}
       {view === 'cliente' && (
         <section className="main tracking-shell">
-          <div className="tracking-header">
-            <div>
-              <span className="badge neutral">{casoActivo.codigo}</span>
-              <h2>{casoActivo.nombre}</h2>
-              <p className="muted">{clienteActivo.nombre} · {casoActivo.responsable}</p>
-            </div>
-          </div>
+          {casoActivo ? (
+            <>
+              <div className="tracking-header">
+                <div className="row between wrap" style={{ width: '100%' }}>
+                  <div>
+                    <span className="badge neutral">{casoActivo.codigo}</span>
+                    <h2>{casoActivo.nombre}</h2>
+                    <p className="muted">{clienteActivo?.nombre} · {casoActivo.responsable}</p>
+                  </div>
 
-          {casoActivo.solicitudPendiente && (
-            <section className="client-action-card">
-              <div>
-                <div className="row">
-                  <span className="badge warning">Documento requerido</span>
-                  <Tooltip content="Envía este documento a tu abogada para continuar la radicación." />
-                </div>
-                <h3 style={{ marginTop: '6px' }}>{casoActivo.solicitudPendiente}</h3>
-                <span className="muted small">Límite: {casoActivo.fechaLimiteSolicitud || 'Próximamente'}</span>
-              </div>
-            </section>
-          )}
-
-          <section className="tracking-grid">
-            <div className="panel tracking-main">
-              <div>
-                <div className="row between">
-                  <h3>
-                    Estado actual
-                    <Tooltip content="El estado procesal oficial notificado por el juzgado o Centro de Conciliación." />
-                  </h3>
-                  <span className={`badge ${casoActivo.estadoTipo}`}>{casoActivo.estadoBadge}</span>
-                </div>
-              </div>
-
-              <div className="milestone-list">
-                {casoActivo.milestones.map((m) => (
-                  <article key={m.id} className={`milestone-item milestone-${m.estadoItem}`}>
-                    <div className="milestone-rail">
-                      <div className="milestone-marker">
-                        {m.estadoItem === 'completed' ? <CircleCheck size={16} /> : m.id}
-                      </div>
-                      {m.id < casoActivo.milestones.length && <div className="milestone-line"></div>}
-                    </div>
-
-                    <div className="milestone-card">
-                      <button 
-                        className="milestone-head" 
-                        type="button"
-                        onClick={() => setMilestoneAbiertoId(milestoneAbiertoId === m.id ? null : m.id)}
+                  {clienteActivo && clienteActivo.casos.length > 1 && (
+                    <div className="field" style={{ minWidth: '220px' }}>
+                      <label style={{ fontSize: '12px', fontWeight: 600 }}>Seleccionar Expediente:</label>
+                      <select 
+                        value={casoActivo.id} 
+                        onChange={(e) => setCasoIdSeleccionado(e.target.value)}
+                        style={{ height: '38px', fontSize: '14px' }}
                       >
-                        <div>
-                          <span className="muted small">{m.fecha}</span>
-                          <strong>{m.titulo}</strong>
-                        </div>
-                        <div className="row">
-                          <span className={`badge ${m.tipoBadge || 'neutral'}`}>{m.estadoBadge}</span>
-                          {milestoneAbiertoId === m.id ? <ChevronDown size={17} /> : <ChevronRight size={17} />}
-                        </div>
-                      </button>
-
-                      {milestoneAbiertoId === m.id && m.detalle && (
-                        <div className="milestone-detail">
-                          <p>{m.detalle}</p>
-                        </div>
-                      )}
+                        {clienteActivo.casos.map(cs => (
+                          <option key={cs.id} value={cs.id}>{cs.codigo} ({cs.estadoBadge})</option>
+                        ))}
+                      </select>
                     </div>
-                  </article>
-                ))}
+                  )}
+                </div>
               </div>
+
+              {casoActivo.solicitudPendiente && (
+                <section className="client-action-card">
+                  <div>
+                    <div className="row">
+                      <span className="badge warning">Documento requerido</span>
+                      <Tooltip content="Envía este documento a tu abogada para continuar la radicación." />
+                    </div>
+                    <h3 style={{ marginTop: '6px' }}>{casoActivo.solicitudPendiente}</h3>
+                    <span className="muted small">Límite: {casoActivo.fechaLimiteSolicitud || 'Próximamente'}</span>
+                  </div>
+                </section>
+              )}
+
+              <section className="tracking-grid">
+                <div className="panel tracking-main">
+                  <div>
+                    <div className="row between">
+                      <h3>
+                        Estado actual
+                        <Tooltip content="El estado procesal oficial notificado por el juzgado o Centro de Conciliación." />
+                      </h3>
+                      <span className={`badge ${casoActivo.estadoTipo}`}>{casoActivo.estadoBadge}</span>
+                    </div>
+                  </div>
+
+                  <div className="milestone-list">
+                    {casoActivo.milestones.map((m) => (
+                      <article key={m.id} className={`milestone-item milestone-${m.estadoItem}`}>
+                        <div className="milestone-rail">
+                          <div className="milestone-marker">
+                            {m.estadoItem === 'completed' ? <CircleCheck size={16} /> : m.id}
+                          </div>
+                          {m.id < casoActivo.milestones.length && <div className="milestone-line"></div>}
+                        </div>
+
+                        <div className="milestone-card">
+                          <button 
+                            className="milestone-head" 
+                            type="button"
+                            onClick={() => setMilestoneAbiertoId(milestoneAbiertoId === m.id ? null : m.id)}
+                          >
+                            <div>
+                              <span className="muted small">{m.fecha}</span>
+                              <strong>{m.titulo}</strong>
+                            </div>
+                            <div className="row">
+                              <span className={`badge ${m.tipoBadge || 'neutral'}`}>{m.estadoBadge}</span>
+                              {milestoneAbiertoId === m.id ? <ChevronDown size={17} /> : <ChevronRight size={17} />}
+                            </div>
+                          </button>
+
+                          {milestoneAbiertoId === m.id && m.detalle && (
+                            <div className="milestone-detail">
+                              <p>{m.detalle}</p>
+                            </div>
+                          )}
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+
+                  {/* Documentos Compartidos en Portal Cliente */}
+                  <DocumentosTab asuntoId={casoActivo.id} isReadOnly={true} />
+                </div>
+
+                <aside className="tracking-side">
+                  <div className="panel">
+                    <div className="section-title">
+                      <h3>Próximo paso</h3>
+                      <CalendarClock size={17} />
+                    </div>
+                    <div className="list-card">
+                      <strong>{casoActivo.proximoPaso}</strong>
+                    </div>
+                  </div>
+
+                  <div className="panel">
+                    <div className="section-title">
+                      <h3>Avances publicados</h3>
+                      <History size={17} />
+                    </div>
+                    <div className="timeline">
+                      {casoActivo.novedades.filter(n => n.visibilidad === 'Cliente').map(n => (
+                        <div key={n.id} className="timeline-item">
+                          <div className="timeline-dot">
+                            <Clock3 size={14} />
+                          </div>
+                          <div className="timeline-body">
+                            <div className="row between">
+                              <strong>{n.autor}</strong>
+                              <span className="muted small">{n.fecha}</span>
+                            </div>
+                            <p style={{ fontSize: '13px', marginTop: '4px' }}>{n.texto}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </aside>
+              </section>
+            </>
+          ) : (
+            <div className="panel" style={{ padding: '48px 24px', textAlign: 'center' }}>
+              <h3>Sin expedientes activos</h3>
+              <p className="muted small">Tu abogada aún no ha aperturado un expediente para tu documento.</p>
             </div>
-
-            <aside className="tracking-side">
-              <div className="panel">
-                <div className="section-title">
-                  <h3>Próximo paso</h3>
-                  <CalendarClock size={17} />
-                </div>
-                <div className="list-card">
-                  <strong>{casoActivo.proximoPaso}</strong>
-                </div>
-              </div>
-
-              <div className="panel">
-                <div className="section-title">
-                  <h3>Avances publicados</h3>
-                  <History size={17} />
-                </div>
-                <div className="timeline">
-                  {casoActivo.novedades.filter(n => n.visibilidad === 'Cliente').map(n => (
-                    <div key={n.id} className="timeline-item">
-                      <div className="timeline-dot">
-                        <Clock3 size={14} />
-                      </div>
-                      <div className="timeline-body">
-                        <div className="row between">
-                          <strong>{n.autor}</strong>
-                          <span className="muted small">{n.fecha}</span>
-                        </div>
-                        <p style={{ fontSize: '13px', marginTop: '4px' }}>{n.texto}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </aside>
-          </section>
+          )}
         </section>
       )}
 
@@ -498,214 +543,249 @@ export default function App() {
                 </button>
               </div>
               <div className="stack">
-                {clientes.map(cli => (
-                  <button 
-                    key={cli.id}
-                    className={`client-entry ${cli.id === clienteActivo.id ? 'active' : ''}`}
-                    type="button"
-                    onClick={() => {
-                      setClienteIdSeleccionado(cli.id);
-                      if (cli.casos && cli.casos.length > 0) {
-                        setCasoIdSeleccionado(cli.casos[0].id);
-                      }
-                    }}
-                  >
-                    <strong>{cli.nombre}</strong>
-                    <span className="muted small">{cli.casos ? cli.casos.length : 0} casos</span>
-                  </button>
-                ))}
+                {clientes.length > 0 ? (
+                  clientes.map(cli => (
+                    <button 
+                      key={cli.id}
+                      className={`client-entry ${clienteActivo && cli.id === clienteActivo.id ? 'active' : ''}`}
+                      type="button"
+                      onClick={() => {
+                        setClienteIdSeleccionado(cli.id);
+                        if (cli.casos && cli.casos.length > 0) {
+                          setCasoIdSeleccionado(cli.casos[0].id);
+                        }
+                      }}
+                    >
+                      <strong>{cli.nombre}</strong>
+                      <span className="muted small">{cli.casos ? cli.casos.length : 0} casos</span>
+                    </button>
+                  ))
+                ) : (
+                  <div className="muted small" style={{ padding: '12px' }}>
+                    Sin clientes registrados.
+                  </div>
+                )}
               </div>
             </div>
           </aside>
 
           <section className="main">
-            <div className="toolbar">
-              <div>
-                <h2>{clienteActivo.nombre}</h2>
-                <span className="muted">{clienteActivo.email} · CC/NIT: {clienteActivo.identificacion}</span>
-              </div>
-              <button className="primary-button" type="button" onClick={handleCrearAsuntoPrompt}>
-                <Plus size={16} />
-                Nuevo caso
-              </button>
-            </div>
-
-            <div className="grid metrics">
-              <div className="metric">
-                <span>Clientes</span>
-                <strong>{clientes.length}</strong>
-              </div>
-              <div className="metric">
-                <span>Casos Activos</span>
-                <strong>{clientes.reduce((acc, curr) => acc + (curr.casos ? curr.casos.length : 0), 0)}</strong>
-              </div>
-              <div className="metric">
-                <span>Pendientes</span>
-                <strong>1</strong>
-              </div>
-              <div className="metric">
-                <span>Solicitudes</span>
-                <strong>1</strong>
-              </div>
-            </div>
-
-            <div className="workspace-flow">
-              <section className="panel case-nav-panel">
-                <div className="section-title">
-                  <h3>Casos ({clienteActivo.casos ? clienteActivo.casos.length : 0})</h3>
+            {seccionFirma === 'config_almacenamiento' ? (
+              <ConfiguracionAlmacenamiento />
+            ) : clienteActivo ? (
+              <>
+                <div className="toolbar">
+                  <div>
+                    <h2>{clienteActivo.nombre}</h2>
+                    <span className="muted">{clienteActivo.email} · CC/NIT: {clienteActivo.identificacion}</span>
+                  </div>
+                  <button className="primary-button" type="button" onClick={handleCrearAsuntoPrompt}>
+                    <Plus size={16} />
+                    Nuevo caso
+                  </button>
                 </div>
-                <div className="case-list">
-                  {clienteActivo.casos && clienteActivo.casos.length > 0 ? (
-                    clienteActivo.casos.map(cs => (
-                      <button 
-                        key={cs.id}
-                        className={`case-card ${cs.id === casoActivo.id ? 'active' : ''}`}
-                        type="button"
-                        onClick={() => setCasoIdSeleccionado(cs.id)}
-                      >
-                        <div className="case-card-header">
+
+                <div className="grid metrics">
+                  <div className="metric">
+                    <span>Clientes</span>
+                    <strong>{clientes.length}</strong>
+                  </div>
+                  <div className="metric">
+                    <span>Casos Activos</span>
+                    <strong>{clientes.reduce((acc, curr) => acc + (curr.casos ? curr.casos.length : 0), 0)}</strong>
+                  </div>
+                  <div className="metric">
+                    <span>Pendientes</span>
+                    <strong>{casoActivo ? 1 : 0}</strong>
+                  </div>
+                  <div className="metric">
+                    <span>Solicitudes</span>
+                    <strong>{casoActivo ? 1 : 0}</strong>
+                  </div>
+                </div>
+
+                <div className="workspace-flow">
+                  <section className="panel case-nav-panel">
+                    <div className="section-title">
+                      <h3>Casos ({clienteActivo.casos ? clienteActivo.casos.length : 0})</h3>
+                    </div>
+                    <div className="case-list">
+                      {clienteActivo.casos && clienteActivo.casos.length > 0 ? (
+                        clienteActivo.casos.map(cs => (
+                          <button 
+                            key={cs.id}
+                            className={`case-card ${casoActivo && cs.id === casoActivo.id ? 'active' : ''}`}
+                            type="button"
+                            onClick={() => setCasoIdSeleccionado(cs.id)}
+                          >
+                            <div className="case-card-header">
+                              <div>
+                                <strong>{cs.nombre}</strong>
+                                <span className="muted small">{cs.codigo}</span>
+                              </div>
+                              <div className="case-card-badges">
+                                <span className={`badge ${cs.estadoTipo}`}>{cs.estadoBadge}</span>
+                              </div>
+                            </div>
+                          </button>
+                        ))
+                      ) : (
+                        <div className="muted small" style={{ padding: '16px' }}>
+                          Sin expedientes. Haz clic en "Nuevo caso".
+                        </div>
+                      )}
+                    </div>
+                  </section>
+
+                  {casoActivo ? (
+                    <section>
+                      <form className="panel" onSubmit={handleGuardarEstado}>
+                        <div className="row between">
                           <div>
-                            <strong>{cs.nombre}</strong>
-                            <span className="muted small">{cs.codigo}</span>
+                            <h3>{casoActivo.nombre}</h3>
+                            <span className="muted small">{casoActivo.codigo} · {casoActivo.responsable}</span>
                           </div>
-                          <div className="case-card-badges">
-                            <span className={`badge ${cs.estadoTipo}`}>{cs.estadoBadge}</span>
+                          <span className={`badge ${casoActivo.estadoTipo}`}>{casoActivo.estadoBadge}</span>
+                        </div>
+
+                        <div className="form-grid" style={{ marginTop: '16px' }}>
+                          <div className="field">
+                            <label htmlFor="estado-procesal-select">
+                              Estado Procesal
+                              <Tooltip content="Cambia el estado público del asunto en la base de datos." />
+                            </label>
+                            <select
+                              id="estado-procesal-select"
+                              value={estadoSeleccionadoId || casoActivo.estadoId || ''}
+                              onChange={(e) => setEstadoSeleccionadoId(e.target.value)}
+                            >
+                              {estadosAPI && estadosAPI.length > 0 ? (
+                                estadosAPI.map((est: EstadoProcesalAPI) => (
+                                  <option key={est.id} value={est.id}>
+                                    {est.nombre}
+                                  </option>
+                                ))
+                              ) : (
+                                <option value="">{casoActivo.estadoBadge}</option>
+                              )}
+                            </select>
+                          </div>
+
+                          <div className="field full">
+                            <label htmlFor="next-step">Próximo paso para el cliente</label>
+                            <textarea 
+                              id="next-step"
+                              value={proximoPasoForm}
+                              onChange={(e) => setProximoPasoForm(e.target.value)}
+                            />
+                          </div>
+                          
+                          <div className="field full">
+                            <button className="secondary-button" type="submit">
+                              <Save size={16} />
+                              Guardar cambios
+                            </button>
                           </div>
                         </div>
-                      </button>
-                    ))
+                      </form>
+
+                      {/* Pestaña de Gestión Documental en Google Drive */}
+                      <DocumentosTab asuntoId={casoActivo.id} isReadOnly={false} />
+
+                      <form className="panel" onSubmit={handlePublicarAvance} style={{ marginTop: '16px' }}>
+                        <div className="section-title">
+                          <h3>Nuevo avance</h3>
+                          <Eye size={17} />
+                        </div>
+                        <div className="form-grid">
+                          <div className="field full">
+                            <label htmlFor="update-body">Detalle de la novedad</label>
+                            <textarea 
+                              id="update-body" 
+                              required
+                              value={nuevoAvanceTexto}
+                              onChange={(e) => setNuevoAvanceTexto(e.target.value)}
+                              placeholder="Avance procesal..."
+                            />
+                          </div>
+
+                          <div className="field">
+                            <label htmlFor="update-visibility">Visibilidad</label>
+                            <select 
+                              id="update-visibility"
+                              value={nuevoAvanceVisibilidad}
+                              onChange={(e) => setNuevoAvanceVisibilidad(e.target.value as 'client' | 'internal')}
+                            >
+                              <option value="client">Cliente (Público)</option>
+                              <option value="internal">Interno (Solo firma)</option>
+                            </select>
+                          </div>
+
+                          <div className="field">
+                            <label>&nbsp;</label>
+                            <button className="primary-button" type="submit">
+                              <Send size={16} />
+                              Publicar avance
+                            </button>
+                          </div>
+                        </div>
+                      </form>
+
+                      <div className="panel">
+                        <div className="section-title">
+                          <h3>Timeline</h3>
+                          <History size={17} />
+                        </div>
+
+                        <div className="timeline">
+                          {casoActivo.novedades && casoActivo.novedades.length > 0 ? (
+                            casoActivo.novedades.map((n) => (
+                              <div key={n.id} className="timeline-item">
+                                <div className="timeline-dot">
+                                  <Clock3 size={14} />
+                                </div>
+                                <div className="timeline-body">
+                                  <div className="row between">
+                                    <strong>{n.autor}</strong>
+                                    <span className="muted small">{n.fecha}</span>
+                                  </div>
+                                  <p style={{ margin: '4px 0' }}>{n.texto}</p>
+                                  <span className={`badge ${n.visibilidad === 'Cliente' ? 'neutral' : 'warning'}`}>
+                                    {n.visibilidad}
+                                  </span>
+                                </div>
+                              </div>
+                            ))
+                          ) : (
+                            <div className="muted small" style={{ padding: '12px' }}>
+                              Sin avances registrados.
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </section>
                   ) : (
-                    <div className="muted small" style={{ padding: '16px' }}>
-                      Sin expedientes. Haz clic en "Nuevo caso".
+                    <div className="panel" style={{ padding: '32px 24px', textAlign: 'center' }}>
+                      <h3>Sin expedientes para este cliente</h3>
+                      <p className="muted small">Haz clic en "Nuevo caso" para aperturar el primer expediente.</p>
+                      <button className="primary-button" style={{ margin: '16px auto 0' }} onClick={handleCrearAsuntoPrompt}>
+                        <Plus size={16} /> Crear expediente
+                      </button>
                     </div>
                   )}
                 </div>
-              </section>
-
-              <section>
-                <form className="panel" onSubmit={handleGuardarEstado}>
-                  <div className="row between">
-                    <div>
-                      <h3>{casoActivo.nombre}</h3>
-                      <span className="muted small">{casoActivo.codigo} · {casoActivo.responsable}</span>
-                    </div>
-                    <span className={`badge ${casoActivo.estadoTipo}`}>{casoActivo.estadoBadge}</span>
-                  </div>
-
-                  <div className="form-grid" style={{ marginTop: '16px' }}>
-                    <div className="field">
-                      <label htmlFor="estado-procesal-select">
-                        Estado Procesal
-                        <Tooltip content="Cambia el estado público del asunto en la base de datos." />
-                      </label>
-                      <select
-                        id="estado-procesal-select"
-                        value={estadoSeleccionadoId || casoActivo.estadoId || ''}
-                        onChange={(e) => setEstadoSeleccionadoId(e.target.value)}
-                      >
-                        {estadosAPI && estadosAPI.length > 0 ? (
-                          estadosAPI.map((est: EstadoProcesalAPI) => (
-                            <option key={est.id} value={est.id}>
-                              {est.nombre}
-                            </option>
-                          ))
-                        ) : (
-                          <option value="">{casoActivo.estadoBadge}</option>
-                        )}
-                      </select>
-                    </div>
-
-                    <div className="field full">
-                      <label htmlFor="next-step">Próximo paso para el cliente</label>
-                      <textarea 
-                        id="next-step"
-                        value={proximoPasoForm}
-                        onChange={(e) => setProximoPasoForm(e.target.value)}
-                      />
-                    </div>
-                    
-                    <div className="field full">
-                      <button className="secondary-button" type="submit">
-                        <Save size={16} />
-                        Guardar cambios
-                      </button>
-                    </div>
-                  </div>
-                </form>
-
-                <form className="panel" onSubmit={handlePublicarAvance}>
-                  <div className="section-title">
-                    <h3>Nuevo avance</h3>
-                    <Eye size={17} />
-                  </div>
-                  <div className="form-grid">
-                    <div className="field full">
-                      <label htmlFor="update-body">Detalle de la novedad</label>
-                      <textarea 
-                        id="update-body" 
-                        required
-                        value={nuevoAvanceTexto}
-                        onChange={(e) => setNuevoAvanceTexto(e.target.value)}
-                        placeholder="Avance procesal..."
-                      />
-                    </div>
-
-                    <div className="field">
-                      <label htmlFor="update-visibility">Visibilidad</label>
-                      <select 
-                        id="update-visibility"
-                        value={nuevoAvanceVisibilidad}
-                        onChange={(e) => setNuevoAvanceVisibilidad(e.target.value as 'client' | 'internal')}
-                      >
-                        <option value="client">Cliente (Público)</option>
-                        <option value="internal">Interno (Solo firma)</option>
-                      </select>
-                    </div>
-
-                    <div className="field">
-                      <label>&nbsp;</label>
-                      <button className="primary-button" type="submit">
-                        <Send size={16} />
-                        Publicar avance
-                      </button>
-                    </div>
-                  </div>
-                </form>
-
-                <div className="panel">
-                  <div className="section-title">
-                    <h3>Timeline</h3>
-                    <History size={17} />
-                  </div>
-
-                  <div className="timeline">
-                    {casoActivo.novedades && casoActivo.novedades.length > 0 ? (
-                      casoActivo.novedades.map((n) => (
-                        <div key={n.id} className="timeline-item">
-                          <div className="timeline-dot">
-                            <Clock3 size={14} />
-                          </div>
-                          <div className="timeline-body">
-                            <div className="row between">
-                              <strong>{n.autor}</strong>
-                              <span className="muted small">{n.fecha}</span>
-                            </div>
-                            <p style={{ margin: '4px 0' }}>{n.texto}</p>
-                            <span className={`badge ${n.visibilidad === 'Cliente' ? 'neutral' : 'warning'}`}>
-                              {n.visibilidad}
-                            </span>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="muted small" style={{ padding: '12px' }}>
-                        Sin avances registrados.
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </section>
-            </div>
+              </>
+            ) : (
+              <div className="panel" style={{ padding: '48px 24px', textAlign: 'center' }}>
+                <h3>No hay clientes registrados</h3>
+                <p className="muted small" style={{ marginBottom: '16px' }}>
+                  La base de datos está limpia. Registra tu primer cliente para comenzar las pruebas reales.
+                </p>
+                <button className="primary-button" style={{ margin: '0 auto' }} onClick={handleCrearClientePrompt}>
+                  <Plus size={16} /> Registrar primer cliente
+                </button>
+              </div>
+            )}
           </section>
         </div>
       )}

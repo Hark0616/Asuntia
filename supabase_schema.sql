@@ -1,122 +1,128 @@
--- ==============================================================================
--- ASUNTIA - Esquema de Base de Datos PostgreSQL (Compatible con Supabase)
--- Ejecutar en el SQL Editor de Supabase (https://app.supabase.com)
--- ==============================================================================
+-- ========================================================
+-- ASUNTIA LEGAL - ESTRUCTURA DDL COMPLETA PARA SUPABASE
+-- ========================================================
 
--- 1. Habilitar extensión UUID
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- 2. Tabla de Firmas (Multi-tenant)
+-- 1. Tabla de Firmas (Tenants)
 CREATE TABLE IF NOT EXISTS firmas (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     nombre VARCHAR(255) NOT NULL,
-    subdominio VARCHAR(100) UNIQUE NOT NULL,
-    is_active BOOLEAN DEFAULT TRUE NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
+    subdominio VARCHAR(100) NOT NULL UNIQUE,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- 3. Tabla de Usuarios (Abogados y Clientes)
+-- 2. Tabla de Usuarios
 CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     firma_id UUID NOT NULL REFERENCES firmas(id) ON DELETE CASCADE,
-    email VARCHAR(255) UNIQUE NOT NULL,
-    hashed_password VARCHAR(255) NULL,
     nombre VARCHAR(255) NOT NULL,
-    cedula VARCHAR(50) NOT NULL,
-    rol VARCHAR(50) DEFAULT 'cliente' NOT NULL,
-    telefono VARCHAR(50) NULL,
-    is_active BOOLEAN DEFAULT TRUE NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    hashed_password VARCHAR(255) NULL,
+    cedula VARCHAR(50) NULL,
+    rol VARCHAR(50) NOT NULL DEFAULT 'cliente',
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     created_by_id UUID NULL
 );
 
--- 4. Tabla de Estados Procesales
+-- 3. Catálogo de Estados Procesales
 CREATE TABLE IF NOT EXISTS estados_procesales (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     firma_id UUID NOT NULL REFERENCES firmas(id) ON DELETE CASCADE,
     nombre VARCHAR(100) NOT NULL,
-    descripcion VARCHAR(500) NULL,
-    color_tipo VARCHAR(50) DEFAULT 'neutral' NOT NULL,
-    orden INT DEFAULT 1 NOT NULL,
-    is_active BOOLEAN DEFAULT TRUE NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
-);
-
--- 5. Tabla de Asuntos / Expedientes
-CREATE TABLE IF NOT EXISTS asuntos (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    firma_id UUID NOT NULL REFERENCES firmas(id) ON DELETE CASCADE,
-    radicado VARCHAR(100) UNIQUE NOT NULL,
-    cliente_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-    abogado_id UUID NULL REFERENCES users(id) ON DELETE SET NULL,
-    estado_id UUID NULL REFERENCES estados_procesales(id) ON DELETE SET NULL,
-    etapa_actual VARCHAR(255) DEFAULT 'Etapa 1: Evaluación y Radicación' NOT NULL,
-    siguiente_paso VARCHAR(500) DEFAULT 'Revisión inicial de documentación' NOT NULL,
-    is_active BOOLEAN DEFAULT TRUE NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    descripcion TEXT NULL,
+    color_tipo VARCHAR(20) DEFAULT 'neutral',
+    orden INT DEFAULT 1,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     created_by_id UUID NULL
 );
 
--- 6. Tabla de Novedades / Avances Procesales
+-- 4. Tabla de Asuntos (Expedientes)
+CREATE TABLE IF NOT EXISTS asuntos (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    firma_id UUID NOT NULL REFERENCES firmas(id) ON DELETE CASCADE,
+    radicado VARCHAR(100) NOT NULL,
+    cliente_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    abogado_id UUID NULL REFERENCES users(id) ON DELETE SET NULL,
+    estado_id UUID NULL REFERENCES estados_procesales(id) ON DELETE SET NULL,
+    etapa_actual VARCHAR(255) NOT NULL DEFAULT 'Etapa 1: Evaluación Inicial',
+    siguiente_paso VARCHAR(255) NOT NULL DEFAULT 'Revisión inicial de documentación',
+    google_drive_folder_id VARCHAR(255) NULL,
+    storage_folders JSONB DEFAULT '{}'::jsonb,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_by_id UUID NULL
+);
+
+-- 5. Tabla de Configuración de Almacenamiento por Firma
+CREATE TABLE IF NOT EXISTS firma_storage_config (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    firma_id UUID NOT NULL UNIQUE REFERENCES firmas(id) ON DELETE CASCADE,
+    provider VARCHAR(30) NOT NULL DEFAULT 'mock',
+    auth_type VARCHAR(30) NOT NULL DEFAULT 'none',
+    oauth_refresh_token_encrypted TEXT NULL,
+    oauth_access_token_encrypted TEXT NULL,
+    oauth_token_expires_at TIMESTAMP WITH TIME ZONE NULL,
+    root_folder_id VARCHAR(255) NULL,
+    root_folder_name VARCHAR(255) DEFAULT 'Asuntia_Expedientes',
+    last_verified_at TIMESTAMP WITH TIME ZONE NULL,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_by_id UUID NULL
+);
+
+-- 6. Tabla de Novedades Procesales
 CREATE TABLE IF NOT EXISTS novedades (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     firma_id UUID NOT NULL REFERENCES firmas(id) ON DELETE CASCADE,
     asunto_id UUID NOT NULL REFERENCES asuntos(id) ON DELETE CASCADE,
     titulo VARCHAR(255) NOT NULL,
     descripcion TEXT NOT NULL,
-    publicado_al_cliente BOOLEAN DEFAULT TRUE NOT NULL,
-    is_active BOOLEAN DEFAULT TRUE NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    created_by_id UUID NULL REFERENCES users(id) ON DELETE SET NULL
+    publicado_al_cliente BOOLEAN DEFAULT TRUE,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_by_id UUID NULL
 );
 
--- Indexación de Rendimiento para Multi-tenancy
+-- 7. Tabla de Documentos del Asunto (Gestión Documental)
+CREATE TABLE IF NOT EXISTS documentos_asunto (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    firma_id UUID NOT NULL REFERENCES firmas(id) ON DELETE CASCADE,
+    asunto_id UUID NOT NULL REFERENCES asuntos(id) ON DELETE CASCADE,
+    nombre_funcional VARCHAR(255) NOT NULL,
+    tipo_documental VARCHAR(50) NOT NULL DEFAULT 'otro',
+    provider VARCHAR(30) NOT NULL DEFAULT 'google_drive',
+    external_file_id VARCHAR(255) NOT NULL,
+    web_view_url TEXT NOT NULL,
+    web_download_url TEXT NULL,
+    mime_type VARCHAR(100) NULL,
+    tamano_bytes BIGINT NULL,
+    compartido_con_cliente BOOLEAN DEFAULT FALSE,
+    estado_revision VARCHAR(50) DEFAULT 'recibido',
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_by_id UUID NULL
+);
+
+-- Índices de Rendimiento
 CREATE INDEX IF NOT EXISTS idx_users_firma ON users(firma_id);
 CREATE INDEX IF NOT EXISTS idx_asuntos_firma ON asuntos(firma_id);
 CREATE INDEX IF NOT EXISTS idx_asuntos_cliente ON asuntos(cliente_id);
 CREATE INDEX IF NOT EXISTS idx_novedades_asunto ON novedades(asunto_id);
+CREATE INDEX IF NOT EXISTS idx_documentos_asunto ON documentos_asunto(asunto_id);
+CREATE INDEX IF NOT EXISTS idx_firma_storage_firma ON firma_storage_config(firma_id);
 
--- ==============================================================================
--- SIEMBRA DE DATOS DE INICIALES (DEMO / PILOTO)
--- ==============================================================================
-
--- Firma Inicial
-INSERT INTO firmas (id, nombre, subdominio, is_active)
-VALUES ('00000000-0000-0000-0000-000000000001', 'Asuntia Legal S.A.S.', 'demo', TRUE)
-ON CONFLICT (id) DO NOTHING;
-
--- Usuarios Iniciales
-INSERT INTO users (id, firma_id, nombre, email, cedula, rol, hashed_password) VALUES
-('00000000-0000-0000-0000-000000000010', '00000000-0000-0000-0000-000000000001', 'Dra. Daniela Torres', 'daniela.torres@asuntia.com', '52.840.192', 'abogado', '$2b$12$R6SBpYVVGOpokqb0L5c7CO0.Sxtcca34jDY3agkZ07Gvi.UQC4Zo.'),
-('00000000-0000-0000-0000-000000000020', '00000000-0000-0000-0000-000000000001', 'Carlos Gómez Restrepo', 'carlos.gomez@email.com', '1.094.852.140', 'cliente', NULL),
-('00000000-0000-0000-0000-000000000030', '00000000-0000-0000-0000-000000000001', 'Constructora Norte S.A.S. (Laura Mejía)', 'laura@constructoranorte.co', '900.542.118-4', 'cliente', NULL)
-ON CONFLICT (id) DO NOTHING;
-
--- Catálogo de 10 Estados Procesales
-INSERT INTO estados_procesales (id, firma_id, nombre, descripcion, color_tipo, orden) VALUES
-('00000000-0000-0000-0000-000000000101', '00000000-0000-0000-0000-000000000001', 'Sin acción aún', 'Expediente recién abierto sin actuaciones iniciales', 'warning', 1),
-('00000000-0000-0000-0000-000000000102', '00000000-0000-0000-0000-000000000001', 'Pendiente por hacer', 'Tareas u observaciones pendientes por la firma', 'warning', 2),
-('00000000-0000-0000-0000-000000000103', '00000000-0000-0000-0000-000000000001', 'Pendiente por corregir', 'Revisión de subsanaciones solicitadas por el juzgado o conciliador', 'danger', 3),
-('00000000-0000-0000-0000-000000000104', '00000000-0000-0000-0000-000000000001', 'Listo pero no se puede presentar', 'Documentación completa en espera de apertura de términos', 'warning', 4),
-('00000000-0000-0000-0000-000000000105', '00000000-0000-0000-0000-000000000001', 'Pendiente por presentar', 'Listo para radicación ante el Centro de Conciliación', 'purple', 5),
-('00000000-0000-0000-0000-000000000106', '00000000-0000-0000-0000-000000000001', 'Presentado', 'Solicitud formalmente radicada', 'blue', 6),
-('00000000-0000-0000-0000-000000000107', '00000000-0000-0000-0000-000000000001', 'En espera de respuesta', 'En traslado o auto de admisión del conciliador', 'cyan', 7),
-('00000000-0000-0000-0000-000000000108', '00000000-0000-0000-0000-000000000001', 'Admitido en Centro de Conciliación', 'Auto admisorio notificado', 'mint', 8),
-('00000000-0000-0000-0000-000000000109', '00000000-0000-0000-0000-000000000001', 'Activo en audiencia', 'Negociación de pasivos en desarrollo', 'mint', 9),
-('00000000-0000-0000-0000-000000000110', '00000000-0000-0000-0000-000000000001', 'Cerrado / Archivado', 'Acuerdo logrado o liquidación concluida', 'neutral', 10)
-ON CONFLICT (id) DO NOTHING;
-
--- Asuntos Iniciales
-INSERT INTO asuntos (id, firma_id, radicado, cliente_id, abogado_id, estado_id, etapa_actual, siguiente_paso) VALUES
-('00000000-0000-0000-0000-000000000201', '00000000-0000-0000-0000-000000000001', 'AS-2026-001', '00000000-0000-0000-0000-000000000020', '00000000-0000-0000-0000-000000000010', '00000000-0000-0000-0000-000000000108', 'Etapa 2: Negociación de Pasivos', 'Fijación de fecha para primera audiencia de negociación'),
-('00000000-0000-0000-0000-000000000202', '00000000-0000-0000-0000-000000000001', 'AS-2026-002', '00000000-0000-0000-0000-000000000030', '00000000-0000-0000-0000-000000000010', '00000000-0000-0000-0000-000000000102', 'Etapa 1: Evaluación de Pliegos', 'Recibir certificado de experiencia actualizado en PDF')
-ON CONFLICT (id) DO NOTHING;
-
--- Novedades Iniciales
-INSERT INTO novedades (id, firma_id, asunto_id, titulo, descripcion, publicado_al_cliente, created_by_id) VALUES
-('00000000-0000-0000-0000-000000000301', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000201', 'Auto de Admisión Expedido', 'El Centro de Conciliación admitió formalmente la solicitud de negociación de pasivos de acuerdo con la Ley 2445.', TRUE, '00000000-0000-0000-0000-000000000010'),
-('00000000-0000-0000-0000-000000000302', '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000201', 'Verificación de acreencia Bancolombia', 'Borrador de conciliación de extractos bancarios antes de la audiencia.', FALSE, '00000000-0000-0000-0000-000000000010')
+-- Datos Semilla Básicos
+INSERT INTO firmas (id, nombre, subdominio) 
+VALUES ('00000000-0000-0000-0000-000000000001', 'Asuntia Legal S.A.S.', 'demo')
 ON CONFLICT (id) DO NOTHING;

@@ -2,7 +2,7 @@ import uuid
 from typing import Optional, List
 from sqlalchemy import String, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from app.models.base import BaseModel
 
 class Asunto(BaseModel):
@@ -33,8 +33,17 @@ class Asunto(BaseModel):
         String(255), nullable=False, default="Revisión inicial de documentación"
     )
 
+    google_drive_folder_id: Mapped[Optional[str]] = mapped_column(
+        String(255), nullable=True
+    )
+
+    storage_folders: Mapped[Optional[dict]] = mapped_column(
+        JSONB, nullable=True, default=dict
+    )
+
     # Relaciones
     cliente: Mapped["User"] = relationship("User", foreign_keys=[cliente_id], lazy="joined")
     abogado: Mapped[Optional["User"]] = relationship("User", foreign_keys=[abogado_id], lazy="joined")
     estado: Mapped[Optional["EstadoProcesal"]] = relationship("EstadoProcesal", lazy="joined")
     novedades: Mapped[List["Novedad"]] = relationship("Novedad", back_populates="asunto", lazy="selectin", cascade="all, delete-orphan")
+    documentos: Mapped[List["DocumentoAsunto"]] = relationship("DocumentoAsunto", back_populates="asunto", lazy="selectin", cascade="all, delete-orphan")
