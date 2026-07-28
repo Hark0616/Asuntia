@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { HardDrive, CheckCircle2, RefreshCw, Link2, Server, Cloud } from 'lucide-react';
+import { HardDrive, CheckCircle2, RefreshCw, Server, Cloud } from 'lucide-react';
 import { 
   fetchFirmaStorageConfig, 
   updateFirmaStorageConfig, 
-  testStorageConnection, 
-  getOAuthAuthUrl 
+  testStorageConnection,
+  getGoogleOAuthAuthUrl,
 } from '@/features/firma/api/firmaStorage';
 import { Tooltip } from '@/components/ui/Tooltip';
 
@@ -13,6 +13,7 @@ export function ConfiguracionAlmacenamiento() {
   const queryClient = useQueryClient();
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<string | null>(null);
+  const showOneDrive = import.meta.env.VITE_ENABLE_ONEDRIVE === 'true';
 
   const { data: config, isLoading } = useQuery({
     queryKey: ['firma-storage-config'],
@@ -26,23 +27,12 @@ export function ConfiguracionAlmacenamiento() {
     }
   });
 
-  const handleSeleccionarProveedor = (provider: 'google_drive' | 'onedrive' | 'local') => {
+  const handleSeleccionarProveedor = (provider: 'local') => {
     mutacionGuardarConfig.mutate({
       provider,
-      auth_type: provider === 'local' ? 'local' : 'oauth2',
+      auth_type: 'local',
       is_active: true
     });
-  };
-
-  const handleConectarOAuth = async (provider: 'google_drive' | 'onedrive') => {
-    try {
-      const data = await getOAuthAuthUrl(provider);
-      if (data.auth_url) {
-        window.location.href = data.auth_url;
-      }
-    } catch (e) {
-      alert('No se pudo generar la URL de autenticación OAuth2.');
-    }
   };
 
   const handleProbarConexion = async () => {
@@ -59,11 +49,21 @@ export function ConfiguracionAlmacenamiento() {
     }
   };
 
+  const handleConectarGoogle = async () => {
+    setTestResult(null);
+    try {
+      const authorizationUrl = await getGoogleOAuthAuthUrl();
+      window.location.assign(authorizationUrl);
+    } catch (e: any) {
+      setTestResult(`🔴 ${e.response?.data?.detail || e.message}`);
+    }
+  };
+
   if (isLoading) {
     return <div className="panel" style={{ padding: '24px', textAlign: 'center' }}>Cargando configuración de almacenamiento...</div>;
   }
 
-  const providerActivo = config?.provider || 'mock';
+  const providerActivo: string = config?.provider || 'local';
 
   return (
     <div className="panel" style={{ marginTop: '20px' }}>
@@ -92,51 +92,41 @@ export function ConfiguracionAlmacenamiento() {
             borderRadius: '8px',
             backgroundColor: providerActivo === 'google_drive' ? 'rgba(16, 185, 129, 0.04)' : 'transparent'
           }}
-          onClick={() => handleSeleccionarProveedor('google_drive')}
         >
           <div className="row between" style={{ marginBottom: '12px' }}>
             <Cloud size={24} color="#4285F4" />
             {providerActivo === 'google_drive' && <CheckCircle2 size={18} color="#10b981" />}
           </div>
           <strong>Google Drive</strong>
-          <p className="muted small" style={{ margin: '6px 0 12px' }}>Cuentas corporativas Google Workspace mediante OAuth2.</p>
-          <button 
+          <p className="muted small" style={{ margin: '6px 0 12px' }}>Conecta la cuenta corporativa mediante OAuth 2.0.</p>
+          <button
             type="button" 
             className="secondary-button" 
+            onClick={handleConectarGoogle}
             style={{ width: '100%', fontSize: '13px', padding: '6px 12px' }}
-            onClick={(e) => { e.stopPropagation(); handleConectarOAuth('google_drive'); }}
           >
-            <Link2 size={14} /> Conectar Google
+            {providerActivo === 'google_drive' ? 'Reconectar cuenta' : 'Conectar Google Drive'}
           </button>
         </div>
 
         {/* OPCION ONEDRIVE */}
-        <div 
-          className={`panel ${providerActivo === 'onedrive' ? 'active' : ''}`}
-          style={{ 
-            padding: '18px', 
-            cursor: 'pointer', 
-            border: providerActivo === 'onedrive' ? '2px solid var(--brand)' : '1px solid var(--border)',
-            borderRadius: '8px',
-            backgroundColor: providerActivo === 'onedrive' ? 'rgba(16, 185, 129, 0.04)' : 'transparent'
-          }}
-          onClick={() => handleSeleccionarProveedor('onedrive')}
-        >
-          <div className="row between" style={{ marginBottom: '12px' }}>
-            <Cloud size={24} color="#0078D4" />
-            {providerActivo === 'onedrive' && <CheckCircle2 size={18} color="#10b981" />}
+        {showOneDrive && (
+          <div className="panel" style={{ padding: '18px' }}>
+            <div className="row between" style={{ marginBottom: '12px' }}>
+              <Cloud size={24} />
+            </div>
+            <strong>OneDrive / M365</strong>
+            <p className="muted small" style={{ margin: '6px 0 12px' }}>Integración reservada para una fase posterior.</p>
+            <button
+              type="button"
+              className="secondary-button"
+              disabled
+              style={{ width: '100%', fontSize: '13px', padding: '6px 12px' }}
+            >
+              Pendiente
+            </button>
           </div>
-          <strong>OneDrive / M365</strong>
-          <p className="muted small" style={{ margin: '6px 0 12px' }}>Microsoft 365 corporativo vía Microsoft Graph API.</p>
-          <button 
-            type="button" 
-            className="secondary-button" 
-            style={{ width: '100%', fontSize: '13px', padding: '6px 12px' }}
-            onClick={(e) => { e.stopPropagation(); handleConectarOAuth('onedrive'); }}
-          >
-            <Link2 size={14} /> Conectar M365
-          </button>
-        </div>
+        )}
 
         {/* OPCION SERVIDOR LOCAL */}
         <div 

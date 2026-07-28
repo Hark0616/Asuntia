@@ -15,8 +15,6 @@ interface CrearAsuntoModalProps {
   onSubmit: (data: {
     radicado: string;
     cliente_id: string;
-    etapa_actual?: string;
-    siguiente_paso?: string;
   }) => void;
   isLoading?: boolean;
 }
@@ -31,8 +29,6 @@ export function CrearAsuntoModal({
 }: CrearAsuntoModalProps) {
   const [radicado, setRadicado] = useState('AS-2026-006');
   const [clienteId, setClienteId] = useState(clienteSeleccionadoId || (clientes[0]?.id || ''));
-  const [etapaActual, setEtapaActual] = useState('Etapa 1: Apertura y Recopilación Probatoria');
-  const [siguientePaso, setSiguientePaso] = useState('Revisión inicial de documentación y entrevista con el cliente');
 
   React.useEffect(() => {
     if (clienteSeleccionadoId) {
@@ -50,9 +46,7 @@ export function CrearAsuntoModal({
 
     onSubmit({
       radicado: radicado.trim(),
-      cliente_id: clienteId,
-      etapa_actual: etapaActual.trim() || 'Etapa 1: Evaluación Inicial',
-      siguiente_paso: siguientePaso.trim() || 'Revisión inicial de expediente'
+      cliente_id: clienteId
     });
   };
 
@@ -66,7 +60,7 @@ export function CrearAsuntoModal({
             </div>
             <div>
               <h3>Aperturar Nuevo Expediente</h3>
-              <span className="muted small">Asigna un radicado y configura el flujo inicial</span>
+              <span className="muted small">El proceso iniciará automáticamente en Radicación</span>
             </div>
           </div>
           <button 
@@ -119,26 +113,9 @@ export function CrearAsuntoModal({
               </div>
             </div>
 
-            <div className="field">
-              <label htmlFor="etapa-asunto">Etapa Procesal Inicial</label>
-              <input
-                id="etapa-asunto"
-                type="text"
-                value={etapaActual}
-                onChange={(e) => setEtapaActual(e.target.value)}
-                placeholder="Etapa 1: Apertura y Recopilación"
-              />
-            </div>
-
-            <div className="field">
-              <label htmlFor="paso-asunto">Próximo Paso para el Cliente</label>
-              <textarea
-                id="paso-asunto"
-                rows={3}
-                value={siguientePaso}
-                onChange={(e) => setSiguientePaso(e.target.value)}
-                placeholder="Descripción del siguiente paso..."
-              />
+            <div className="list-card">
+              <strong>Paso 1 · Radicación</strong>
+              <span className="muted small">Los pasos posteriores se habilitan al completar el anterior.</span>
             </div>
           </div>
 

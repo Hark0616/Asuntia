@@ -52,6 +52,7 @@ export function DocumentosTab({ asuntoId, isReadOnly = false }: DocumentosTabPro
   const [compartido, setCompartido] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
   const [previewDocUrl, setPreviewDocUrl] = useState<string | null>(null);
 
   const { data: documentos = [], isLoading } = useQuery({
@@ -79,6 +80,7 @@ export function DocumentosTab({ asuntoId, isReadOnly = false }: DocumentosTabPro
     if (!selectedFile || !nombreFuncional.trim()) return;
 
     setUploading(true);
+    setUploadError('');
     try {
       const formData = new FormData();
       formData.append('file', selectedFile);
@@ -93,8 +95,8 @@ export function DocumentosTab({ asuntoId, isReadOnly = false }: DocumentosTabPro
       setNombreFuncional('');
       setSelectedFile(null);
       setShowUploadForm(false);
-    } catch (err) {
-      alert('Error al subir archivo a la nube configurada.');
+    } catch {
+      setUploadError('No fue posible cargar el documento.');
     } finally {
       setUploading(false);
     }
@@ -106,7 +108,7 @@ export function DocumentosTab({ asuntoId, isReadOnly = false }: DocumentosTabPro
         <div>
           <h3>
             Expediente Documental ({documentos.length})
-            <Tooltip content="Documentos y soportes alojados en la nube corporativa de la firma (Google Drive, OneDrive o Servidor Local)." />
+            <Tooltip content="Documentos y soportes alojados en Google Drive o en el servidor de la firma." />
           </h3>
         </div>
 
@@ -123,6 +125,11 @@ export function DocumentosTab({ asuntoId, isReadOnly = false }: DocumentosTabPro
 
       {!isReadOnly && showUploadForm && (
         <form onSubmit={handleUploadSubmit} className="panel" style={{ backgroundColor: 'var(--panel-subtle)', marginBottom: '16px' }}>
+          {uploadError && (
+            <div className="badge danger" style={{ marginBottom: '12px' }}>
+              {uploadError}
+            </div>
+          )}
           <div className="form-grid">
             <div className="field full">
               <label htmlFor="doc-nombre">Nombre funcional del documento</label>

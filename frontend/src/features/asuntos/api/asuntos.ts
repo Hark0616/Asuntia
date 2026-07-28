@@ -16,11 +16,35 @@ export interface ClienteAPI {
   created_at: string;
 }
 
+export interface PasoCampoAPI {
+  clave: string;
+  etiqueta: string;
+  tipo: 'text' | 'textarea' | 'date' | 'datetime' | 'url' | 'select' | 'boolean';
+  requerido: boolean;
+  opciones: Array<{ valor: string; etiqueta: string }>;
+}
+
+export interface AsuntoPasoAPI {
+  id: string;
+  orden: number;
+  codigo: string;
+  titulo: string;
+  descripcion: string;
+  estado: 'bloqueado' | 'activo' | 'completado';
+  campos: PasoCampoAPI[];
+  datos: Record<string, unknown>;
+  completed_at?: string | null;
+  completed_by_id?: string | null;
+}
+
 export interface AsuntoAPI {
   id: string;
   radicado: string;
   etapa_actual: string;
   siguiente_paso: string;
+  ruta_codigo: string;
+  paso_actual: number;
+  flujo_estado: 'activo' | 'completado';
   cliente_id: string;
   abogado_id?: string;
   estado?: EstadoProcesalAPI;
@@ -32,6 +56,7 @@ export interface AsuntoAPI {
     publicado_al_cliente: boolean;
     created_at: string;
   }>;
+  pasos: AsuntoPasoAPI[];
   created_at: string;
   updated_at: string;
 }
@@ -56,8 +81,16 @@ export const crearClienteAPI = async (payload: { nombre: string; cedula: string;
   return response.data;
 };
 
-export const crearAsuntoAPI = async (payload: { radicado: string; cliente_id: string; estado_id?: string; etapa_actual?: string; siguiente_paso?: string }) => {
+export const crearAsuntoAPI = async (payload: { radicado: string; cliente_id: string; abogado_id?: string; estado_id?: string }) => {
   const response = await apiClient.post<AsuntoAPI>('/asuntos', payload);
+  return response.data;
+};
+
+export const avanzarPasoAPI = async (
+  asuntoId: string,
+  payload: { paso_codigo: string; datos: Record<string, unknown> },
+) => {
+  const response = await apiClient.post<AsuntoAPI>(`/asuntos/${asuntoId}/flujo/avanzar`, payload);
   return response.data;
 };
 

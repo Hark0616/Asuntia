@@ -1,96 +1,94 @@
-import uuid
 from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.db import get_db
-from app.schemas.auth import OTPRequest, OTPVerify, LoginRequest, TokenResponse, UserResponse
-from app.core.mail import send_otp_email
-from app.core.security import create_access_token, verify_password, get_password_hash
-from app.core.exceptions import UnauthorizedException, NotFoundException
 
-from sqlalchemy import select
+from app.config import settings
+from app.core.deps import get_current_user
+from app.core.db import get_db
+from app.schemas.auth import OTPRequest, OTPVerify, LoginRequest, SessionResponse, UserResponse
+from app.core.mail import send_otp_email
+from app.core.security import create_access_token
 from app.models.user import User
+from app.services.auth_service import AuthService
 
 router = APIRouter()
 
-# En memoria para OTP de desarrollo (Subfase 1)
-_otp_store = {}
 
-def _clean_cedula(cedula: str) -> str:
-    return cedula.strip().replace(".", "").replace("-", "").replace(" ", "")
-
-@router.post("/otp/request", status_code=status.HTTP_200_OK)
-async def request_otp(payload: OTPRequest):
-    """
-    Solicita un código OTP por correo electrónico usando la cédula del cliente.
-    """
-    cedula_clean = _clean_cedula(payload.cedula)
-    otp_code = "123456" # Código por defecto para desarrollo local
-    _otp_store[cedula_clean] = otp_code
-    
-    # Intentar enviar correo vía Mailpit / SMTP de forma segura sin romper la API
-    try:
-        send_otp_email("cliente.demo@asuntia.com", otp_code)
-    except Exception as err:
-        print(f"[OTP Dev Warning] No se pudo contactar servidor SMTP: {err}")
-    
-    return {"message": "Código OTP enviado al correo registrado", "cedula": payload.cedula}
-
-@router.post("/otp/verify", response_model=TokenResponse)
-async def verify_otp(payload: OTPVerify, response: Response, db: AsyncSession = Depends(get_db)):
-    """
-    Verifica el código OTP e inicia sesión del cliente guardando el JWT en cookie HttpOnly.
-    """
-    cedula_clean = _clean_cedula(payload.cedula)
-    user_code = payload.code.strip()
-    expected_code = _otp_store.get(cedula_clean, "123456")
-    
-    # En desarrollo local acepta 123456 o el código generado en la tienda
-    if user_code not in (expected_code, "123456", "12345"):
-        raise UnauthorizedException(detail="Código OTP inválido o expirado. Usa 123456 para pruebas.")
-
-    # Buscar usuario real en la BD por cédula
-    stmt = select(User).where(User.cedula == payload.cedula).where(User.is_active == True)
-    result = await db.execute(stmt)
-    user = result.scalars().first()
-
-    if not user:
-        # Intento de fallback limpiando caracteres si venía formateada o viceversa
-        stmt_all = select(User).where(User.is_active == True)
-        all_users = (await db.execute(stmt_all)).scalars().all()
-        for u in all_users:
-            if _clean_cedula(u.cedula) == cedula_clean:
-                user = u
-                break
-
-    if not user:
-        raise NotFoundException(detail=f"No se encontró un cliente registrado con la cédula {payload.cedula}")
-
-    token_data = {
-        "sub": str(user.id),
-        "cedula": user.cedula,
-        "rol": user.rol,
-        "firma_id": str(user.firma_id)
-    }
-    access_token = create_access_token(data=token_data)
-
-    # Cookie HttpOnly, Secure, SameSite=Lax
+def _set_session_cookie(response: Response, access_token: str) -> None:
     response.set_cookie(
         key="access_token",
         value=access_token,
         httponly=True,
         samesite="lax",
-        secure=False,
-        max_age=28800
+        secure=settings.ENVIRONMENT == "production",
+        domain=settings.COOKIE_DOMAIN,
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
     )
 
-    user_resp = UserResponse(
-        id=user.id,
-        email=user.email,
-        nombre=user.nombre,
-        cedula=user.cedula,
-        rol=user.rol,
-        firma_id=user.firma_id
+
+def _session_response(user: User, response: Response) -> SessionResponse:
+    token_data = {
+        "sub": str(user.id),
+        "cedula": user.cedula,
+        "rol": user.rol,
+        "firma_id": str(user.firma_id),
+    }
+    access_token = create_access_token(data=token_data)
+    _set_session_cookie(response, access_token)
+    return SessionResponse(user=UserResponse.model_validate(user))
+
+
+@router.post("/login", response_model=SessionResponse)
+async def login_office(
+    payload: LoginRequest,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+):
+    user = await AuthService(db).authenticate_office(
+        payload.firma_slug, str(payload.email), payload.password
     )
+    return _session_response(user, response)
 
-    return TokenResponse(access_token=access_token, user=user_resp)
+@router.post("/otp/request", status_code=status.HTTP_200_OK)
+async def request_otp(payload: OTPRequest, db: AsyncSession = Depends(get_db)):
+    """
+    Solicita un código OTP por correo electrónico usando la cédula del cliente.
+    """
+    user, otp_code = await AuthService(db).issue_client_otp(
+        payload.firma_slug, payload.cedula
+    )
+    
+    # Intentar enviar correo vía Mailpit / SMTP de forma segura sin romper la API
+    if user and otp_code:
+        try:
+            send_otp_email(user.email, otp_code)
+        except Exception as err:
+            print(f"[OTP Dev Warning] No se pudo contactar servidor SMTP: {err}")
+    
+    return {"message": "Si la cédula está registrada, recibirás un código de acceso"}
 
+@router.post("/otp/verify", response_model=SessionResponse)
+async def verify_otp(payload: OTPVerify, response: Response, db: AsyncSession = Depends(get_db)):
+    """
+    Verifica el código OTP e inicia sesión del cliente guardando el JWT en cookie HttpOnly.
+    """
+    user = await AuthService(db).verify_client_otp(
+        payload.firma_slug, payload.cedula, payload.code.strip()
+    )
+    return _session_response(user, response)
+
+
+@router.get("/me", response_model=UserResponse)
+async def get_me(current_user: User = Depends(get_current_user)):
+    return current_user
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+async def logout(response: Response):
+    response.delete_cookie(
+        key="access_token",
+        httponly=True,
+        samesite="lax",
+        secure=settings.ENVIRONMENT == "production",
+        domain=settings.COOKIE_DOMAIN,
+    )
+    return None

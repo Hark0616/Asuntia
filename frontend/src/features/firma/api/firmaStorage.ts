@@ -3,12 +3,20 @@ import { apiClient } from '@/lib/axios';
 export interface FirmaStorageConfig {
   id: string;
   firma_id: string;
-  provider: 'google_drive' | 'onedrive' | 'local' | 'mock';
-  auth_type: 'oauth2' | 'service_account' | 'local' | 'none';
+  provider: 'local' | 'google_drive';
+  auth_type: 'local' | 'oauth2';
   root_folder_id?: string;
   root_folder_name?: string;
   is_active: boolean;
   last_verified_at?: string;
+}
+
+export async function getGoogleOAuthAuthUrl(): Promise<string> {
+  const res = await apiClient.get<{ authorization_url: string }>(
+    '/storage/auth-url',
+    { params: { provider: 'google_drive' } },
+  );
+  return res.data.authorization_url;
 }
 
 export async function fetchFirmaStorageConfig(): Promise<FirmaStorageConfig> {
@@ -23,10 +31,5 @@ export async function updateFirmaStorageConfig(payload: Partial<FirmaStorageConf
 
 export async function testStorageConnection(): Promise<{ status: string; provider: string; folder_id: string; web_view_url: string; message: string }> {
   const res = await apiClient.post<{ status: string; provider: string; folder_id: string; web_view_url: string; message: string }>('/firma/storage/config/test');
-  return res.data;
-}
-
-export async function getOAuthAuthUrl(provider: 'google_drive' | 'onedrive'): Promise<{ provider: string; auth_url: string }> {
-  const res = await apiClient.get<{ provider: string; auth_url: string }>(`/storage/auth-url?provider=${provider}`);
   return res.data;
 }

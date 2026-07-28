@@ -11,8 +11,18 @@ export interface User {
   id: string;
   email: string;
   nombre: string;
+  cedula: string;
   rol: 'administrador' | 'abogado' | 'auxiliar' | 'cliente';
   firma_id: string;
+}
+
+export interface AuthChallenge {
+  id: string;
+  user_id: string;
+  purpose: string;
+  expires_at: string;
+  attempts: number;
+  consumed_at?: string | null;
 }
 
 export interface Asunto {
@@ -26,8 +36,31 @@ export interface Asunto {
   estado_color: string;
   ultima_novedad?: string;
   siguiente_paso?: string;
+  ruta_codigo: string;
+  paso_actual: number;
+  flujo_estado: 'activo' | 'completado';
+  pasos: AsuntoPaso[];
   updated_at: string;
   firma_id: string;
+}
+
+export interface AsuntoPaso {
+  id: string;
+  orden: number;
+  codigo: string;
+  titulo: string;
+  descripcion: string;
+  estado: 'bloqueado' | 'activo' | 'completado';
+  campos: Array<{
+    clave: string;
+    etiqueta: string;
+    tipo: 'text' | 'textarea' | 'date' | 'datetime' | 'url' | 'select' | 'boolean';
+    requerido: boolean;
+    opciones: Array<{ valor: string; etiqueta: string }>;
+  }>;
+  datos: Record<string, unknown>;
+  completed_at?: string | null;
+  completed_by_id?: string | null;
 }
 
 export interface Novedad {

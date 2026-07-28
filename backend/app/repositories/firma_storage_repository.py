@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 from typing import Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,3 +31,51 @@ class FirmaStorageRepository(BaseRepository[FirmaStorageConfig]):
         await self.session.commit()
         await self.session.refresh(config)
         return config
+
+    async def save_google_oauth_tokens(
+        self,
+        access_token_encrypted: str,
+        refresh_token_encrypted: str | None,
+        expires_at: datetime | None,
+    ) -> FirmaStorageConfig:
+        config = await self.get_config()
+        if not config:
+            config = FirmaStorageConfig(
+                firma_id=self.firma_id,
+                provider="google_drive",
+                auth_type="oauth2",
+                root_folder_name="Asuntia_Expedientes",
+                is_active=True,
+            )
+        config.provider = "google_drive"
+        config.auth_type = "oauth2"
+        config.oauth_access_token_encrypted = access_token_encrypted
+        if refresh_token_encrypted:
+            config.oauth_refresh_token_encrypted = refresh_token_encrypted
+        config.oauth_token_expires_at = expires_at
+        config.is_active = True
+        self.session.add(config)
+        await self.session.commit()
+        await self.session.refresh(config)
+        return config
+
+    async def update_google_tokens(
+        self,
+        config: FirmaStorageConfig,
+        access_token_encrypted: str,
+        refresh_token_encrypted: str | None,
+        expires_at: datetime | None,
+    ) -> None:
+        config.oauth_access_token_encrypted = access_token_encrypted
+        if refresh_token_encrypted:
+            config.oauth_refresh_token_encrypted = refresh_token_encrypted
+        config.oauth_token_expires_at = expires_at
+        self.session.add(config)
+        await self.session.commit()
+
+    async def set_root_folder_id(
+        self, config: FirmaStorageConfig, root_folder_id: str
+    ) -> None:
+        config.root_folder_id = root_folder_id
+        self.session.add(config)
+        await self.session.commit()

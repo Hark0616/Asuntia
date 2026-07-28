@@ -1,6 +1,6 @@
 from typing import List
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import field_validator
+from pydantic import model_validator
 
 class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
@@ -17,6 +17,16 @@ class Settings(BaseSettings):
     JWT_SECRET: str = "super_secret_jwt_key_asuntia_change_in_prod_12345"
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 480
+    COOKIE_DOMAIN: str | None = None
+    FRONTEND_URL: str = "http://127.0.0.1:5173"
+
+    # Google Drive OAuth
+    GOOGLE_CLIENT_ID: str = ""
+    GOOGLE_CLIENT_SECRET: str = ""
+    GOOGLE_OAUTH_REDIRECT_URI: str = (
+        "http://127.0.0.1:8000/api/v1/storage/oauth-callback"
+    )
+    STORAGE_TOKEN_ENCRYPTION_KEY: str = ""
 
     # CORS
     ALLOW_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173"
@@ -28,6 +38,19 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = ""
     EMAILS_FROM_EMAIL: str = "no-reply@asuntia.com"
     EMAILS_FROM_NAME: str = "Asuntia Legal"
+
+    @model_validator(mode="after")
+    def validate_production_secrets(self):
+        if (
+            self.ENVIRONMENT == "production"
+            and self.JWT_SECRET == "super_secret_jwt_key_asuntia_change_in_prod_12345"
+        ):
+            raise ValueError("JWT_SECRET debe configurarse explícitamente en producción")
+        if self.ENVIRONMENT == "production" and not self.STORAGE_TOKEN_ENCRYPTION_KEY:
+            raise ValueError(
+                "STORAGE_TOKEN_ENCRYPTION_KEY debe configurarse explícitamente en producción"
+            )
+        return self
 
     @property
     def allow_origins_list(self) -> List[str]:

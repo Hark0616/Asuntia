@@ -1,142 +1,173 @@
-import os
+import asyncio
 import io
-import uuid
-import logging
-from typing import Optional, Dict, Any, Tuple
-from google.oauth2 import service_account
+from typing import Any, Dict, Optional, Tuple
+
+from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 
+from app.config import settings
+from app.models.firma_storage import FirmaStorageConfig
+from app.repositories.firma_storage_repository import FirmaStorageRepository
 from app.services.storage.base import BaseStorageService
+from app.services.storage.google_oauth import GOOGLE_DRIVE_SCOPES
+from app.services.storage.token_cipher import StorageTokenCipher
 
-logger = logging.getLogger(__name__)
-
-SCOPES = ['https://www.googleapis.com/auth/drive']
 
 class GoogleDriveStorageService(BaseStorageService):
-    """
-    Implementación del proveedor de almacenamiento de Google Drive API v3.
-    """
+    """Proveedor real de Google Drive autenticado por OAuth 2.0."""
 
-    def __init__(self, credentials_path: Optional[str] = None):
-        self.credentials_path = credentials_path or os.getenv("GOOGLE_SERVICE_ACCOUNT_FILE")
-        self.service = None
-        self._initialize_client()
+    def __init__(
+        self,
+        config: FirmaStorageConfig,
+        repository: FirmaStorageRepository,
+    ):
+        if not config.oauth_access_token_encrypted:
+            raise ValueError("Google Drive todavía no está conectado")
+        self.config = config
+        self.repository = repository
+        self.cipher = StorageTokenCipher()
 
-    def _initialize_client(self):
-        if self.credentials_path and os.path.exists(self.credentials_path):
-            try:
-                creds = service_account.Credentials.from_service_account_file(
-                    self.credentials_path, scopes=SCOPES
-                )
-                self.service = build('drive', 'v3', credentials=creds)
-                logger.info("Cliente de Google Drive API v3 inicializado correctamente.")
-            except Exception as e:
-                logger.warning(f"No se pudo autenticar con Service Account de Google Drive: {e}. Operando en modo dev/fallback.")
-                self.service = None
-        else:
-            logger.info("GOOGLE_SERVICE_ACCOUNT_FILE no configurado. Operando con fallback simulado para Google Drive.")
+    async def _credentials(self) -> Credentials:
+        refresh_token = (
+            self.cipher.decrypt(self.config.oauth_refresh_token_encrypted)
+            if self.config.oauth_refresh_token_encrypted
+            else None
+        )
+        credentials = Credentials(
+            token=self.cipher.decrypt(self.config.oauth_access_token_encrypted),
+            refresh_token=refresh_token,
+            token_uri="https://oauth2.googleapis.com/token",
+            client_id=settings.GOOGLE_CLIENT_ID,
+            client_secret=settings.GOOGLE_CLIENT_SECRET,
+            scopes=GOOGLE_DRIVE_SCOPES,
+        )
+        if not credentials.valid:
+            if not credentials.refresh_token:
+                raise ValueError("Reconecta Google Drive para renovar la autorización")
+            await asyncio.to_thread(credentials.refresh, Request())
+            await self.repository.update_google_tokens(
+                self.config,
+                self.cipher.encrypt(credentials.token),
+                self.cipher.encrypt(credentials.refresh_token),
+                credentials.expiry,
+            )
+        return credentials
 
-    async def create_folder(self, folder_name: str, parent_folder_id: Optional[str] = None) -> Tuple[str, str]:
-        """
-        Crea una subcarpeta en Google Drive.
-        """
-        if self.service:
-            file_metadata = {
-                'name': folder_name,
-                'mimeType': 'application/vnd.google-apps.folder'
-            }
-            if parent_folder_id:
-                file_metadata['parents'] = [parent_folder_id]
+    async def _service(self):
+        credentials = await self._credentials()
+        return await asyncio.to_thread(
+            build,
+            "drive",
+            "v3",
+            credentials=credentials,
+            cache_discovery=False,
+        )
 
-            folder = self.service.files().create(body=file_metadata, fields='id, webViewLink').execute()
-            return folder.get('id'), folder.get('webViewLink')
-        else:
-            # Fallback simulado para entorno dev / pruebas
-            mock_id = f"gdrive_folder_{uuid.uuid4().hex[:12]}"
-            mock_url = f"https://drive.google.com/drive/folders/{mock_id}"
-            return mock_id, mock_url
+    async def _create_raw_folder(
+        self, folder_name: str, parent_folder_id: Optional[str]
+    ) -> Tuple[str, str]:
+        service = await self._service()
+        metadata: dict[str, Any] = {
+            "name": folder_name,
+            "mimeType": "application/vnd.google-apps.folder",
+        }
+        if parent_folder_id:
+            metadata["parents"] = [parent_folder_id]
+        result = await asyncio.to_thread(
+            lambda: service.files()
+            .create(
+                body=metadata,
+                fields="id,webViewLink",
+                supportsAllDrives=True,
+            )
+            .execute()
+        )
+        folder_id = result["id"]
+        return folder_id, result.get(
+            "webViewLink", f"https://drive.google.com/drive/folders/{folder_id}"
+        )
+
+    async def _ensure_root(self) -> str:
+        if self.config.root_folder_id:
+            return self.config.root_folder_id
+        root_id, _ = await self._create_raw_folder(
+            self.config.root_folder_name or "Asuntia_Expedientes",
+            None,
+        )
+        await self.repository.set_root_folder_id(self.config, root_id)
+        return root_id
+
+    async def create_folder(
+        self, folder_name: str, parent_folder_id: Optional[str] = None
+    ) -> Tuple[str, str]:
+        parent = parent_folder_id or await self._ensure_root()
+        return await self._create_raw_folder(folder_name, parent)
 
     async def upload_file(
         self,
         file_bytes: bytes,
         filename: str,
         mime_type: str,
-        parent_folder_id: Optional[str] = None
+        parent_folder_id: Optional[str] = None,
     ) -> Tuple[str, str, Optional[str], int]:
-        """
-        Sube un archivo por streaming a Google Drive.
-        """
-        size_bytes = len(file_bytes)
-        if self.service:
-            file_metadata = {'name': filename}
-            if parent_folder_id:
-                file_metadata['parents'] = [parent_folder_id]
-
-            media = MediaIoBaseUpload(io.BytesIO(file_bytes), mimetype=mime_type, resumable=True)
-            file = self.service.files().create(
-                body=file_metadata, media_body=media, fields='id, webViewLink, webContentLink'
-            ).execute()
-
-            file_id = file.get('id')
-            web_view = file.get('webViewLink')
-            web_download = file.get('webContentLink')
-
-            # Permitir lectura a quienes tengan el enlace
-            try:
-                self.service.permissions().create(
-                    fileId=file_id,
-                    body={'type': 'anyone', 'role': 'reader'}
-                ).execute()
-            except Exception as pe:
-                logger.warning(f"No se pudieron ajustar permisos públicos en Google Drive: {pe}")
-
-            return file_id, web_view, web_download, size_bytes
-        else:
-            # Fallback simulado para entorno dev / pruebas
-            mock_id = f"gdrive_file_{uuid.uuid4().hex[:12]}"
-            mock_view = f"https://drive.google.com/file/d/{mock_id}/view"
-            mock_download = f"https://drive.google.com/uc?id={mock_id}&export=download"
-            return mock_id, mock_view, mock_download, size_bytes
+        service = await self._service()
+        parent = parent_folder_id or await self._ensure_root()
+        metadata: dict[str, Any] = {"name": filename}
+        if parent:
+            metadata["parents"] = [parent]
+        media = MediaIoBaseUpload(
+            io.BytesIO(file_bytes),
+            mimetype=mime_type,
+            resumable=True,
+        )
+        result = await asyncio.to_thread(
+            lambda: service.files()
+            .create(
+                body=metadata,
+                media_body=media,
+                fields="id,webViewLink,webContentLink,size",
+                supportsAllDrives=True,
+            )
+            .execute()
+        )
+        return (
+            result["id"],
+            result.get("webViewLink", ""),
+            result.get("webContentLink"),
+            int(result.get("size") or len(file_bytes)),
+        )
 
     async def get_file_metadata(self, external_file_id: str) -> Dict[str, Any]:
-        """
-        Consulta los metadatos de un archivo en Google Drive.
-        """
-        if self.service:
-            return self.service.files().get(
-                fileId=external_file_id, fields='id, name, mimeType, size, webViewLink, webContentLink'
-            ).execute()
-        else:
-            return {
-                'id': external_file_id,
-                'name': 'documento_simulado.pdf',
-                'mimeType': 'application/pdf',
-                'size': 102450,
-                'webViewLink': f"https://drive.google.com/file/d/{external_file_id}/view",
-                'webContentLink': f"https://drive.google.com/uc?id={external_file_id}&export=download"
-            }
+        service = await self._service()
+        return await asyncio.to_thread(
+            lambda: service.files()
+            .get(
+                fileId=external_file_id,
+                fields="id,name,mimeType,size,webViewLink,webContentLink",
+                supportsAllDrives=True,
+            )
+            .execute()
+        )
 
-    async def create_case_folder_structure(self, radicado: str, root_folder_id: Optional[str] = None) -> Dict[str, Any]:
-        """
-        Crea la carpeta del radicado y sus 4 subcarpetas oficiales (01_Anexos, 02_Solicitud, 03_Audiencias, 04_Liquidacion).
-        """
-        root_case_id, root_case_url = await self.create_folder(f"Expediente_{radicado}", parent_folder_id=root_folder_id)
-
-        sub_names = {
+    async def create_case_folder_structure(
+        self, radicado: str, root_folder_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        root_case_id, root_case_url = await self.create_folder(
+            f"Expediente_{radicado}",
+            parent_folder_id=root_folder_id,
+        )
+        subfolders = {}
+        for key, name in {
             "anexo": "01_Anexos",
             "solicitud": "02_Solicitud",
             "audiencia": "03_Audiencias",
-            "liquidacion": "04_Liquidacion"
-        }
-
-        subfolders = {}
-        for key, name in sub_names.items():
-            sub_id, _ = await self.create_folder(name, parent_folder_id=root_case_id)
-            subfolders[key] = sub_id
-
+            "liquidacion": "04_Liquidacion",
+        }.items():
+            subfolders[key], _ = await self.create_folder(name, root_case_id)
         return {
             "root_folder_id": root_case_id,
             "web_view_url": root_case_url,
-            "subfolders": subfolders
+            "subfolders": subfolders,
         }

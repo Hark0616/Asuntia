@@ -2,6 +2,17 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { OficinaLogin } from '../OficinaLogin';
 
+vi.mock('@/features/auth/api/auth', () => ({
+  loginOficinaAPI: vi.fn().mockResolvedValue({
+    id: 'user-1',
+    nombre: 'Dra. Daniela Torres',
+    email: 'daniela.torres@asuntia.com',
+    cedula: '52.840.192',
+    rol: 'administrador',
+    firma_id: 'firma-1',
+  }),
+}));
+
 describe('OficinaLogin Component', () => {
   it('debe renderizar el formulario de login de la oficina', () => {
     const onSuccessMock = vi.fn();
@@ -22,7 +33,7 @@ describe('OficinaLogin Component', () => {
     await waitFor(() => {
       expect(onSuccessMock).toHaveBeenCalledWith(expect.objectContaining({
         email: 'daniela.torres@asuntia.com',
-        rol: 'abogado'
+        rol: 'administrador'
       }));
     });
   });

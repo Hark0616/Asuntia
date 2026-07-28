@@ -7,14 +7,15 @@ vi.mock('@/features/firma/api/firmaStorage', () => ({
   fetchFirmaStorageConfig: vi.fn().mockResolvedValue({
     id: 'config-123',
     firma_id: 'firma-001',
-    provider: 'google_drive',
-    auth_type: 'oauth2',
+    provider: 'local',
+    auth_type: 'local',
     is_active: true
   }),
   updateFirmaStorageConfig: vi.fn(),
+  getGoogleOAuthAuthUrl: vi.fn(),
   testStorageConnection: vi.fn().mockResolvedValue({
     status: 'success',
-    provider: 'GoogleDriveStorageService',
+    provider: 'LocalStorageService',
     folder_id: 'test-folder',
     web_view_url: 'https://drive.google.com/test',
     message: 'Conexión probada'
@@ -36,7 +37,7 @@ describe('ConfiguracionAlmacenamiento Component', () => {
 
     expect(await screen.findByText('Almacenamiento de la Firma')).toBeInTheDocument();
     expect(screen.getByText('Google Drive')).toBeInTheDocument();
-    expect(screen.getByText('OneDrive / M365')).toBeInTheDocument();
+    expect(screen.queryByText('OneDrive / M365')).not.toBeInTheDocument();
     expect(screen.getByText('Servidor Local')).toBeInTheDocument();
   });
 });

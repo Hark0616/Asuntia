@@ -8,7 +8,11 @@ from app.models.estado import EstadoProcesal
 from app.models.asunto import Asunto
 from app.models.novedad import Novedad
 from app.models.documento import DocumentoAsunto
+from app.models.firma_storage import FirmaStorageConfig
+from app.models.auth_challenge import AuthChallenge
+from app.models.asunto_paso import AsuntoPaso
 from app.core.security import get_password_hash
+from app.services.workflow_service import initial_workflow_steps
 
 DEFAULT_FIRMA_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
 
@@ -17,8 +21,11 @@ async def seed_data():
         print("Iniciando siembra de datos realistas para el equipo de Asuntia Legal...")
 
         # Limpiar datos previos en orden inverso de claves foráneas
+        await session.execute(delete(AuthChallenge))
         await session.execute(delete(DocumentoAsunto))
+        await session.execute(delete(FirmaStorageConfig))
         await session.execute(delete(Novedad))
+        await session.execute(delete(AsuntoPaso))
         await session.execute(delete(Asunto))
         await session.execute(delete(EstadoProcesal))
         await session.execute(delete(User))
@@ -42,7 +49,7 @@ async def seed_data():
             email="daniela.torres@asuntia.com",
             hashed_password=get_password_hash("admin123"),
             cedula="52.840.192",
-            rol="abogado"
+            rol="administrador"
         )
         abogado_alejandro = User(
             id=uuid.UUID("00000000-0000-0000-0000-000000000011"),
@@ -181,9 +188,10 @@ async def seed_data():
             radicado="AS-2026-001",
             cliente_id=cliente_carlos.id,
             abogado_id=abogada_daniela.id,
-            estado_id=estados[7].id, # Admitido en Centro de Conciliación
-            etapa_actual="Etapa 2: Negociación de Pasivos",
-            siguiente_paso="Fijación de fecha para primera audiencia de negociación de acreedores"
+            estado_id=estados[0].id,
+            etapa_actual="Paso 1 de 5: Radicación",
+            siguiente_paso=initial_workflow_steps()[0]["descripcion"],
+            created_by_id=abogada_daniela.id,
         )
         asunto2 = Asunto(
             id=uuid.UUID("00000000-0000-0000-0000-000000000202"),
@@ -191,9 +199,10 @@ async def seed_data():
             radicado="AS-2026-002",
             cliente_id=cliente_transportes.id,
             abogado_id=abogado_alejandro.id,
-            estado_id=estados[8].id, # Activo en audiencia
-            etapa_actual="Etapa 3: Calificación y Graduación de Créditos",
-            siguiente_paso="Presentación del inventario de activos y pasivos ante la Supersociedades"
+            estado_id=estados[0].id,
+            etapa_actual="Paso 1 de 5: Radicación",
+            siguiente_paso=initial_workflow_steps()[0]["descripcion"],
+            created_by_id=abogado_alejandro.id,
         )
         asunto3 = Asunto(
             id=uuid.UUID("00000000-0000-0000-0000-000000000203"),
@@ -201,9 +210,10 @@ async def seed_data():
             radicado="AS-2026-003",
             cliente_id=cliente_elena.id,
             abogado_id=abogada_daniela.id,
-            estado_id=estados[2].id, # Pendiente por corregir
-            etapa_actual="Etapa 1: Subsanación de Demanda",
-            siguiente_paso="Anexo de certificado médico actualizado para subsanar auto inadmitorio"
+            estado_id=estados[0].id,
+            etapa_actual="Paso 1 de 5: Radicación",
+            siguiente_paso=initial_workflow_steps()[0]["descripcion"],
+            created_by_id=abogada_daniela.id,
         )
         asunto4 = Asunto(
             id=uuid.UUID("00000000-0000-0000-0000-000000000204"),
@@ -211,12 +221,25 @@ async def seed_data():
             radicado="AS-2026-004",
             cliente_id=cliente_jorge.id,
             abogado_id=abogado_alejandro.id,
-            estado_id=estados[6].id, # En espera de respuesta
-            etapa_actual="Etapa 2: Medidas Cautelares y Embargos",
-            siguiente_paso="Respuesta del oficio de embargo preventivo de productos bancarios"
+            estado_id=estados[0].id,
+            etapa_actual="Paso 1 de 5: Radicación",
+            siguiente_paso=initial_workflow_steps()[0]["descripcion"],
+            created_by_id=abogado_alejandro.id,
         )
 
         session.add_all([asunto1, asunto2, asunto3, asunto4])
+        session.add_all(
+            [
+                AsuntoPaso(
+                    **step,
+                    asunto_id=asunto.id,
+                    firma_id=DEFAULT_FIRMA_ID,
+                    created_by_id=asunto.abogado_id,
+                )
+                for asunto in (asunto1, asunto2, asunto3, asunto4)
+                for step in initial_workflow_steps()
+            ]
+        )
 
         # 5. Crear Novedades Procesales
         novedades = [
@@ -240,59 +263,6 @@ async def seed_data():
             )
         ]
         session.add_all(novedades)
-
-        # 6. Crear Documentos en Google Drive para el Asunto AS-2026-001
-        documentos = [
-            DocumentoAsunto(
-                id=uuid.UUID("00000000-0000-0000-0000-000000000401"),
-                firma_id=DEFAULT_FIRMA_ID,
-                asunto_id=asunto1.id,
-                nombre_funcional="Certificado Laboral e Ingresos",
-                tipo_documental="anexo",
-                provider="google_drive",
-                external_file_id="gdrive_cert_carlos_001",
-                web_view_url="https://drive.google.com/file/d/gdrive_cert_carlos_001/view",
-                web_download_url="https://drive.google.com/uc?id=gdrive_cert_carlos_001&export=download",
-                mime_type="application/pdf",
-                tamano_bytes=1048576,
-                compartido_con_cliente=True,
-                estado_revision="recibido",
-                created_by_id=abogada_daniela.id
-            ),
-            DocumentoAsunto(
-                id=uuid.UUID("00000000-0000-0000-0000-000000000402"),
-                firma_id=DEFAULT_FIRMA_ID,
-                asunto_id=asunto1.id,
-                nombre_funcional="Auto Admisorio del Centro de Conciliación",
-                tipo_documental="auto_admisorio",
-                provider="google_drive",
-                external_file_id="gdrive_auto_admisorio_001",
-                web_view_url="https://drive.google.com/file/d/gdrive_auto_admisorio_001/view",
-                web_download_url="https://drive.google.com/uc?id=gdrive_auto_admisorio_001&export=download",
-                mime_type="application/pdf",
-                tamano_bytes=2097152,
-                compartido_con_cliente=True,
-                estado_revision="recibido",
-                created_by_id=abogada_daniela.id
-            ),
-            DocumentoAsunto(
-                id=uuid.UUID("00000000-0000-0000-0000-000000000403"),
-                firma_id=DEFAULT_FIRMA_ID,
-                asunto_id=asunto1.id,
-                nombre_funcional="Borrador Reservado de Estrategia con Bancos",
-                tipo_documental="otro",
-                provider="google_drive",
-                external_file_id="gdrive_estrategia_interna_001",
-                web_view_url="https://drive.google.com/file/d/gdrive_estrategia_interna_001/view",
-                web_download_url="https://drive.google.com/uc?id=gdrive_estrategia_interna_001&export=download",
-                mime_type="application/pdf",
-                tamano_bytes=524288,
-                compartido_con_cliente=False,
-                estado_revision="recibido",
-                created_by_id=abogada_daniela.id
-            )
-        ]
-        session.add_all(documentos)
 
         await session.commit()
         print("Siembra de datos realistas para Asuntia Legal completada exitosamente.")

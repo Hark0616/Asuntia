@@ -1,28 +1,29 @@
 import React, { useState } from 'react';
 import { LogIn } from 'lucide-react';
+import { loginOficinaAPI } from '@/features/auth/api/auth';
+import type { User } from '@/types/api';
 
 interface OficinaLoginProps {
-  onSuccess: (user: any) => void;
+  onSuccess: (user: User) => void;
 }
 
 export function OficinaLogin({ onSuccess }: OficinaLoginProps) {
   const [email, setEmail] = useState('daniela.torres@asuntia.com');
   const [password, setPassword] = useState('admin123');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-
-    setTimeout(() => {
-      onSuccess({
-        id: '00000000-0000-0000-0000-000000000010',
-        nombre: 'Dra. Daniela Torres',
-        email,
-        rol: 'abogado'
-      });
+    setError('');
+    try {
+      onSuccess(await loginOficinaAPI(email, password));
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'No fue posible iniciar sesión.');
+    } finally {
       setLoading(false);
-    }, 400);
+    }
   };
 
   return (
@@ -39,6 +40,12 @@ export function OficinaLogin({ onSuccess }: OficinaLoginProps) {
         <p className="muted small" style={{ marginBottom: '24px' }}>
           Portal exclusivo para abogados y equipo de la firma Asuntia.
         </p>
+
+        {error && (
+          <div className="badge danger" style={{ width: '100%', marginBottom: '16px', padding: '8px 12px' }}>
+            {error}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="stack">
           <div className="field">

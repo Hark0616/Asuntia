@@ -1,11 +1,11 @@
-from typing import Optional
+from typing import Literal, Optional
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 import uuid
 
 class FirmaStorageConfigBase(BaseModel):
-    provider: str = "mock" # google_drive, onedrive, local, mock
-    auth_type: str = "none" # oauth2, service_account, local, none
+    provider: Literal["local", "google_drive"] = "local"
+    auth_type: Literal["local", "oauth2"] = "local"
     root_folder_id: Optional[str] = None
     root_folder_name: Optional[str] = "Asuntia_Expedientes"
     is_active: bool = True

@@ -1,12 +1,11 @@
 import uuid
 from typing import Optional
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.firma_storage import FirmaStorageConfig
+from app.repositories.firma_storage_repository import FirmaStorageRepository
 from app.services.storage.base import BaseStorageService
-from app.services.storage.google_drive import GoogleDriveStorageService
 from app.services.storage.local_storage import LocalStorageService
+from app.services.storage.google_drive import GoogleDriveStorageService
 
 class StorageFactory:
     """
@@ -15,20 +14,19 @@ class StorageFactory:
 
     @staticmethod
     async def get_provider_for_firma(session: AsyncSession, firma_id: uuid.UUID) -> BaseStorageService:
-        res = await session.execute(select(FirmaStorageConfig).where(FirmaStorageConfig.firma_id == firma_id))
-        config = res.scalars().first()
+        config = await FirmaStorageRepository(session, firma_id).get_config()
 
         if not config or not config.is_active:
-            # Fallback por defecto: Google Drive (en modo simulado si no hay credenciales)
-            return GoogleDriveStorageService()
+            return LocalStorageService()
 
         provider = config.provider.lower()
         if provider == "local":
             return LocalStorageService()
-        elif provider == "google_drive":
-            return GoogleDriveStorageService()
-        elif provider == "onedrive":
-            # Para OneDrive se usará la misma interfaz una vez configurado Graph API
-            return GoogleDriveStorageService()
-        else:
-            return GoogleDriveStorageService()
+        if provider == "google_drive":
+            return GoogleDriveStorageService(
+                config,
+                FirmaStorageRepository(session, firma_id),
+            )
+        raise ValueError(
+            f"El proveedor '{provider}' todavía no tiene una integración activa"
+        )

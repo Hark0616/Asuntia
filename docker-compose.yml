@@ -25,6 +25,24 @@ services:
       - "8025:8025" # UI Web Mailpit
       - "1025:1025" # Puerto SMTP
 
+  migrate:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://asuntia:asuntia_dev@db:5432/asuntia_db
+      - JWT_SECRET=dev_secret_key_asuntia_2026
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - GOOGLE_OAUTH_REDIRECT_URI=${GOOGLE_OAUTH_REDIRECT_URI:-http://127.0.0.1:8000/api/v1/storage/oauth-callback}
+      - STORAGE_TOKEN_ENCRYPTION_KEY=${STORAGE_TOKEN_ENCRYPTION_KEY:-}
+      - FRONTEND_URL=${FRONTEND_URL:-http://127.0.0.1:5173}
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
   backend:
     build:
       context: ./backend
@@ -36,13 +54,27 @@ services:
       - SMTP_HOST=mailpit
       - SMTP_PORT=1025
       - JWT_SECRET=dev_secret_key_asuntia_2026
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - GOOGLE_OAUTH_REDIRECT_URI=${GOOGLE_OAUTH_REDIRECT_URI:-http://127.0.0.1:8000/api/v1/storage/oauth-callback}
+      - STORAGE_TOKEN_ENCRYPTION_KEY=${STORAGE_TOKEN_ENCRYPTION_KEY:-}
+      - FRONTEND_URL=${FRONTEND_URL:-http://127.0.0.1:5173}
     ports:
       - "8000:8000"
+    volumes:
+      - asuntia_storage:/app/storage
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
     depends_on:
-      db:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       mailpit:
         condition: service_started
 
 volumes:
   postgres_data:
+  asuntia_storage:

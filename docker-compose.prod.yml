@@ -1,49 +1,63 @@
 services:
-  db:
-    image: postgres:16-alpine
-    container_name: asuntia_prod_db
-    restart: always
+  migrate:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
-    volumes:
-      - postgres_prod_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+      - ENVIRONMENT=production
+      - DATABASE_URL=${DATABASE_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - STORAGE_TOKEN_ENCRYPTION_KEY=${STORAGE_TOKEN_ENCRYPTION_KEY}
+    command: ["alembic", "upgrade", "head"]
+    restart: "no"
 
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: asuntia_prod_backend
     restart: always
     environment:
+      - ENVIRONMENT=production
       - DATABASE_URL=${DATABASE_URL}
       - JWT_SECRET=${JWT_SECRET}
+      - ALLOW_ORIGINS=${ALLOW_ORIGINS}
+      - COOKIE_DOMAIN=${COOKIE_DOMAIN}
+      - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-480}
       - SMTP_HOST=${SMTP_HOST}
       - SMTP_PORT=${SMTP_PORT}
       - SMTP_USER=${SMTP_USER}
       - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - EMAILS_FROM_EMAIL=${EMAILS_FROM_EMAIL}
+      - EMAILS_FROM_NAME=${EMAILS_FROM_NAME:-Asuntia Legal}
+      - FRONTEND_URL=${FRONTEND_URL}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - GOOGLE_OAUTH_REDIRECT_URI=${GOOGLE_OAUTH_REDIRECT_URI}
+      - STORAGE_TOKEN_ENCRYPTION_KEY=${STORAGE_TOKEN_ENCRYPTION_KEY}
     ports:
       - "8000:8000"
+    volumes:
+      - asuntia_storage:/app/storage
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
     depends_on:
-      db:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: asuntia_prod_frontend
     restart: always
     ports:
       - "80:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
 
 volumes:
-  postgres_prod_data:
+  asuntia_storage:

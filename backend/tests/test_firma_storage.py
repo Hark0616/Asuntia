@@ -40,22 +40,35 @@ async def test_test_storage_connection(client):
     assert "folder_id" in data
 
 @pytest.mark.asyncio
-async def test_get_oauth_url(client):
+async def test_get_oauth_url_requires_real_credentials(client, monkeypatch):
     """
-    Prueba obtener las URLs OAuth2 para Google Drive y OneDrive.
+    Google solo inicia OAuth con credenciales reales; OneDrive permanece oculto.
     """
     res_gdrive = await client.get("/api/v1/storage/auth-url?provider=google_drive")
-    assert res_gdrive.status_code == 200
-    assert "accounts.google.com" in res_gdrive.json()["auth_url"]
+    assert res_gdrive.status_code == 503
 
     res_onedrive = await client.get("/api/v1/storage/auth-url?provider=onedrive")
-    assert res_onedrive.status_code == 200
-    assert "login.microsoftonline.com" in res_onedrive.json()["auth_url"]
+    assert res_onedrive.status_code == 400
+
+    res_unknown = await client.get("/api/v1/storage/auth-url?provider=dropbox")
+    assert res_unknown.status_code == 400
+
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "GOOGLE_CLIENT_ID", "client-id.apps.googleusercontent.com")
+    monkeypatch.setattr(settings, "GOOGLE_CLIENT_SECRET", "client-secret")
+    configured = await client.get(
+        "/api/v1/storage/auth-url?provider=google_drive"
+    )
+    assert configured.status_code == 200
+    assert configured.json()["authorization_url"].startswith(
+        "https://accounts.google.com/o/oauth2/auth"
+    )
 
 @pytest.mark.asyncio
 async def test_preview_documento_proxy(client):
     """
-    Prueba el endpoint de previsualización proxy de PDFs.
+    Un enlace cloud no conectado no debe devolver un PDF ficticio.
     """
     asunto_id = "00000000-0000-0000-0000-000000000201"
     # Vincular documento primero
@@ -67,5 +80,4 @@ async def test_preview_documento_proxy(client):
     doc_id = link_res.json()["id"]
 
     res_preview = await client.get(f"/api/v1/documentos/{doc_id}/preview")
-    assert res_preview.status_code == 200
-    assert res_preview.headers["content-type"] == "application/pdf"
+    assert res_preview.status_code == 501

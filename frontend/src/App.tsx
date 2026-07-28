@@ -21,6 +21,7 @@ import {
   fetchClientesAPI,
   crearClienteAPI,
   crearAsuntoAPI,
+  avanzarPasoAPI,
   crearNovedadAPI, 
   actualizarEstadoAPI, 
   AsuntoAPI, 
@@ -29,9 +30,15 @@ import {
 } from '@/features/asuntos/api/asuntos';
 import { ClienteOTPLogin } from '@/features/auth/components/ClienteOTPLogin';
 import { OficinaLogin } from '@/features/auth/components/OficinaLogin';
+import { fetchCurrentUserAPI, logoutAPI } from '@/features/auth/api/auth';
+import type { User } from '@/types/api';
 import { Tooltip } from '@/components/ui/Tooltip';
+import { CrearClienteModal } from '@/components/ui/CrearClienteModal';
+import { CrearAsuntoModal } from '@/components/ui/CrearAsuntoModal';
 import { DocumentosTab } from '@/features/documentos/components/DocumentosTab';
 import { ConfiguracionAlmacenamiento } from '@/features/firma/components/ConfiguracionAlmacenamiento';
+import { FlujoAsunto } from '@/features/asuntos/components/FlujoAsunto';
+import type { AsuntoPasoAPI } from '@/features/asuntos/api/asuntos';
 
 interface NovedadItem {
   id: string;
@@ -66,6 +73,8 @@ interface CasoData {
   fechaLimiteSolicitud?: string;
   milestones: Milestone[];
   novedades: NovedadItem[];
+  pasos: AsuntoPasoAPI[];
+  flujoEstado: 'activo' | 'completado';
 }
 
 interface ClienteData {
@@ -77,86 +86,80 @@ interface ClienteData {
   casos: CasoData[];
 }
 
-const mockClientesFallback: ClienteData[] = [
-  {
-    id: '00000000-0000-0000-0000-000000000020',
-    nombre: 'Carlos Gómez Restrepo',
-    contacto: 'Carlos Gómez',
-    email: 'carlos.gomez@email.com',
-    identificacion: '1.094.852.140',
-    casos: [
-      {
-        id: '00000000-0000-0000-0000-000000000201',
-        codigo: 'AS-2026-001',
-        nombre: 'Insolvencia Persona Natural',
-        responsable: 'Dra. Daniela Torres',
-        estadoBadge: 'Admitido en Centro de Conciliación',
-        estadoTipo: 'mint',
-        prioridad: 'alta',
-        proximoPaso: 'Fijación de fecha para primera audiencia de negociación',
-        solicitudPendiente: 'Certificado de ingresos y estado de cuenta',
-        fechaLimiteSolicitud: '08 de ago de 2026',
-        milestones: [
-          {
-            id: 1,
-            fecha: '01 de jul de 2026',
-            titulo: 'Apertura de evaluación de viabilidad',
-            estadoBadge: 'Completado',
-            estadoItem: 'completed'
-          },
-          {
-            id: 2,
-            fecha: '26 de jul de 2026',
-            titulo: 'Etapa 2: Negociación de Pasivos',
-            estadoBadge: 'Actual',
-            estadoItem: 'current',
-            detalle: 'Esperando soporte de ingresos y extracto bancario para observaciones.'
-          }
-        ],
-        novedades: [
-          {
-            id: 'n1',
-            autor: 'Dra. Daniela Torres',
-            fecha: '26 de jul, 09:15 a. m.',
-            texto: 'El Centro de Conciliación admitió la solicitud de negociación de pasivos de acuerdo con la Ley 2445.',
-            visibilidad: 'Cliente'
-          }
-        ]
-      }
-    ]
-  }
-];
-
 export default function App() {
   const queryClient = useQueryClient();
   
-  const [usuarioAutenticado, setUsuarioAutenticado] = useState<any>(null);
+  const [usuarioAutenticado, setUsuarioAutenticado] = useState<User | null | undefined>(undefined);
   const [view, setView] = useState<'cliente' | 'firma'>('firma');
   const [seccionFirma, setSeccionFirma] = useState<'expedientes' | 'config_almacenamiento'>('expedientes');
   const [clienteIdSeleccionado, setClienteIdSeleccionado] = useState<string>('');
   const [casoIdSeleccionado, setCasoIdSeleccionado] = useState<string>('');
   const [milestoneAbiertoId, setMilestoneAbiertoId] = useState<number | null>(2);
+  const [crearClienteAbierto, setCrearClienteAbierto] = useState(false);
+  const [crearAsuntoAbierto, setCrearAsuntoAbierto] = useState(false);
 
-  // Consultas API
-  const { data: asuntosAPI, isSuccess: apiConectada } = useQuery({ queryKey: ['asuntos'], queryFn: fetchAsuntos, retry: 1 });
-  const { data: estadosAPI } = useQuery({ queryKey: ['estados'], queryFn: fetchEstadosAPI, retry: 1 });
-  const { data: clientesAPI } = useQuery({ queryKey: ['clientes'], queryFn: fetchClientesAPI, retry: 1 });
+  const { data: sessionUser, isLoading: sessionLoading } = useQuery({
+    queryKey: ['auth', 'me'],
+    queryFn: fetchCurrentUserAPI,
+    retry: false,
+  });
+
+  React.useEffect(() => {
+    if (sessionUser) {
+      setUsuarioAutenticado(sessionUser);
+      setView(sessionUser.rol === 'cliente' ? 'cliente' : 'firma');
+    } else if (!sessionLoading) {
+      setUsuarioAutenticado(null);
+    }
+  }, [sessionUser, sessionLoading]);
+
+  // Consultas API protegidas por la sesión y el rol.
+  const authenticated = Boolean(usuarioAutenticado);
+  const officeUser = authenticated && usuarioAutenticado?.rol !== 'cliente';
+  const { data: asuntosAPI, isSuccess: apiConectada } = useQuery({
+    queryKey: ['asuntos'],
+    queryFn: fetchAsuntos,
+    retry: 1,
+    enabled: authenticated,
+  });
+  const { data: estadosAPI } = useQuery({
+    queryKey: ['estados'],
+    queryFn: fetchEstadosAPI,
+    retry: 1,
+    enabled: authenticated,
+  });
+  const { data: clientesAPI } = useQuery({
+    queryKey: ['clientes'],
+    queryFn: fetchClientesAPI,
+    retry: 1,
+    enabled: officeUser,
+  });
 
   // Mutaciones
   const mutacionNuevoCliente = useMutation({
-    mutationFn: (payload: { nombre: string; cedula: string; email: string }) => crearClienteAPI(payload),
+    mutationFn: (payload: { nombre: string; cedula: string; email: string; telefono?: string }) => crearClienteAPI(payload),
     onSuccess: (newClient) => {
       queryClient.invalidateQueries({ queryKey: ['clientes'] });
       setClienteIdSeleccionado(newClient.id);
+      setCrearClienteAbierto(false);
     }
   });
 
   const mutacionNuevoAsunto = useMutation({
-    mutationFn: (payload: { radicado: string; cliente_id: string; etapa_actual?: string; siguiente_paso?: string }) => crearAsuntoAPI(payload),
+    mutationFn: (payload: { radicado: string; cliente_id: string }) => crearAsuntoAPI(payload),
     onSuccess: (newAsunto) => {
       queryClient.invalidateQueries({ queryKey: ['asuntos'] });
       setCasoIdSeleccionado(newAsunto.id);
+      setCrearAsuntoAbierto(false);
     }
+  });
+
+  const mutacionAvanzarPaso = useMutation({
+    mutationFn: ({ asuntoId, pasoCodigo, datos }: { asuntoId: string; pasoCodigo: string; datos: Record<string, unknown> }) =>
+      avanzarPasoAPI(asuntoId, { paso_codigo: pasoCodigo, datos }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['asuntos'] });
+    },
   });
 
   const mutacionNovedad = useMutation({
@@ -175,11 +178,19 @@ export default function App() {
     },
   });
 
-  // Mapeo dinámico (Maneja BD vacía sin datos de prueba)
-  const clientes: ClienteData[] = React.useMemo(() => {
-    if (!clientesAPI) return apiConectada ? [] : mockClientesFallback;
+  // El cliente autenticado se convierte en la única raíz disponible en su portal.
+  const clientesFuente: ClienteAPI[] = usuarioAutenticado?.rol === 'cliente'
+    ? [{
+        id: usuarioAutenticado.id,
+        nombre: usuarioAutenticado.nombre,
+        cedula: usuarioAutenticado.cedula,
+        email: usuarioAutenticado.email,
+        rol: usuarioAutenticado.rol,
+        created_at: '',
+      }]
+    : (clientesAPI || []);
 
-    return clientesAPI.map((cli: ClienteAPI) => {
+  const clientes: ClienteData[] = clientesFuente.map((cli: ClienteAPI) => {
       const casosDelCliente = (asuntosAPI || []).filter((as: AsuntoAPI) => as.cliente_id === cli.id);
 
       return {
@@ -192,34 +203,27 @@ export default function App() {
           id: as.id,
           codigo: as.radicado,
           nombre: 'Insolvencia Persona Natural',
-          responsable: 'Dra. Daniela Torres',
+          responsable: 'Equipo jurídico asignado',
           estadoBadge: as.estado?.nombre || 'En trámite',
           estadoTipo: (as.estado?.color_tipo as any) || 'mint',
           estadoId: as.estado?.id,
-          prioridad: 'alta' as const,
+          prioridad: 'normal' as const,
           proximoPaso: as.siguiente_paso,
-          solicitudPendiente: 'Certificado de ingresos y estado de cuenta',
-          fechaLimiteSolicitud: '08 de ago de 2026',
-          milestones: [
-            {
-              id: 1,
-              fecha: '01 de jul de 2026',
-              titulo: 'Apertura de evaluación de viabilidad',
-              estadoBadge: 'Completado',
-              estadoItem: 'completed'
-            },
-            {
-              id: 2,
-              fecha: '26 de jul de 2026',
-              titulo: as.etapa_actual,
-              estadoBadge: 'Actual',
-              estadoItem: 'current',
-              detalle: as.siguiente_paso
-            }
-          ],
+          milestones: as.pasos.map((paso) => ({
+            id: paso.orden,
+            fecha: paso.completed_at
+              ? new Date(paso.completed_at).toLocaleDateString()
+              : paso.estado === 'activo' ? 'En curso' : 'Pendiente',
+            titulo: `Paso ${paso.orden}: ${paso.titulo}`,
+            estadoBadge: paso.estado === 'completado' ? 'Completado' : paso.estado === 'activo' ? 'Actual' : 'Pendiente',
+            estadoItem: paso.estado === 'completado' ? 'completed' : paso.estado === 'activo' ? 'current' : 'upcoming',
+            detalle: paso.descripcion,
+          })),
+          pasos: as.pasos,
+          flujoEstado: as.flujo_estado,
           novedades: as.novedades.map(nov => ({
             id: nov.id,
-            autor: 'Dra. Daniela Torres',
+            autor: 'Equipo jurídico',
             fecha: new Date(nov.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             texto: nov.descripcion,
             visibilidad: nov.publicado_al_cliente ? 'Cliente' : 'Interno'
@@ -227,50 +231,14 @@ export default function App() {
         }))
       };
     });
-  }, [clientesAPI, asuntosAPI, apiConectada]);
 
   // Selección activa
   const clienteActivo = clientes.find(c => c.id === clienteIdSeleccionado) || clientes[0] || null;
   const casoActivo = clienteActivo && clienteActivo.casos ? (clienteActivo.casos.find(c => c.id === casoIdSeleccionado) || clienteActivo.casos[0] || null) : null;
 
   const [estadoSeleccionadoId, setEstadoSeleccionadoId] = useState<string>('');
-  const [proximoPasoForm, setProximoPasoForm] = useState(casoActivo?.proximoPaso || '');
-
-  React.useEffect(() => {
-    if (casoActivo) {
-      setProximoPasoForm(casoActivo.proximoPaso);
-    }
-  }, [casoActivo?.id]);
-
   const [nuevoAvanceTexto, setNuevoAvanceTexto] = useState('');
   const [nuevoAvanceVisibilidad, setNuevoAvanceVisibilidad] = useState<'client' | 'internal'>('client');
-
-  const handleCrearClientePrompt = () => {
-    const nombre = prompt('Nombre del nuevo cliente:');
-    if (!nombre) return;
-    const cedula = prompt('Cédula o NIT:');
-    if (!cedula) return;
-    const email = prompt('Correo electrónico:');
-    if (!email) return;
-
-    mutacionNuevoCliente.mutate({ nombre, cedula, email });
-  };
-
-  const handleCrearAsuntoPrompt = () => {
-    if (!clienteActivo) {
-      alert('Debes crear un cliente primero.');
-      return;
-    }
-    const radicado = prompt(`Radicado para ${clienteActivo.nombre} (Ej: AS-2026-003):`);
-    if (!radicado) return;
-    const paso = prompt('Próximo paso:', 'Revisión inicial de documentación');
-
-    mutacionNuevoAsunto.mutate({
-      radicado,
-      cliente_id: clienteActivo.id,
-      siguiente_paso: paso || 'Revisión inicial'
-    });
-  };
 
   const handleGuardarEstado = (e: React.FormEvent) => {
     e.preventDefault();
@@ -278,8 +246,7 @@ export default function App() {
       mutacionEstado.mutate({
         asuntoId: casoActivo.id,
         payload: {
-          estado_id: estadoSeleccionadoId || casoActivo.estadoId,
-          siguiente_paso: proximoPasoForm
+          estado_id: estadoSeleccionadoId || casoActivo.estadoId
         }
       });
     }
@@ -302,6 +269,33 @@ export default function App() {
 
     setNuevoAvanceTexto('');
   };
+
+  const handleAuthenticated = (user: User) => {
+    queryClient.setQueryData(['auth', 'me'], user);
+    setUsuarioAutenticado(user);
+    setView(user.rol === 'cliente' ? 'cliente' : 'firma');
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logoutAPI();
+    } finally {
+      queryClient.clear();
+      setUsuarioAutenticado(null);
+      setView('firma');
+      setSeccionFirma('expedientes');
+    }
+  };
+
+  if (usuarioAutenticado === undefined) {
+    return (
+      <div className="app-shell">
+        <div className="panel" style={{ maxWidth: '420px', margin: '64px auto', textAlign: 'center' }}>
+          <span className="muted small">Verificando sesión…</span>
+        </div>
+      </div>
+    );
+  }
 
   if (!usuarioAutenticado) {
     return (
@@ -326,9 +320,9 @@ export default function App() {
         </header>
 
         {view === 'cliente' ? (
-          <ClienteOTPLogin onSuccess={(user) => { setUsuarioAutenticado(user); setView('cliente'); }} />
+          <ClienteOTPLogin onSuccess={handleAuthenticated} />
         ) : (
-          <OficinaLogin onSuccess={(user) => { setUsuarioAutenticado(user); setView('firma'); }} />
+          <OficinaLogin onSuccess={handleAuthenticated} />
         )}
       </div>
     );
@@ -336,6 +330,21 @@ export default function App() {
 
   return (
     <div className="app-shell">
+      <CrearClienteModal
+        isOpen={crearClienteAbierto}
+        isLoading={mutacionNuevoCliente.isPending}
+        onClose={() => setCrearClienteAbierto(false)}
+        onSubmit={(payload) => mutacionNuevoCliente.mutate(payload)}
+      />
+      <CrearAsuntoModal
+        isOpen={crearAsuntoAbierto}
+        isLoading={mutacionNuevoAsunto.isPending}
+        clientes={clientes}
+        clienteSeleccionadoId={clienteActivo?.id}
+        onClose={() => setCrearAsuntoAbierto(false)}
+        onSubmit={(payload) => mutacionNuevoAsunto.mutate(payload)}
+      />
+
       {/* Topbar */}
       <header className="topbar">
         <div className="brand">
@@ -349,7 +358,7 @@ export default function App() {
         <div className="row wrap">
           <span className={`badge ${apiConectada ? 'mint' : 'neutral'}`} style={{ gap: '6px' }}>
             <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: apiConectada ? '#10b981' : '#94a3b8' }}></span>
-            {apiConectada ? 'BD Conectada' : 'Demo'}
+            {apiConectada ? 'BD Conectada' : 'Sin conexión'}
           </span>
 
           <span className="badge neutral" style={{ gap: '4px' }}>
@@ -357,8 +366,7 @@ export default function App() {
             {usuarioAutenticado.nombre}
           </span>
 
-          {usuarioAutenticado.rol !== 'cliente' && (
-            <>
+          {usuarioAutenticado.rol === 'administrador' && (
               <button 
                 className="secondary-button" 
                 type="button"
@@ -368,22 +376,12 @@ export default function App() {
                 <HardDrive size={15} />
                 {seccionFirma === 'expedientes' ? 'Almacenamiento' : 'Ver Expedientes'}
               </button>
-
-              <button 
-                className="secondary-button" 
-                type="button"
-                onClick={() => setView(view === 'cliente' ? 'firma' : 'cliente')}
-                style={{ fontWeight: 600, borderColor: 'var(--brand)', color: 'var(--brand)' }}
-              >
-                {view === 'cliente' ? '🛡️ Oficina' : '👤 Vista Cliente'}
-              </button>
-            </>
           )}
 
           <button 
             className="secondary-button" 
             type="button"
-            onClick={() => setUsuarioAutenticado(null)}
+            onClick={handleLogout}
           >
             <LogOut size={16} />
             Salir
@@ -538,7 +536,7 @@ export default function App() {
             <div className="sidebar-inner">
               <div className="section-title">
                 <h3>Clientes ({clientes.length})</h3>
-                <button className="icon-button" type="button" onClick={handleCrearClientePrompt} title="Nuevo Cliente">
+                <button className="icon-button" type="button" onClick={() => setCrearClienteAbierto(true)} title="Nuevo Cliente">
                   <Plus size={16} />
                 </button>
               </div>
@@ -579,7 +577,7 @@ export default function App() {
                     <h2>{clienteActivo.nombre}</h2>
                     <span className="muted">{clienteActivo.email} · CC/NIT: {clienteActivo.identificacion}</span>
                   </div>
-                  <button className="primary-button" type="button" onClick={handleCrearAsuntoPrompt}>
+                  <button className="primary-button" type="button" onClick={() => setCrearAsuntoAbierto(true)}>
                     <Plus size={16} />
                     Nuevo caso
                   </button>
@@ -672,15 +670,6 @@ export default function App() {
                           </div>
 
                           <div className="field full">
-                            <label htmlFor="next-step">Próximo paso para el cliente</label>
-                            <textarea 
-                              id="next-step"
-                              value={proximoPasoForm}
-                              onChange={(e) => setProximoPasoForm(e.target.value)}
-                            />
-                          </div>
-                          
-                          <div className="field full">
                             <button className="secondary-button" type="submit">
                               <Save size={16} />
                               Guardar cambios
@@ -689,7 +678,18 @@ export default function App() {
                         </div>
                       </form>
 
-                      {/* Pestaña de Gestión Documental en Google Drive */}
+                      <FlujoAsunto
+                        pasos={casoActivo.pasos}
+                        flujoEstado={casoActivo.flujoEstado}
+                        isLoading={mutacionAvanzarPaso.isPending}
+                        onAdvance={(pasoCodigo, datos) => mutacionAvanzarPaso.mutateAsync({
+                          asuntoId: casoActivo.id,
+                          pasoCodigo,
+                          datos,
+                        })}
+                      />
+
+                      {/* Gestión documental del expediente */}
                       <DocumentosTab asuntoId={casoActivo.id} isReadOnly={false} />
 
                       <form className="panel" onSubmit={handlePublicarAvance} style={{ marginTop: '16px' }}>
@@ -768,7 +768,7 @@ export default function App() {
                     <div className="panel" style={{ padding: '32px 24px', textAlign: 'center' }}>
                       <h3>Sin expedientes para este cliente</h3>
                       <p className="muted small">Haz clic en "Nuevo caso" para aperturar el primer expediente.</p>
-                      <button className="primary-button" style={{ margin: '16px auto 0' }} onClick={handleCrearAsuntoPrompt}>
+                      <button className="primary-button" style={{ margin: '16px auto 0' }} onClick={() => setCrearAsuntoAbierto(true)}>
                         <Plus size={16} /> Crear expediente
                       </button>
                     </div>
@@ -781,7 +781,7 @@ export default function App() {
                 <p className="muted small" style={{ marginBottom: '16px' }}>
                   La base de datos está limpia. Registra tu primer cliente para comenzar las pruebas reales.
                 </p>
-                <button className="primary-button" style={{ margin: '0 auto' }} onClick={handleCrearClientePrompt}>
+                <button className="primary-button" style={{ margin: '0 auto' }} onClick={() => setCrearClienteAbierto(true)}>
                   <Plus size={16} /> Registrar primer cliente
                 </button>
               </div>

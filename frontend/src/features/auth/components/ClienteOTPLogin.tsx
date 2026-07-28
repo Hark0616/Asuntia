@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { ShieldCheck, Mail, ArrowRight, ExternalLink } from 'lucide-react';
 import { apiClient } from '@/lib/axios';
+import type { User } from '@/types/api';
 
 interface ClienteOTPLoginProps {
-  onSuccess: (user: any) => void;
+  onSuccess: (user: User) => void;
 }
 
 const formatCedulaInput = (val: string): string => {
@@ -13,9 +14,10 @@ const formatCedulaInput = (val: string): string => {
 };
 
 export function ClienteOTPLogin({ onSuccess }: ClienteOTPLoginProps) {
+  const isDevelopment = import.meta.env.DEV;
   const [step, setStep] = useState<'cedula' | 'otp'>('cedula');
   const [cedula, setCedula] = useState('1.094.852.140');
-  const [code, setCode] = useState('123456');
+  const [code, setCode] = useState(isDevelopment ? '123456' : '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -31,7 +33,7 @@ export function ClienteOTPLogin({ onSuccess }: ClienteOTPLoginProps) {
     setError('');
 
     try {
-      await apiClient.post('/auth/otp/request', { cedula });
+      await apiClient.post('/auth/otp/request', { cedula, firma_slug: 'demo' });
       setStep('otp');
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Error de verificación.');
@@ -48,7 +50,11 @@ export function ClienteOTPLogin({ onSuccess }: ClienteOTPLoginProps) {
     setError('');
 
     try {
-      const response = await apiClient.post('/auth/otp/verify', { cedula, code });
+      const response = await apiClient.post('/auth/otp/verify', {
+        cedula,
+        code,
+        firma_slug: 'demo',
+      });
       onSuccess(response.data.user);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Código incorrecto.');
@@ -110,7 +116,7 @@ export function ClienteOTPLogin({ onSuccess }: ClienteOTPLoginProps) {
           <form onSubmit={handleVerificarOTP} className="stack">
             <div className="badge warning" style={{ width: '100%', justifyContent: 'center', padding: '6px' }}>
               <Mail size={13} />
-              Código enviado al correo (Dev: 123456)
+              Código enviado al correo{isDevelopment ? ' (Dev: 123456)' : ''}
             </div>
 
             <div className="field" style={{ marginTop: '12px' }}>
@@ -137,18 +143,20 @@ export function ClienteOTPLogin({ onSuccess }: ClienteOTPLoginProps) {
               <ShieldCheck size={16} />
             </button>
 
-            <div style={{ marginTop: '16px', borderTop: '1px dashed var(--line)', paddingTop: '12px' }}>
-              <a 
-                href="http://localhost:8025" 
-                target="_blank" 
-                rel="noreferrer"
-                className="muted small row"
-                style={{ justifyContent: 'center', textDecoration: 'none', color: 'var(--brand)' }}
-              >
-                <ExternalLink size={13} />
-                Mailpit (Bandeja dev)
-              </a>
-            </div>
+            {isDevelopment && (
+              <div style={{ marginTop: '16px', borderTop: '1px dashed var(--line)', paddingTop: '12px' }}>
+                <a
+                  href="http://localhost:8025"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="muted small row"
+                  style={{ justifyContent: 'center', textDecoration: 'none', color: 'var(--brand)' }}
+                >
+                  <ExternalLink size={13} />
+                  Mailpit (Bandeja dev)
+                </a>
+              </div>
+            )}
           </form>
         )}
       </div>

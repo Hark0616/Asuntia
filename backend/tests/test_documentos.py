@@ -12,6 +12,33 @@ async def test_list_documentos_asunto_empty(client):
     data = response.json()
     assert isinstance(data, list)
 
+
+@pytest.mark.asyncio
+async def test_upload_and_preview_real_local_pdf(client):
+    asunto_id = "00000000-0000-0000-0000-000000000201"
+    pdf_content = b"%PDF-1.4\n% Asuntia test document\n%%EOF"
+
+    upload = await client.post(
+        f"/api/v1/asuntos/{asunto_id}/documentos/upload",
+        data={
+            "nombre_funcional": "Soporte real local",
+            "tipo_documental": "anexo",
+            "subcarpeta": "anexo",
+            "compartido_con_cliente": "true",
+        },
+        files={"file": ("soporte.pdf", pdf_content, "application/pdf")},
+    )
+
+    assert upload.status_code == 201
+    document = upload.json()
+    assert document["provider"] == "local"
+    assert document["tamano_bytes"] == len(pdf_content)
+
+    preview = await client.get(f"/api/v1/documentos/{document['id']}/preview")
+    assert preview.status_code == 200
+    assert preview.headers["content-type"] == "application/pdf"
+    assert preview.content == pdf_content
+
 @pytest.mark.asyncio
 async def test_vincular_y_toggle_visibilidad_documento(client):
     """
