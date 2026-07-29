@@ -95,7 +95,7 @@ async def create_asunto(
                 f"{initial_workflow_steps()[0]['titulo']}"
             ),
             "siguiente_paso": initial_workflow_steps()[0]["descripcion"],
-            "ruta_codigo": "insolvencia_persona_natural",
+            "ruta_codigo": "insolvencia_persona_natural:v2",
             "paso_actual": 1,
             "flujo_estado": "activo",
         }
@@ -130,7 +130,7 @@ async def update_estado_asunto(
     asunto_id: uuid.UUID,
     payload: AsuntoUpdateEstado,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_office_user),
+    current_user: User = Depends(require_roles("administrador")),
 ):
     """
     Actualiza el estado procesal de un asunto sin alterar su ruta de trabajo.
@@ -165,13 +165,14 @@ async def advance_asunto_workflow(
         paso_codigo=payload.paso_codigo,
         data=payload.datos,
         user_id=current_user.id,
+        user_role=current_user.rol,
     )
 
 @router.delete("/{asunto_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_asunto(
     asunto_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_office_user),
+    current_user: User = Depends(require_roles("administrador")),
 ):
     """
     Elimina (soft delete) un asunto de la firma.

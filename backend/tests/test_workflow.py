@@ -24,6 +24,7 @@ async def test_create_case_starts_with_seven_sequential_steps(client):
 
     assert asunto["paso_actual"] == 1
     assert asunto["flujo_estado"] == "activo"
+    assert asunto["ruta_codigo"] == "insolvencia_persona_natural:v2"
     assert asunto["etapa_actual"] == "Paso 1 de 7: Recepción y evaluación inicial"
     assert asunto["abogado_id"] == "00000000-0000-0000-0000-000000000010"
     assert len(asunto["pasos"]) == 7
@@ -181,6 +182,66 @@ async def test_client_cannot_advance_workflow(carlos_client):
         json={"paso_codigo": "recepcion_evaluacion", "datos": {}},
     )
     assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_lawyer_cannot_advance_another_lawyers_work(alejandro_client):
+    response = await alejandro_client.post(
+        "/api/v1/asuntos/00000000-0000-0000-0000-000000000201/flujo/avanzar",
+        json={
+            "paso_codigo": "recepcion_evaluacion",
+            "datos": {
+                "identidad_verificada": True,
+                "conflicto_interes": "sin_conflicto",
+                "viabilidad_preliminar": "viable",
+                "observaciones": "Intento sin asignación.",
+            },
+        },
+    )
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Esta tarea está asignada a otro responsable"
+
+
+@pytest.mark.asyncio
+async def test_workflow_stops_when_conflict_requires_review(client):
+    asunto = await create_case(client, uuid.uuid4().hex[:8])
+    response = await client.post(
+        f"/api/v1/asuntos/{asunto['id']}/flujo/avanzar",
+        json={
+            "paso_codigo": "recepcion_evaluacion",
+            "datos": {
+                "identidad_verificada": True,
+                "conflicto_interes": "requiere_revision",
+                "viabilidad_preliminar": "viable",
+                "observaciones": "Existe una coincidencia por revisar.",
+            },
+        },
+    )
+
+    assert response.status_code == 409
+    assert "conflicto" in response.json()["detail"]
+    detail = await client.get(f"/api/v1/asuntos/{asunto['radicado']}")
+    assert detail.json()["paso_actual"] == 1
+
+
+@pytest.mark.asyncio
+async def test_workflow_stops_when_viability_is_not_confirmed(client):
+    asunto = await create_case(client, uuid.uuid4().hex[:8])
+    response = await client.post(
+        f"/api/v1/asuntos/{asunto['id']}/flujo/avanzar",
+        json={
+            "paso_codigo": "recepcion_evaluacion",
+            "datos": {
+                "identidad_verificada": True,
+                "conflicto_interes": "sin_conflicto",
+                "viabilidad_preliminar": "informacion_insuficiente",
+                "observaciones": "Faltan soportes para concluir.",
+            },
+        },
+    )
+
+    assert response.status_code == 409
+    assert "viabilidad" in response.json()["detail"]
 
 
 @pytest.mark.asyncio

@@ -193,6 +193,7 @@ async def seed_data():
             estado_id=estados[0].id,
             etapa_actual=f"Paso 1 de {len(initial_workflow_steps())}: {initial_workflow_steps()[0]['titulo']}",
             siguiente_paso=initial_workflow_steps()[0]["descripcion"],
+            ruta_codigo="insolvencia_persona_natural:v2",
             created_by_id=abogada_daniela.id,
         )
         asunto2 = Asunto(
@@ -204,6 +205,7 @@ async def seed_data():
             estado_id=estados[0].id,
             etapa_actual=f"Paso 1 de {len(initial_workflow_steps())}: {initial_workflow_steps()[0]['titulo']}",
             siguiente_paso=initial_workflow_steps()[0]["descripcion"],
+            ruta_codigo="insolvencia_persona_natural:v2",
             created_by_id=abogado_alejandro.id,
         )
         asunto3 = Asunto(
@@ -215,6 +217,7 @@ async def seed_data():
             estado_id=estados[0].id,
             etapa_actual=f"Paso 1 de {len(initial_workflow_steps())}: {initial_workflow_steps()[0]['titulo']}",
             siguiente_paso=initial_workflow_steps()[0]["descripcion"],
+            ruta_codigo="insolvencia_persona_natural:v2",
             created_by_id=abogada_daniela.id,
         )
         asunto4 = Asunto(
@@ -226,6 +229,7 @@ async def seed_data():
             estado_id=estados[0].id,
             etapa_actual=f"Paso 1 de {len(initial_workflow_steps())}: {initial_workflow_steps()[0]['titulo']}",
             siguiente_paso=initial_workflow_steps()[0]["descripcion"],
+            ruta_codigo="insolvencia_persona_natural:v2",
             created_by_id=abogado_alejandro.id,
         )
 

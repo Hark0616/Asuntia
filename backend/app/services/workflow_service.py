@@ -3,7 +3,7 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import DomainException, NotFoundException
+from app.core.exceptions import DomainException, ForbiddenException, NotFoundException
 from app.models.asunto import Asunto
 from app.models.asunto_paso import AsuntoPaso
 from app.repositories.asunto_repository import AsuntoRepository
@@ -148,6 +148,22 @@ class WorkflowService:
             raise DomainException(
                 detail="La identidad debe quedar verificada antes de avanzar"
             )
+        if (
+            step.codigo == "recepcion_evaluacion"
+            and data.get("conflicto_interes") != "sin_conflicto"
+        ):
+            raise DomainException(
+                detail="El control de conflicto requiere revisión antes de avanzar",
+                status_code=409,
+            )
+        if (
+            step.codigo == "recepcion_evaluacion"
+            and data.get("viabilidad_preliminar") != "viable"
+        ):
+            raise DomainException(
+                detail="La viabilidad debe estar confirmada antes de avanzar",
+                status_code=409,
+            )
         if step.codigo == "preparacion_solicitud" and (
             data.get("documentacion_completa") is not True
             or data.get("solicitud_revisada") is not True
@@ -162,6 +178,7 @@ class WorkflowService:
         paso_codigo: str,
         data: dict[str, Any],
         user_id: uuid.UUID,
+        user_role: str,
     ) -> Asunto:
         asunto = await self.asuntos.get_by_id(asunto_id)
         if not asunto:
@@ -187,6 +204,13 @@ class WorkflowService:
             raise DomainException(
                 detail="El paso activo no tiene una tarea abierta asociada",
                 status_code=409,
+            )
+        if (
+            user_role != "administrador"
+            and current_task.responsable_id != user_id
+        ):
+            raise ForbiddenException(
+                detail="Esta tarea está asignada a otro responsable"
             )
         self.tareas.stage_complete_from_workflow(
             current_task,
