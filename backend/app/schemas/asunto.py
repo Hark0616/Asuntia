@@ -19,13 +19,10 @@ class AsuntoCreate(BaseModel):
     cliente_id: uuid.UUID
     abogado_id: Optional[uuid.UUID] = None
     estado_id: Optional[uuid.UUID] = None
-    siguiente_paso: Optional[str] = Field(default=None, max_length=255)
     fecha_apertura: date = Field(default_factory=date.today)
 
 class AsuntoUpdateEstado(BaseModel):
     estado_id: Optional[uuid.UUID] = None
-    etapa_actual: Optional[str] = None
-    siguiente_paso: Optional[str] = None
 
 class AsuntoResponse(BaseSchemaResponse):
     id: uuid.UUID

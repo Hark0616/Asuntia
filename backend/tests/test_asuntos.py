@@ -34,16 +34,18 @@ async def test_get_asunto_not_found(client):
 @pytest.mark.asyncio
 async def test_update_estado_asunto_success(client):
     """
-    Prueba actualizar el próximo paso de un asunto existente.
+    Prueba actualizar el estado procesal de un asunto existente.
     """
     asunto_id = "00000000-0000-0000-0000-000000000201"
+    estado_id = "00000000-0000-0000-0000-000000000102"
     response = await client.patch(
         f"/api/v1/asuntos/{asunto_id}/estado",
-        json={"siguiente_paso": "Fijar fecha de audiencia en tribunal"}
+        json={"estado_id": estado_id}
     )
     assert response.status_code == 200
     data = response.json()
-    assert data["siguiente_paso"] == "Fijar fecha de audiencia en tribunal"
+    assert data["estado"]["id"] == estado_id
+    assert data["etapa_actual"] == "Paso 1 de 7: Recepción y evaluación inicial"
 
 @pytest.mark.asyncio
 async def test_update_estado_asunto_not_found(client):
@@ -53,7 +55,7 @@ async def test_update_estado_asunto_not_found(client):
     random_uuid = str(uuid.uuid4())
     response = await client.patch(
         f"/api/v1/asuntos/{random_uuid}/estado",
-        json={"siguiente_paso": "Paso inválido"}
+        json={"estado_id": "00000000-0000-0000-0000-000000000102"}
     )
     assert response.status_code == 404
 
@@ -75,8 +77,6 @@ async def test_create_and_soft_delete_asunto(client):
     create_payload = {
         "radicado": radicado_test,
         "cliente_id": "00000000-0000-0000-0000-000000000020",
-        "etapa_actual": "Etapa 1",
-        "siguiente_paso": "Borrado de prueba"
     }
     # 1. Crear
     res_create = await client.post("/api/v1/asuntos", json=create_payload)

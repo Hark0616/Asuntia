@@ -77,3 +77,10 @@ class Asunto(BaseModel):
         cascade="all, delete-orphan",
         order_by="AsuntoPaso.orden",
     )
+    tareas: Mapped[List["Tarea"]] = relationship(
+        "Tarea",
+        back_populates="asunto",
+        lazy="selectin",
+        cascade="all, delete-orphan",
+        order_by="Tarea.created_at",
+    )

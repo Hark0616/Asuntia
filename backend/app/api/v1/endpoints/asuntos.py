@@ -5,7 +5,7 @@ from typing import List
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.db import get_db
-from app.core.deps import get_current_user, require_office_user
+from app.core.deps import get_current_user, require_office_user, require_roles
 from app.schemas.asunto import AsuntoResponse, AsuntoCreate, AsuntoUpdateEstado
 from app.schemas.flujo import AvanzarPasoRequest
 from app.repositories.asunto_repository import AsuntoRepository
@@ -58,10 +58,18 @@ async def create_asunto(
     cliente = await user_repo.get_by_id(payload.cliente_id)
     if not cliente or cliente.rol != "cliente":
         raise NotFoundException(detail="Cliente no encontrado")
-    if payload.abogado_id:
-        abogado = await user_repo.get_by_id(payload.abogado_id)
+    responsable_id = payload.abogado_id
+    if responsable_id:
+        abogado = await user_repo.get_by_id(responsable_id)
         if not abogado or abogado.rol not in {"administrador", "abogado"}:
             raise NotFoundException(detail="Abogado no encontrado")
+    elif current_user.rol in {"administrador", "abogado"}:
+        responsable_id = current_user.id
+    else:
+        raise DomainException(
+            detail="Debes asignar un abogado responsable al abrir el asunto",
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        )
     repo = AsuntoRepository(db, current_user.firma_id)
     radicado = await _resolve_internal_case_code(repo, payload.radicado)
     if await repo.get_by_radicado(radicado):
@@ -80,10 +88,13 @@ async def create_asunto(
     data["radicado"] = radicado
     data.update(
         {
-            "abogado_id": payload.abogado_id or current_user.id,
+            "abogado_id": responsable_id,
             "estado_id": estado_id,
-            "etapa_actual": "Paso 1 de 5: Radicación",
-            "siguiente_paso": payload.siguiente_paso or initial_workflow_steps()[0]["descripcion"],
+            "etapa_actual": (
+                f"Paso 1 de {len(initial_workflow_steps())}: "
+                f"{initial_workflow_steps()[0]['titulo']}"
+            ),
+            "siguiente_paso": initial_workflow_steps()[0]["descripcion"],
             "ruta_codigo": "insolvencia_persona_natural",
             "paso_actual": 1,
             "flujo_estado": "activo",
@@ -122,7 +133,7 @@ async def update_estado_asunto(
     current_user: User = Depends(require_office_user),
 ):
     """
-    Actualiza el estado procesal o siguiente paso de un asunto.
+    Actualiza el estado procesal de un asunto sin alterar su ruta de trabajo.
     """
     repo = AsuntoRepository(db, current_user.firma_id)
     asunto = await repo.get_by_id(asunto_id)
@@ -146,7 +157,7 @@ async def advance_asunto_workflow(
     asunto_id: uuid.UUID,
     payload: AvanzarPasoRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_office_user),
+    current_user: User = Depends(require_roles("administrador", "abogado")),
 ):
     """Completa el paso activo y habilita el siguiente de forma atómica."""
     return await WorkflowService(db, current_user.firma_id).advance(

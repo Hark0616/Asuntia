@@ -10,6 +10,7 @@ from app.models.base import BaseModel
 
 if TYPE_CHECKING:
     from app.models.asunto import Asunto
+    from app.models.tarea import Tarea
 
 
 class AsuntoPaso(BaseModel):
@@ -48,3 +49,6 @@ class AsuntoPaso(BaseModel):
     )
 
     asunto: Mapped["Asunto"] = relationship("Asunto", back_populates="pasos")
+    tarea: Mapped[Optional["Tarea"]] = relationship(
+        "Tarea", back_populates="asunto_paso", uselist=False
+    )

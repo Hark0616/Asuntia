@@ -44,6 +44,7 @@ class PasoRepository(BaseRepository[AsuntoPaso]):
         next_step: AsuntoPaso | None,
         data: dict,
         user_id: uuid.UUID,
+        total_steps: int,
     ) -> Asunto:
         current.estado = "completado"
         current.datos = data
@@ -53,7 +54,9 @@ class PasoRepository(BaseRepository[AsuntoPaso]):
         if next_step:
             next_step.estado = "activo"
             asunto.paso_actual = next_step.orden
-            asunto.etapa_actual = f"Paso {next_step.orden} de 5: {next_step.titulo}"
+            asunto.etapa_actual = (
+                f"Paso {next_step.orden} de {total_steps}: {next_step.titulo}"
+            )
             asunto.siguiente_paso = next_step.descripcion
             self.session.add(next_step)
         else:

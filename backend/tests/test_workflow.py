@@ -19,16 +19,18 @@ async def create_case(client, suffix: str):
 
 
 @pytest.mark.asyncio
-async def test_create_case_starts_with_five_sequential_steps(client):
+async def test_create_case_starts_with_seven_sequential_steps(client):
     asunto = await create_case(client, uuid.uuid4().hex[:8])
 
     assert asunto["paso_actual"] == 1
     assert asunto["flujo_estado"] == "activo"
-    assert asunto["etapa_actual"] == "Paso 1 de 5: Radicación"
+    assert asunto["etapa_actual"] == "Paso 1 de 7: Recepción y evaluación inicial"
     assert asunto["abogado_id"] == "00000000-0000-0000-0000-000000000010"
-    assert len(asunto["pasos"]) == 5
+    assert len(asunto["pasos"]) == 7
     assert [paso["estado"] for paso in asunto["pasos"]] == [
         "activo",
+        "bloqueado",
+        "bloqueado",
         "bloqueado",
         "bloqueado",
         "bloqueado",
@@ -48,18 +50,17 @@ async def test_create_case_assigns_an_internal_code_when_not_provided(client):
 
 
 @pytest.mark.asyncio
-async def test_create_case_preserves_the_initial_next_action(client):
+async def test_create_case_derives_the_initial_next_action_from_the_route(client):
     response = await client.post(
         "/api/v1/asuntos",
         json={
             "cliente_id": CLIENTE_CARLOS_ID,
-            "siguiente_paso": "Solicitar poder firmado",
             "fecha_apertura": "2026-07-15",
         },
     )
 
     assert response.status_code == 201, response.text
-    assert response.json()["siguiente_paso"] == "Solicitar poder firmado"
+    assert response.json()["siguiente_paso"].startswith("Verifica identidad")
     assert response.json()["fecha_apertura"] == "2026-07-15"
 
 
@@ -70,7 +71,10 @@ async def test_workflow_validates_data_and_prevents_skipping(client):
 
     invalid = await client.post(
         endpoint,
-        json={"paso_codigo": "radicacion", "datos": {"radicado_oficial": ""}},
+        json={
+            "paso_codigo": "recepcion_evaluacion",
+            "datos": {"identidad_verificada": False},
+        },
     )
     assert invalid.status_code == 400
     assert "obligatorio" in invalid.json()["detail"]
@@ -80,16 +84,17 @@ async def test_workflow_validates_data_and_prevents_skipping(client):
         json={"paso_codigo": "agendar_audiencia", "datos": {}},
     )
     assert skipped.status_code == 409
-    assert "Radicación" in skipped.json()["detail"]
+    assert "Recepción y evaluación inicial" in skipped.json()["detail"]
 
     advanced = await client.post(
         endpoint,
         json={
-            "paso_codigo": "radicacion",
+            "paso_codigo": "recepcion_evaluacion",
             "datos": {
-                "radicado_oficial": "RAD-2026-900",
-                "autoridad": "Centro de Conciliación",
-                "fecha_radicacion": "2026-07-28",
+                "identidad_verificada": True,
+                "conflicto_interes": "sin_conflicto",
+                "viabilidad_preliminar": "viable",
+                "observaciones": "La información inicial permite continuar.",
             },
         },
     )
@@ -98,7 +103,7 @@ async def test_workflow_validates_data_and_prevents_skipping(client):
     assert body["paso_actual"] == 2
     assert body["pasos"][0]["estado"] == "completado"
     assert body["pasos"][1]["estado"] == "activo"
-    assert body["pasos"][0]["datos"]["radicado_oficial"] == "RAD-2026-900"
+    assert body["pasos"][0]["datos"]["identidad_verificada"] is True
 
 
 @pytest.mark.asyncio
@@ -106,6 +111,23 @@ async def test_workflow_can_complete_all_steps(client):
     asunto = await create_case(client, uuid.uuid4().hex[:8])
     endpoint = f"/api/v1/asuntos/{asunto['id']}/flujo/avanzar"
     steps = [
+        (
+            "recepcion_evaluacion",
+            {
+                "identidad_verificada": True,
+                "conflicto_interes": "sin_conflicto",
+                "viabilidad_preliminar": "viable",
+                "observaciones": "Recepción completa.",
+            },
+        ),
+        (
+            "preparacion_solicitud",
+            {
+                "documentacion_completa": True,
+                "solicitud_revisada": True,
+                "observaciones": "Solicitud lista para radicar.",
+            },
+        ),
         (
             "radicacion",
             {
@@ -142,7 +164,7 @@ async def test_workflow_can_complete_all_steps(client):
 
     body = response.json()
     assert body["flujo_estado"] == "completado"
-    assert body["paso_actual"] == 5
+    assert body["paso_actual"] == 7
     assert all(paso["estado"] == "completado" for paso in body["pasos"])
 
     repeated = await client.post(
@@ -156,7 +178,7 @@ async def test_workflow_can_complete_all_steps(client):
 async def test_client_cannot_advance_workflow(carlos_client):
     response = await carlos_client.post(
         "/api/v1/asuntos/00000000-0000-0000-0000-000000000201/flujo/avanzar",
-        json={"paso_codigo": "radicacion", "datos": {}},
+        json={"paso_codigo": "recepcion_evaluacion", "datos": {}},
     )
     assert response.status_code == 403
 

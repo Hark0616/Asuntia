@@ -11,6 +11,7 @@ from app.models.documento import DocumentoAsunto
 from app.models.firma_storage import FirmaStorageConfig
 from app.models.auth_challenge import AuthChallenge
 from app.models.asunto_paso import AsuntoPaso
+from app.models.tarea import Tarea, TareaEstado, TareaPrioridad, TareaTipo
 from app.core.security import get_password_hash
 from app.services.workflow_service import initial_workflow_steps
 
@@ -25,6 +26,7 @@ async def seed_data():
         await session.execute(delete(DocumentoAsunto))
         await session.execute(delete(FirmaStorageConfig))
         await session.execute(delete(Novedad))
+        await session.execute(delete(Tarea))
         await session.execute(delete(AsuntoPaso))
         await session.execute(delete(Asunto))
         await session.execute(delete(EstadoProcesal))
@@ -189,7 +191,7 @@ async def seed_data():
             cliente_id=cliente_carlos.id,
             abogado_id=abogada_daniela.id,
             estado_id=estados[0].id,
-            etapa_actual="Paso 1 de 5: Radicación",
+            etapa_actual=f"Paso 1 de {len(initial_workflow_steps())}: {initial_workflow_steps()[0]['titulo']}",
             siguiente_paso=initial_workflow_steps()[0]["descripcion"],
             created_by_id=abogada_daniela.id,
         )
@@ -200,7 +202,7 @@ async def seed_data():
             cliente_id=cliente_transportes.id,
             abogado_id=abogado_alejandro.id,
             estado_id=estados[0].id,
-            etapa_actual="Paso 1 de 5: Radicación",
+            etapa_actual=f"Paso 1 de {len(initial_workflow_steps())}: {initial_workflow_steps()[0]['titulo']}",
             siguiente_paso=initial_workflow_steps()[0]["descripcion"],
             created_by_id=abogado_alejandro.id,
         )
@@ -211,7 +213,7 @@ async def seed_data():
             cliente_id=cliente_elena.id,
             abogado_id=abogada_daniela.id,
             estado_id=estados[0].id,
-            etapa_actual="Paso 1 de 5: Radicación",
+            etapa_actual=f"Paso 1 de {len(initial_workflow_steps())}: {initial_workflow_steps()[0]['titulo']}",
             siguiente_paso=initial_workflow_steps()[0]["descripcion"],
             created_by_id=abogada_daniela.id,
         )
@@ -222,24 +224,45 @@ async def seed_data():
             cliente_id=cliente_jorge.id,
             abogado_id=abogado_alejandro.id,
             estado_id=estados[0].id,
-            etapa_actual="Paso 1 de 5: Radicación",
+            etapa_actual=f"Paso 1 de {len(initial_workflow_steps())}: {initial_workflow_steps()[0]['titulo']}",
             siguiente_paso=initial_workflow_steps()[0]["descripcion"],
             created_by_id=abogado_alejandro.id,
         )
 
         session.add_all([asunto1, asunto2, asunto3, asunto4])
-        session.add_all(
-            [
+        pasos_por_asunto: dict[uuid.UUID, list[AsuntoPaso]] = {}
+        for asunto in (asunto1, asunto2, asunto3, asunto4):
+            pasos = [
                 AsuntoPaso(
                     **step,
                     asunto_id=asunto.id,
                     firma_id=DEFAULT_FIRMA_ID,
                     created_by_id=asunto.abogado_id,
                 )
-                for asunto in (asunto1, asunto2, asunto3, asunto4)
                 for step in initial_workflow_steps()
             ]
-        )
+            pasos_por_asunto[asunto.id] = pasos
+            session.add_all(pasos)
+        await session.flush()
+
+        for asunto in (asunto1, asunto2, asunto3, asunto4):
+            primer_paso = pasos_por_asunto[asunto.id][0]
+            session.add(
+                Tarea(
+                    firma_id=DEFAULT_FIRMA_ID,
+                    asunto_id=asunto.id,
+                    asunto_paso_id=primer_paso.id,
+                    codigo=f"paso:{primer_paso.codigo}",
+                    tipo=TareaTipo.COMPLETAR_PASO.value,
+                    titulo=f"Completar {primer_paso.titulo.lower()}",
+                    instruccion=primer_paso.descripcion,
+                    estado=TareaEstado.PENDIENTE.value,
+                    prioridad=TareaPrioridad.NORMAL.value,
+                    responsable_id=asunto.abogado_id,
+                    solicitante_id=asunto.created_by_id,
+                    created_by_id=asunto.created_by_id,
+                )
+            )
 
         # 5. Crear Novedades Procesales
         novedades = [
@@ -247,8 +270,8 @@ async def seed_data():
                 id=uuid.UUID("00000000-0000-0000-0000-000000000301"),
                 firma_id=DEFAULT_FIRMA_ID,
                 asunto_id=asunto1.id,
-                titulo="Auto de Admisión Expedido",
-                descripcion="El Centro de Conciliación admitió la solicitud de negociación de pasivos de acuerdo con la Ley de Insolvencia.",
+                titulo="Documentos iniciales solicitados",
+                descripcion="El equipo jurídico inició la recepción del asunto y solicitó la información necesaria para evaluar la solicitud.",
                 publicado_al_cliente=True,
                 created_by_id=abogada_daniela.id
             ),
@@ -256,8 +279,8 @@ async def seed_data():
                 id=uuid.UUID("00000000-0000-0000-0000-000000000302"),
                 firma_id=DEFAULT_FIRMA_ID,
                 asunto_id=asunto1.id,
-                titulo="Verificación interna de acreencias",
-                descripcion="Revisión de saldos reportados con Bancolombia y Davivienda por el equipo legal.",
+                titulo="Revisión inicial del asunto",
+                descripcion="Validación interna de identidad, documentos disponibles y posibles conflictos antes de emitir una conclusión.",
                 publicado_al_cliente=False,
                 created_by_id=abogada_daniela.id
             )

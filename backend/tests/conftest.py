@@ -115,6 +115,22 @@ async def carlos_client():
 
 
 @pytest_asyncio.fixture
+async def alejandro_client():
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as api_client:
+        response = await api_client.post(
+            "/api/v1/auth/login",
+            json={
+                "firma_slug": "demo",
+                "email": "alejandro.morales@asuntia.com",
+                "password": "admin123",
+            },
+        )
+        assert response.status_code == 200
+        yield api_client
+
+
+@pytest_asyncio.fixture
 async def elena_client():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as api_client:
