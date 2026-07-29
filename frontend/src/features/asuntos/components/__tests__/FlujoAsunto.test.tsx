@@ -63,4 +63,20 @@ describe('FlujoAsunto', () => {
       });
     });
   });
+
+  it('muestra la ruta sin controles de avance cuando el rol es de consulta', () => {
+    render(
+      <FlujoAsunto
+        pasos={pasos}
+        flujoEstado="activo"
+        canAdvance={false}
+        onAdvance={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText('Paso 1 de 2')).toBeInTheDocument();
+    expect(screen.getByText('Registra la radicación oficial.')).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Radicado oficial/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Completar/ })).not.toBeInTheDocument();
+  });
 });

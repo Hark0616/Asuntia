@@ -83,7 +83,7 @@ export const crearClienteAPI = async (payload: { nombre: string; cedula: string;
   return response.data;
 };
 
-export const crearAsuntoAPI = async (payload: { radicado?: string; cliente_id: string; abogado_id?: string; estado_id?: string; siguiente_paso?: string; fecha_apertura?: string }) => {
+export const crearAsuntoAPI = async (payload: { radicado?: string; cliente_id: string; abogado_id?: string; estado_id?: string; fecha_apertura?: string }) => {
   const response = await apiClient.post<AsuntoAPI>('/asuntos', payload);
   return response.data;
 };
@@ -101,7 +101,7 @@ export const crearNovedadAPI = async (asuntoId: string, payload: { titulo: strin
   return response.data;
 };
 
-export const actualizarEstadoAPI = async (asuntoId: string, payload: { estado_id?: string; etapa_actual?: string; siguiente_paso?: string }) => {
+export const actualizarEstadoAPI = async (asuntoId: string, payload: { estado_id?: string }) => {
   const response = await apiClient.patch(`/asuntos/${asuntoId}/estado`, payload);
   return response.data;
 };

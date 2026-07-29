@@ -25,6 +25,11 @@ button {
   cursor: pointer;
 }
 
+:where(button, a, input, select, textarea):focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--brand) 32%, transparent);
+  outline-offset: 2px;
+}
+
 .app-shell {
   min-height: 100vh;
 }
@@ -510,6 +515,43 @@ button {
   display: flex;
 }
 
+.office-nav {
+  gap: var(--space-1);
+  display: grid;
+}
+
+.office-nav a {
+  width: 100%;
+  min-height: 2.75rem;
+  color: var(--muted);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0 var(--space-3);
+  font-weight: 650;
+  text-align: left;
+  display: flex;
+  text-decoration: none;
+}
+
+.office-nav a:hover,
+.office-nav a.active {
+  color: var(--brand-dark);
+  background: var(--panel-soft);
+}
+
+.sidebar-divider {
+  height: 1px;
+  background: var(--line);
+}
+
+.office-nav-note {
+  border-top: 1px solid var(--line);
+  padding-top: var(--space-4);
+}
+
 .layout > .main {
   min-height: 0;
   overflow-y: auto;
@@ -657,9 +699,11 @@ button {
 
 .client-entry {
   text-align: left;
+  color: var(--text);
   border-color: var(--line);
   width: 100%;
   padding: 12px;
+  text-decoration: none;
 }
 
 .client-entry.active {
@@ -693,6 +737,7 @@ button {
 
 .case-card {
   text-align: left;
+  color: var(--text);
   width: 100%;
   min-height: 96px;
   box-shadow: none;
@@ -701,6 +746,7 @@ button {
   gap: 8px;
   padding: 14px;
   display: grid;
+  text-decoration: none;
 }
 
 .case-card.active {
@@ -777,7 +823,8 @@ button {
 }
 
 .workflow-stepper {
-  grid-template-columns: repeat(5, minmax(8rem, 1fr));
+  grid-auto-columns: minmax(8rem, 1fr);
+  grid-auto-flow: column;
   gap: var(--space-2);
   margin: var(--space-4) 0;
   padding: 0;
@@ -785,6 +832,180 @@ button {
   display: grid;
   max-width: 100%;
   overflow-x: auto;
+}
+
+/* Bandeja principal de trabajo */
+.workbench {
+  width: min(100%, 70rem);
+}
+
+.workbench-toolbar {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: var(--space-4);
+}
+
+.workbench-toolbar h2 {
+  margin: var(--space-1) 0;
+}
+
+.workbench-toolbar p {
+  margin: 0;
+}
+
+.page-eyebrow {
+  color: var(--brand);
+  font-size: 0.75rem;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.scope-tabs {
+  width: fit-content;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  margin-bottom: var(--space-4);
+  padding: var(--space-1);
+  display: flex;
+}
+
+.scope-tabs button {
+  min-height: 2.25rem;
+  color: var(--muted);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  padding: 0 var(--space-3);
+  font-weight: 650;
+}
+
+.scope-tabs button.active {
+  color: var(--brand-dark);
+  background: var(--panel-soft);
+}
+
+.work-list {
+  padding: 0;
+  overflow: hidden;
+}
+
+.work-item {
+  width: 100%;
+  color: var(--text);
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+  grid-template-columns: 0.5rem minmax(0, 1fr) auto;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  text-align: left;
+  align-items: center;
+  display: grid;
+  text-decoration: none;
+}
+
+.work-item:last-child {
+  border-bottom: 0;
+}
+
+.work-item:hover {
+  background: var(--panel-soft);
+}
+
+.work-item-status {
+  width: 0.5rem;
+  height: 0.5rem;
+  background: var(--brand);
+  border-radius: var(--radius-full);
+}
+
+.work-item-body {
+  min-width: 0;
+  gap: var(--space-1);
+  display: grid;
+}
+
+.work-item-context {
+  color: var(--muted);
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.75rem;
+  display: flex;
+}
+
+.work-item-context strong {
+  color: var(--text);
+  font-size: 0.8125rem;
+}
+
+.work-item-title {
+  font-size: 1rem;
+}
+
+.work-item-instruction {
+  max-width: 48rem;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: 0.875rem;
+  display: flex;
+}
+
+.work-item-meta {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+  display: flex;
+}
+
+.work-item-meta > .small {
+  align-items: center;
+  gap: var(--space-1);
+  display: flex;
+}
+
+.work-item-action {
+  color: var(--brand);
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  display: flex;
+}
+
+.work-empty {
+  min-height: 12rem;
+  place-items: center;
+  align-content: center;
+  gap: var(--space-3);
+  text-align: center;
+  display: grid;
+}
+
+.work-empty h3,
+.work-empty p {
+  margin: 0;
+}
+
+.work-stale-notice {
+  color: var(--warning);
+  margin-bottom: var(--space-3);
+  font-size: 0.8125rem;
+}
+
+.work-item-skeleton {
+  pointer-events: none;
+}
+
+.work-item-skeleton span {
+  height: 0.75rem;
+  background: var(--panel-soft);
+  border-radius: var(--radius-sm);
+}
+
+.work-item-skeleton span:nth-child(2) {
+  width: 70%;
 }
 
 .workflow-step {
@@ -919,6 +1140,9 @@ button {
     padding: 14px 16px;
     position: static;
   }
+  .office-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .sidebar-inner > .stack {
     flex-direction: row;
     overflow-x: auto;
@@ -944,6 +1168,12 @@ button {
   .tracking-header, .client-action-card {
     flex-direction: column;
     align-items: stretch;
+  }
+  .work-item {
+    grid-template-columns: 0.5rem minmax(0, 1fr);
+  }
+  .work-item-action {
+    grid-column: 2;
   }
 }
 

@@ -7,6 +7,7 @@ interface FlujoAsuntoProps {
   pasos: AsuntoPasoAPI[];
   flujoEstado: 'activo' | 'completado';
   isLoading?: boolean;
+  canAdvance?: boolean;
   onAdvance: (pasoCodigo: string, datos: Record<string, unknown>) => Promise<unknown>;
 }
 
@@ -14,6 +15,7 @@ export function FlujoAsunto({
   pasos,
   flujoEstado,
   isLoading = false,
+  canAdvance = true,
   onAdvance,
 }: FlujoAsuntoProps) {
   const pasoActivo = pasos.find((paso) => paso.estado === 'activo');
@@ -68,7 +70,7 @@ export function FlujoAsunto({
         ))}
       </ol>
 
-      {pasoActivo && (
+      {pasoActivo && canAdvance && (
         <form onSubmit={handleSubmit} className="workflow-form">
           <div>
             <h3>{pasoActivo.titulo}</h3>
@@ -133,6 +135,15 @@ export function FlujoAsunto({
             </button>
           </div>
         </form>
+      )}
+
+      {pasoActivo && !canAdvance && (
+        <div className="workflow-form">
+          <div>
+            <h3>{pasoActivo.titulo}</h3>
+            <p className="muted small">{pasoActivo.descripcion}</p>
+          </div>
+        </div>
       )}
     </section>
   );

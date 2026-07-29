@@ -42,11 +42,6 @@ describe('flujos de creación de oficina', () => {
         onClose={vi.fn()}
         cliente={{ id: 'cliente-2', nombre: 'María Elena' }}
         responsableNombre="Ana Abogada"
-        estados={[{
-          id: 'estado-1',
-          nombre: 'Sin acción aún',
-          descripcion: 'Expediente recién abierto sin actuaciones iniciales',
-        }]}
         onSubmit={onSubmit}
       />,
     );
@@ -55,19 +50,15 @@ describe('flujos de creación de oficina', () => {
     expect(screen.queryByLabelText(/Cliente Asignado/i)).not.toBeInTheDocument();
     expect(screen.getByText('María Elena')).toBeInTheDocument();
     expect(screen.getByText(/Responsable inicial.*Ana Abogada/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Situación inicial/i)).toHaveValue('estado-1');
-    expect(screen.getByText(/Expediente recién abierto/i)).toBeInTheDocument();
+    expect(screen.getByText(/Paso 1.*Recepción y evaluación inicial/i)).toBeInTheDocument();
+    expect(screen.getByText(/Se asignará como tarea a Ana Abogada/i)).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText(/Fecha de apertura/i), {
       target: { value: '2026-07-15' },
     });
-    await user.clear(screen.getByLabelText(/Próxima acción/i));
-    await user.type(screen.getByLabelText(/Próxima acción/i), 'Solicitar poder firmado');
-    await user.click(screen.getByRole('button', { name: /Crear Expediente/i }));
+    await user.click(screen.getByRole('button', { name: /Crear expediente/i }));
 
     expect(onSubmit).toHaveBeenCalledWith({
       cliente_id: 'cliente-2',
-      estado_id: 'estado-1',
-      siguiente_paso: 'Solicitar poder firmado',
       fecha_apertura: '2026-07-15',
     });
   });
