@@ -28,9 +28,14 @@ async def get_mi_trabajo(
             detail="Solo la administración puede consultar el trabajo de toda la firma"
         )
 
-    tareas = await TareaRepository(db, current_user.firma_id).list_for_responsable(
+    repo = TareaRepository(db, current_user.firma_id)
+    tareas = await repo.list_for_responsable(
         current_user.id,
         include_team=include_team,
         limit=limit,
     )
-    return {"items": tareas, "total": len(tareas)}
+    total = await repo.count_for_responsable(
+        current_user.id,
+        include_team=include_team,
+    )
+    return {"items": tareas, "total": total}

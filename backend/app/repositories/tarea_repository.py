@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, time, timedelta, timezone
 from typing import Optional
 
-from sqlalchemy import case, select
+from sqlalchemy import case, func, select
 from sqlalchemy.orm import joinedload
 
 from app.models.asunto import Asunto
@@ -76,6 +76,29 @@ class TareaRepository(BaseRepository[Tarea]):
 
         result = await self.session.execute(stmt)
         return list(result.scalars().unique().all())
+
+    async def count_for_responsable(
+        self,
+        responsable_id: Optional[uuid.UUID],
+        *,
+        include_team: bool = False,
+    ) -> int:
+        stmt = (
+            select(func.count(Tarea.id))
+            .join(Tarea.asunto)
+            .where(Tarea.firma_id == self.firma_id)
+            .where(Tarea.is_active == True)
+            .where(Tarea.estado.in_(
+                [TareaEstado.PENDIENTE.value, TareaEstado.EN_PROGRESO.value]
+            ))
+            .where(Asunto.firma_id == self.firma_id)
+            .where(Asunto.is_active == True)
+        )
+        if not include_team:
+            stmt = stmt.where(Tarea.responsable_id == responsable_id)
+
+        result = await self.session.execute(stmt)
+        return int(result.scalar_one())
 
     async def get_open_for_step_for_update(
         self, asunto_id: uuid.UUID, asunto_paso_id: uuid.UUID

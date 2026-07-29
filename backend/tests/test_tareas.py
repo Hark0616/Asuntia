@@ -68,11 +68,15 @@ async def test_advancing_workflow_replaces_open_work_item(client):
 @pytest.mark.asyncio
 async def test_administrator_can_view_team_work(client):
     mine = await client.get("/api/v1/tareas/mi-trabajo")
-    team = await client.get("/api/v1/tareas/mi-trabajo?alcance=equipo")
+    team = await client.get(
+        "/api/v1/tareas/mi-trabajo?alcance=equipo&limit=1"
+    )
 
     assert mine.status_code == 200
     assert team.status_code == 200
     assert team.json()["total"] > mine.json()["total"]
+    assert len(team.json()["items"]) == 1
+    assert team.json()["total"] > len(team.json()["items"])
 
 
 @pytest.mark.asyncio
