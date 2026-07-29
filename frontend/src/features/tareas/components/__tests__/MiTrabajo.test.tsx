@@ -58,7 +58,10 @@ describe('MiTrabajo', () => {
     const link = screen.getByRole('link', {
       name: /Abrir AS-2026-001.*recepción/i,
     });
-    expect(link).toHaveAttribute('href', '/oficina/asuntos/asunto-1');
+    expect(link).toHaveAttribute(
+      'href',
+      '/oficina/asuntos/asunto-1#paso-activo',
+    );
     await user.click(link);
   });
 

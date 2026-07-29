@@ -124,7 +124,7 @@ export function MiTrabajo({ isAdmin }: MiTrabajoProps) {
             <Link
               className="work-item"
               key={tarea.id}
-              to={`/oficina/asuntos/${tarea.asunto.id}`}
+              to={`/oficina/asuntos/${tarea.asunto.id}#paso-activo`}
               aria-label={`Abrir ${tarea.asunto.radicado}: ${tarea.titulo}`}
             >
               <span className="work-item-status" aria-hidden="true" />

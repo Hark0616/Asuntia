@@ -46,7 +46,11 @@ export function FlujoAsunto({
   };
 
   return (
-    <section className="panel workflow-panel">
+    <section
+      className="panel workflow-panel"
+      id="paso-activo"
+      tabIndex={-1}
+    >
       <div className="section-title">
         <div>
           <h3>Ruta del expediente</h3>

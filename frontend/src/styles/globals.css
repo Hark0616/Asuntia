@@ -820,6 +820,12 @@ button {
 
 .workflow-panel {
   margin-top: var(--space-4);
+  scroll-margin-top: var(--space-4);
+}
+
+.workflow-panel:focus {
+  outline: 3px solid color-mix(in srgb, var(--brand) 32%, transparent);
+  outline-offset: 2px;
 }
 
 .workflow-stepper {

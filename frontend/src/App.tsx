@@ -170,6 +170,7 @@ export default function App() {
       queryClient.invalidateQueries({ queryKey: ['clientes'] });
       setClienteIdSeleccionado(newClient.id);
       setCrearClienteAbierto(false);
+      setCrearAsuntoAbierto(true);
       navigate('/oficina/asuntos');
     }
   });
@@ -182,7 +183,7 @@ export default function App() {
       queryClient.invalidateQueries({ queryKey: ['tareas'] });
       setCasoIdSeleccionado(newAsunto.id);
       setCrearAsuntoAbierto(false);
-      navigate(`/oficina/asuntos/${newAsunto.id}`);
+      navigate(`/oficina/asuntos/${newAsunto.id}#paso-activo`);
     }
   });
 
@@ -289,6 +290,16 @@ export default function App() {
       setCasoIdSeleccionado(asunto.id);
     }
   }, [asuntoRouteMatch?.params.asuntoId, asuntosAPI]);
+
+  React.useEffect(() => {
+    if (!casoActivo || location.hash !== '#paso-activo') return;
+    const frame = window.requestAnimationFrame(() => {
+      const activeStep = document.getElementById('paso-activo');
+      activeStep?.scrollIntoView({ block: 'start' });
+      activeStep?.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [casoActivo?.id, location.hash]);
 
   const handleGuardarEstado = (e: React.FormEvent) => {
     e.preventDefault();
