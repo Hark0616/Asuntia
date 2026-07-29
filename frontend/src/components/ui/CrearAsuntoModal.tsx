@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { X, FolderPlus, Save } from 'lucide-react';
 import { Tooltip } from './Tooltip';
 
@@ -7,14 +7,23 @@ interface ClienteItem {
   nombre: string;
 }
 
+interface EstadoItem {
+  id: string;
+  nombre: string;
+  descripcion?: string;
+}
+
 interface CrearAsuntoModalProps {
   isOpen: boolean;
   onClose: () => void;
-  clientes: ClienteItem[];
-  clienteSeleccionadoId?: string;
+  cliente: ClienteItem;
+  responsableNombre: string;
+  estados: EstadoItem[];
   onSubmit: (data: {
-    radicado: string;
     cliente_id: string;
+    estado_id?: string;
+    siguiente_paso: string;
+    fecha_apertura: string;
   }) => void;
   isLoading?: boolean;
 }
@@ -22,31 +31,31 @@ interface CrearAsuntoModalProps {
 export function CrearAsuntoModal({
   isOpen,
   onClose,
-  clientes,
-  clienteSeleccionadoId,
+  cliente,
+  responsableNombre,
+  estados,
   onSubmit,
   isLoading = false
 }: CrearAsuntoModalProps) {
-  const [radicado, setRadicado] = useState('AS-2026-006');
-  const [clienteId, setClienteId] = useState(clienteSeleccionadoId || (clientes[0]?.id || ''));
+  const [estadoId, setEstadoId] = useState('');
+  const [siguientePaso, setSiguientePaso] = useState('Registrar radicación oficial');
+  const [fechaApertura, setFechaApertura] = useState(() => new Date().toISOString().slice(0, 10));
 
-  React.useEffect(() => {
-    if (clienteSeleccionadoId) {
-      setClienteId(clienteSeleccionadoId);
-    } else if (clientes.length > 0 && !clienteId) {
-      setClienteId(clientes[0].id);
-    }
-  }, [clienteSeleccionadoId, clientes]);
+  useEffect(() => {
+    if (isOpen) setEstadoId(estados[0]?.id || '');
+  }, [estados, isOpen]);
 
   if (!isOpen) return null;
 
+  const estadoSeleccionado = estados.find((estado) => estado.id === estadoId);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!radicado.trim() || !clienteId) return;
-
     onSubmit({
-      radicado: radicado.trim(),
-      cliente_id: clienteId
+      cliente_id: cliente.id,
+      estado_id: estadoId || undefined,
+      siguiente_paso: siguientePaso.trim(),
+      fecha_apertura: fechaApertura,
     });
   };
 
@@ -60,7 +69,7 @@ export function CrearAsuntoModal({
             </div>
             <div>
               <h3>Aperturar Nuevo Expediente</h3>
-              <span className="muted small">El proceso iniciará automáticamente en Radicación</span>
+              <span className="muted small">Insolvencia de persona natural</span>
             </div>
           </div>
           <button 
@@ -76,46 +85,58 @@ export function CrearAsuntoModal({
 
         <form onSubmit={handleSubmit}>
           <div className="modal-body stack" style={{ gap: '16px' }}>
+            <div className="list-card">
+              <span className="muted small">Cliente</span>
+              <strong>{cliente.nombre}</strong>
+              <span className="muted small">Responsable inicial · {responsableNombre}</span>
+            </div>
+
             <div className="form-grid">
               <div className="field">
-                <label htmlFor="radicado-asunto">
-                  Número de Radicado *
-                  <Tooltip content="Identificador único del asunto dentro de Asuntia (ej: AS-2026-006)." />
+                <label htmlFor="estado-inicial">
+                  Situación inicial
+                  <Tooltip content="Describe el estado operativo del expediente al abrirlo. No cambia la ruta: Radicación continúa siendo el primer paso." />
                 </label>
-                <input
-                  id="radicado-asunto"
-                  type="text"
-                  required
-                  value={radicado}
-                  onChange={(e) => setRadicado(e.target.value)}
-                  placeholder="AS-2026-006"
-                  autoFocus
-                />
+                <select
+                  id="estado-inicial"
+                  value={estadoId}
+                  onChange={(event) => setEstadoId(event.target.value)}
+                >
+                  {estados.map((estado) => (
+                    <option key={estado.id} value={estado.id}>{estado.nombre}</option>
+                  ))}
+                </select>
+                {estadoSeleccionado?.descripcion && (
+                  <span className="muted small">{estadoSeleccionado.descripcion}</span>
+                )}
               </div>
 
               <div className="field">
-                <label htmlFor="cliente-asunto">
-                  Cliente Asignado *
-                  <Tooltip content="El titular del proceso que podrá consultar los avances vía OTP." />
-                </label>
-                <select
-                  id="cliente-asunto"
+                <label htmlFor="fecha-apertura">Fecha de apertura</label>
+                <input
+                  id="fecha-apertura"
+                  type="date"
                   required
-                  value={clienteId}
-                  onChange={(e) => setClienteId(e.target.value)}
-                >
-                  {clientes.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.nombre}
-                    </option>
-                  ))}
-                </select>
+                  value={fechaApertura}
+                  onChange={(event) => setFechaApertura(event.target.value)}
+                />
+              </div>
+
+              <div className="field full">
+                <label htmlFor="siguiente-paso-inicial">Próxima acción *</label>
+                <input
+                  id="siguiente-paso-inicial"
+                  type="text"
+                  required
+                  value={siguientePaso}
+                  onChange={(event) => setSiguientePaso(event.target.value)}
+                />
               </div>
             </div>
 
             <div className="list-card">
-              <strong>Paso 1 · Radicación</strong>
-              <span className="muted small">Los pasos posteriores se habilitan al completar el anterior.</span>
+              <strong>Ruta inicial · Radicación</strong>
+              <span className="muted small">El código interno se asignará al crear el expediente.</span>
             </div>
           </div>
 

@@ -3,6 +3,7 @@ import { apiClient } from '@/lib/axios';
 export interface EstadoProcesalAPI {
   id: string;
   nombre: string;
+  descripcion?: string;
   color_tipo: string;
 }
 
@@ -40,6 +41,7 @@ export interface AsuntoPasoAPI {
 export interface AsuntoAPI {
   id: string;
   radicado: string;
+  fecha_apertura: string;
   etapa_actual: string;
   siguiente_paso: string;
   ruta_codigo: string;
@@ -81,7 +83,7 @@ export const crearClienteAPI = async (payload: { nombre: string; cedula: string;
   return response.data;
 };
 
-export const crearAsuntoAPI = async (payload: { radicado: string; cliente_id: string; abogado_id?: string; estado_id?: string }) => {
+export const crearAsuntoAPI = async (payload: { radicado?: string; cliente_id: string; abogado_id?: string; estado_id?: string; siguiente_paso?: string; fecha_apertura?: string }) => {
   const response = await apiClient.post<AsuntoAPI>('/asuntos', payload);
   return response.data;
 };

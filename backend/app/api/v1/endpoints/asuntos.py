@@ -1,4 +1,6 @@
 import uuid
+from datetime import date
+from secrets import token_hex
 from typing import List
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,6 +16,18 @@ from app.models.user import User
 from app.services.workflow_service import WorkflowService, initial_workflow_steps
 
 router = APIRouter()
+
+
+async def _resolve_internal_case_code(repo: AsuntoRepository, supplied_code: str | None) -> str:
+    """Preserva códigos legados y genera uno interno para nuevas aperturas."""
+    if supplied_code and supplied_code.strip():
+        return supplied_code.strip()
+
+    for _ in range(10):
+        code = f"AS-{date.today().year}-{token_hex(3).upper()}"
+        if not await repo.get_by_radicado(code):
+            return code
+    raise DomainException(detail="No fue posible asignar un código interno al expediente", status_code=503)
 
 @router.get("", response_model=List[AsuntoResponse])
 async def list_asuntos(
@@ -49,7 +63,8 @@ async def create_asunto(
         if not abogado or abogado.rol not in {"administrador", "abogado"}:
             raise NotFoundException(detail="Abogado no encontrado")
     repo = AsuntoRepository(db, current_user.firma_id)
-    if await repo.get_by_radicado(payload.radicado):
+    radicado = await _resolve_internal_case_code(repo, payload.radicado)
+    if await repo.get_by_radicado(radicado):
         raise DomainException(detail="Ya existe un expediente con ese radicado")
 
     estado_repo = EstadoRepository(db, current_user.firma_id)
@@ -62,12 +77,13 @@ async def create_asunto(
         estado_id = estados[0].id if estados else None
 
     data = payload.model_dump()
+    data["radicado"] = radicado
     data.update(
         {
             "abogado_id": payload.abogado_id or current_user.id,
             "estado_id": estado_id,
             "etapa_actual": "Paso 1 de 5: Radicación",
-            "siguiente_paso": initial_workflow_steps()[0]["descripcion"],
+            "siguiente_paso": payload.siguiente_paso or initial_workflow_steps()[0]["descripcion"],
             "ruta_codigo": "insolvencia_persona_natural",
             "paso_actual": 1,
             "flujo_estado": "activo",

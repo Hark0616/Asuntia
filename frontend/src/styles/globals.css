@@ -45,6 +45,91 @@ button {
   top: 0;
 }
 
+.user-menu {
+  position: relative;
+}
+
+.user-menu-trigger {
+  color: var(--text);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  display: flex;
+}
+
+.user-menu-trigger:hover,
+.user-menu-trigger[aria-expanded="true"] {
+  border-color: var(--line);
+  background: var(--panel);
+}
+
+.user-avatar {
+  width: 2rem;
+  height: 2rem;
+  color: var(--brand-dark);
+  background: var(--panel-soft);
+  border-radius: var(--radius-full);
+  place-items: center;
+  font-size: 0.75rem;
+  font-weight: 750;
+  display: grid;
+}
+
+.user-menu-identity {
+  min-width: 0;
+  text-align: left;
+}
+
+.user-menu-identity strong,
+.user-menu-identity small {
+  display: block;
+}
+
+.user-menu-identity strong {
+  max-width: 15rem;
+  overflow: hidden;
+  font-size: 0.875rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-menu-identity small {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.user-menu-popover {
+  z-index: 30;
+  width: 13.5rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  box-shadow: 0 4px 8px #12231e1f;
+  padding: var(--space-1);
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  right: 0;
+}
+
+.user-menu-popover button {
+  width: 100%;
+  color: var(--text);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  display: flex;
+}
+
+.user-menu-popover button:hover {
+  background: var(--panel-soft);
+}
+
 .brand {
   align-items: center;
   gap: 12px;
@@ -395,13 +480,27 @@ button {
 /* Office Layout (/firma) */
 .layout {
   grid-template-columns: 280px 1fr;
-  min-height: calc(100vh - 64px);
+  width: 100%;
+  min-width: 0;
+  height: calc(100dvh - 64px);
+  min-height: 0;
   display: grid;
+}
+
+.layout > *,
+.workspace-flow,
+.workspace-flow > * {
+  min-width: 0;
 }
 
 .sidebar {
   border-right: 1px solid var(--line);
   background: #fbfcfb;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 .sidebar-inner {
@@ -409,8 +508,19 @@ button {
   gap: 18px;
   padding: 20px;
   display: flex;
-  position: sticky;
-  top: 64px;
+}
+
+.layout > .main {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.sidebar::-webkit-scrollbar,
+.layout > .main::-webkit-scrollbar {
+  display: none;
 }
 
 .toolbar {
@@ -475,6 +585,51 @@ button {
   font-weight: 700;
 }
 
+.field-error {
+  color: var(--danger);
+  font-size: 12px;
+}
+
+.client-picker {
+  position: relative;
+}
+
+.client-picker-options {
+  z-index: 10;
+  max-height: 13rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  box-shadow: 0 4px 8px #12231e1f;
+  overflow-y: auto;
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  right: 0;
+  left: 0;
+}
+
+.client-picker-options button,
+.client-picker-empty {
+  width: 100%;
+  color: var(--text);
+  border: 0;
+  background: transparent;
+  text-align: left;
+  padding: var(--space-2) var(--space-3);
+  display: block;
+}
+
+.client-picker-options button:hover,
+.client-picker-options button.selected {
+  color: var(--brand-dark);
+  background: var(--panel-soft);
+}
+
+.client-picker-empty {
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .field input, .field select, .field textarea {
   border: 1px solid var(--line);
   width: 100%;
@@ -512,6 +667,10 @@ button {
   background: var(--panel-soft);
 }
 
+.client-entry {
+  box-shadow: none;
+}
+
 .client-entry strong, .case-card strong {
   margin-bottom: 4px;
   display: block;
@@ -523,7 +682,8 @@ button {
 
 .case-list {
   scroll-snap-type: x proximity;
-  grid-auto-columns: minmax(320px, 400px);
+  grid-auto-columns: minmax(min(20rem, 100%), 25rem);
+  max-width: 100%;
   grid-auto-flow: column;
   gap: 12px;
   padding-bottom: 8px;
@@ -623,6 +783,7 @@ button {
   padding: 0;
   list-style: none;
   display: grid;
+  max-width: 100%;
   overflow-x: auto;
 }
 
@@ -735,23 +896,43 @@ button {
 
 @media (max-width: 760px) {
   .topbar {
-    flex-direction: column;
-    align-items: flex-start;
+    align-items: center;
     padding: 12px 16px;
+  }
+  .user-menu-identity strong {
+    max-width: 9rem;
+  }
+  .user-menu-identity small {
+    display: none;
   }
   .layout {
     grid-template-columns: 1fr;
+    height: auto;
+    min-height: calc(100vh - 64px);
   }
   .sidebar {
     border-right: 0;
     border-bottom: 1px solid var(--line);
+    overflow-y: visible;
   }
   .sidebar-inner {
     padding: 14px 16px;
     position: static;
   }
+  .sidebar-inner > .stack {
+    flex-direction: row;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+  }
+  .sidebar-inner > .stack .client-entry {
+    width: 12rem;
+    min-width: 12rem;
+    flex: 0 0 12rem;
+    scroll-snap-align: start;
+  }
   .main {
     padding: 16px;
+    overflow-y: visible;
   }
   .toolbar {
     flex-direction: column;
@@ -764,6 +945,72 @@ button {
     flex-direction: column;
     align-items: stretch;
   }
+}
+
+@media (max-width: 480px) {
+  .user-menu-identity {
+    display: none;
+  }
+}
+
+.settings-sidebar-heading {
+  align-items: center;
+  gap: var(--space-3);
+  display: flex;
+}
+
+.settings-sidebar-heading h3 {
+  margin: 0;
+}
+
+.settings-icon {
+  width: 2.25rem;
+  height: 2.25rem;
+  color: var(--brand);
+  background: var(--panel-soft);
+  border-radius: var(--radius-md);
+  place-items: center;
+  display: grid;
+}
+
+.settings-nav {
+  display: grid;
+}
+
+.settings-nav button {
+  width: 100%;
+  color: var(--text);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  display: flex;
+}
+
+.settings-nav button.active {
+  color: var(--brand-dark);
+  background: var(--panel-soft);
+  font-weight: 650;
+}
+
+.settings-back {
+  width: 100%;
+  margin-top: auto;
+}
+
+.settings-content {
+  max-width: 70rem;
+}
+
+.settings-toolbar {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: var(--space-4);
+}
+
+.settings-toolbar h2 {
+  margin: 0 0 var(--space-1);
 }
 
 /* Modal Overlay & Dialog UI */

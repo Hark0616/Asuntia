@@ -37,6 +37,33 @@ async def test_create_case_starts_with_five_sequential_steps(client):
 
 
 @pytest.mark.asyncio
+async def test_create_case_assigns_an_internal_code_when_not_provided(client):
+    response = await client.post(
+        "/api/v1/asuntos",
+        json={"cliente_id": CLIENTE_CARLOS_ID},
+    )
+
+    assert response.status_code == 201, response.text
+    assert response.json()["radicado"].startswith("AS-")
+
+
+@pytest.mark.asyncio
+async def test_create_case_preserves_the_initial_next_action(client):
+    response = await client.post(
+        "/api/v1/asuntos",
+        json={
+            "cliente_id": CLIENTE_CARLOS_ID,
+            "siguiente_paso": "Solicitar poder firmado",
+            "fecha_apertura": "2026-07-15",
+        },
+    )
+
+    assert response.status_code == 201, response.text
+    assert response.json()["siguiente_paso"] == "Solicitar poder firmado"
+    assert response.json()["fecha_apertura"] == "2026-07-15"
+
+
+@pytest.mark.asyncio
 async def test_workflow_validates_data_and_prevents_skipping(client):
     asunto = await create_case(client, uuid.uuid4().hex[:8])
     endpoint = f"/api/v1/asuntos/{asunto['id']}/flujo/avanzar"

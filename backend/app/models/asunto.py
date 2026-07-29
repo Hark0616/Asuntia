@@ -1,6 +1,7 @@
 import uuid
+from datetime import date
 from typing import Optional, List
-from sqlalchemy import Integer, String, ForeignKey
+from sqlalchemy import Date, Integer, String, ForeignKey, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from app.models.base import BaseModel
@@ -12,6 +13,13 @@ class Asunto(BaseModel):
     __tablename__ = "asuntos"
 
     radicado: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+
+    fecha_apertura: Mapped[date] = mapped_column(
+        Date,
+        nullable=False,
+        default=date.today,
+        server_default=text("CURRENT_DATE"),
+    )
     
     cliente_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True

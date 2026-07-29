@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -40,25 +40,36 @@ describe('flujos de creación de oficina', () => {
       <CrearAsuntoModal
         isOpen
         onClose={vi.fn()}
-        clientes={[
-          { id: 'cliente-1', nombre: 'Carlos Gómez' },
-          { id: 'cliente-2', nombre: 'María Elena' },
-        ]}
-        clienteSeleccionadoId="cliente-2"
+        cliente={{ id: 'cliente-2', nombre: 'María Elena' }}
+        responsableNombre="Ana Abogada"
+        estados={[{
+          id: 'estado-1',
+          nombre: 'Sin acción aún',
+          descripcion: 'Expediente recién abierto sin actuaciones iniciales',
+        }]}
         onSubmit={onSubmit}
       />,
     );
 
-    const radicado = screen.getByLabelText(/Número de Radicado/i);
-    await user.clear(radicado);
-    await user.type(radicado, 'AS-2026-010');
+    expect(screen.queryByLabelText(/Número de Radicado/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Cliente Asignado/i)).not.toBeInTheDocument();
+    expect(screen.getByText('María Elena')).toBeInTheDocument();
+    expect(screen.getByText(/Responsable inicial.*Ana Abogada/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Situación inicial/i)).toHaveValue('estado-1');
+    expect(screen.getByText(/Expediente recién abierto/i)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(/Fecha de apertura/i), {
+      target: { value: '2026-07-15' },
+    });
+    await user.clear(screen.getByLabelText(/Próxima acción/i));
+    await user.type(screen.getByLabelText(/Próxima acción/i), 'Solicitar poder firmado');
     await user.click(screen.getByRole('button', { name: /Crear Expediente/i }));
 
-    expect(onSubmit).toHaveBeenCalledWith(
-      expect.objectContaining({
-        radicado: 'AS-2026-010',
-        cliente_id: 'cliente-2',
-      }),
-    );
+    expect(onSubmit).toHaveBeenCalledWith({
+      cliente_id: 'cliente-2',
+      estado_id: 'estado-1',
+      siguiente_paso: 'Solicitar poder firmado',
+      fecha_apertura: '2026-07-15',
+    });
   });
+
 });

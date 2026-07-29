@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
-  LogOut, 
   CircleCheck, 
   ChevronRight, 
   ChevronDown, 
@@ -12,7 +11,6 @@ import {
   Eye, 
   Send, 
   Clock3,
-  UserCheck,
   HardDrive
 } from 'lucide-react';
 import { 
@@ -39,6 +37,7 @@ import { DocumentosTab } from '@/features/documentos/components/DocumentosTab';
 import { ConfiguracionAlmacenamiento } from '@/features/firma/components/ConfiguracionAlmacenamiento';
 import { FlujoAsunto } from '@/features/asuntos/components/FlujoAsunto';
 import type { AsuntoPasoAPI } from '@/features/asuntos/api/asuntos';
+import { UserMenu } from '@/components/layout/UserMenu';
 
 interface NovedadItem {
   id: string;
@@ -146,7 +145,7 @@ export default function App() {
   });
 
   const mutacionNuevoAsunto = useMutation({
-    mutationFn: (payload: { radicado: string; cliente_id: string }) => crearAsuntoAPI(payload),
+    mutationFn: (payload: { cliente_id: string }) => crearAsuntoAPI(payload),
     onSuccess: (newAsunto) => {
       queryClient.invalidateQueries({ queryKey: ['asuntos'] });
       setCasoIdSeleccionado(newAsunto.id);
@@ -339,8 +338,9 @@ export default function App() {
       <CrearAsuntoModal
         isOpen={crearAsuntoAbierto}
         isLoading={mutacionNuevoAsunto.isPending}
-        clientes={clientes}
-        clienteSeleccionadoId={clienteActivo?.id}
+        cliente={clienteActivo!}
+        responsableNombre={usuarioAutenticado.nombre}
+        estados={estadosAPI || []}
         onClose={() => setCrearAsuntoAbierto(false)}
         onSubmit={(payload) => mutacionNuevoAsunto.mutate(payload)}
       />
@@ -351,42 +351,25 @@ export default function App() {
           <div className="brand-mark">A</div>
           <div>
             <h1>Asuntia</h1>
-            <span>{view === 'cliente' ? (casoActivo?.codigo || 'Cliente') : 'Firma'}</span>
+            <span>
+              {view === 'cliente'
+                ? (casoActivo?.codigo || 'Cliente')
+                : seccionFirma === 'config_almacenamiento'
+                  ? 'Ajustes'
+                  : 'Oficina'}
+            </span>
           </div>
         </div>
 
-        <div className="row wrap">
-          <span className={`badge ${apiConectada ? 'mint' : 'neutral'}`} style={{ gap: '6px' }}>
-            <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: apiConectada ? '#10b981' : '#94a3b8' }}></span>
-            {apiConectada ? 'BD Conectada' : 'Sin conexión'}
-          </span>
-
-          <span className="badge neutral" style={{ gap: '4px' }}>
-            <UserCheck size={13} />
-            {usuarioAutenticado.nombre}
-          </span>
-
-          {usuarioAutenticado.rol === 'administrador' && (
-              <button 
-                className="secondary-button" 
-                type="button"
-                onClick={() => setSeccionFirma(seccionFirma === 'expedientes' ? 'config_almacenamiento' : 'expedientes')}
-                style={{ fontWeight: 600 }}
-              >
-                <HardDrive size={15} />
-                {seccionFirma === 'expedientes' ? 'Almacenamiento' : 'Ver Expedientes'}
-              </button>
-          )}
-
-          <button 
-            className="secondary-button" 
-            type="button"
-            onClick={handleLogout}
-          >
-            <LogOut size={16} />
-            Salir
-          </button>
-        </div>
+        <UserMenu
+          user={usuarioAutenticado}
+          onLogout={handleLogout}
+          onOpenSettings={
+            usuarioAutenticado.rol === 'administrador' && view === 'firma'
+              ? () => setSeccionFirma('config_almacenamiento')
+              : undefined
+          }
+        />
       </header>
 
       {/* VISTA CLIENTE */}
@@ -534,42 +517,77 @@ export default function App() {
         <div className="layout">
           <aside className="sidebar">
             <div className="sidebar-inner">
-              <div className="section-title">
-                <h3>Clientes ({clientes.length})</h3>
-                <button className="icon-button" type="button" onClick={() => setCrearClienteAbierto(true)} title="Nuevo Cliente">
-                  <Plus size={16} />
-                </button>
-              </div>
-              <div className="stack">
-                {clientes.length > 0 ? (
-                  clientes.map(cli => (
-                    <button 
-                      key={cli.id}
-                      className={`client-entry ${clienteActivo && cli.id === clienteActivo.id ? 'active' : ''}`}
-                      type="button"
-                      onClick={() => {
-                        setClienteIdSeleccionado(cli.id);
-                        if (cli.casos && cli.casos.length > 0) {
-                          setCasoIdSeleccionado(cli.casos[0].id);
-                        }
-                      }}
-                    >
-                      <strong>{cli.nombre}</strong>
-                      <span className="muted small">{cli.casos ? cli.casos.length : 0} casos</span>
-                    </button>
-                  ))
-                ) : (
-                  <div className="muted small" style={{ padding: '12px' }}>
-                    Sin clientes registrados.
+              {seccionFirma === 'config_almacenamiento' ? (
+                <>
+                  <div className="settings-sidebar-heading">
+                    <span className="settings-icon"><HardDrive size={17} /></span>
+                    <div>
+                      <h3>Ajustes</h3>
+                      <span className="muted small">Administración</span>
+                    </div>
                   </div>
-                )}
-              </div>
+                  <nav className="settings-nav" aria-label="Ajustes de la firma">
+                    <button type="button" className="active">
+                      <HardDrive size={16} />
+                      Almacenamiento
+                    </button>
+                  </nav>
+                  <button
+                    className="secondary-button settings-back"
+                    type="button"
+                    onClick={() => setSeccionFirma('expedientes')}
+                  >
+                    Volver a expedientes
+                  </button>
+                </>
+              ) : (
+                <>
+                  <div className="section-title">
+                    <h3>Clientes ({clientes.length})</h3>
+                    <button className="icon-button" type="button" onClick={() => setCrearClienteAbierto(true)} title="Nuevo Cliente">
+                      <Plus size={16} />
+                    </button>
+                  </div>
+                  <div className="stack">
+                    {clientes.length > 0 ? (
+                      clientes.map(cli => (
+                        <button
+                          key={cli.id}
+                          className={`client-entry ${clienteActivo && cli.id === clienteActivo.id ? 'active' : ''}`}
+                          type="button"
+                          onClick={() => {
+                            setClienteIdSeleccionado(cli.id);
+                            if (cli.casos && cli.casos.length > 0) {
+                              setCasoIdSeleccionado(cli.casos[0].id);
+                            }
+                          }}
+                        >
+                          <strong>{cli.nombre}</strong>
+                          <span className="muted small">{cli.casos ? cli.casos.length : 0} casos</span>
+                        </button>
+                      ))
+                    ) : (
+                      <div className="muted small" style={{ padding: '12px' }}>
+                        Sin clientes registrados.
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           </aside>
 
           <section className="main">
             {seccionFirma === 'config_almacenamiento' ? (
-              <ConfiguracionAlmacenamiento />
+              <div className="settings-content">
+                <div className="toolbar settings-toolbar">
+                  <div>
+                    <h2>Ajustes de la firma</h2>
+                    <span className="muted">Configuración disponible solo para administradores.</span>
+                  </div>
+                </div>
+                <ConfiguracionAlmacenamiento />
+              </div>
             ) : clienteActivo ? (
               <>
                 <div className="toolbar">
@@ -581,25 +599,6 @@ export default function App() {
                     <Plus size={16} />
                     Nuevo caso
                   </button>
-                </div>
-
-                <div className="grid metrics">
-                  <div className="metric">
-                    <span>Clientes</span>
-                    <strong>{clientes.length}</strong>
-                  </div>
-                  <div className="metric">
-                    <span>Casos Activos</span>
-                    <strong>{clientes.reduce((acc, curr) => acc + (curr.casos ? curr.casos.length : 0), 0)}</strong>
-                  </div>
-                  <div className="metric">
-                    <span>Pendientes</span>
-                    <strong>{casoActivo ? 1 : 0}</strong>
-                  </div>
-                  <div className="metric">
-                    <span>Solicitudes</span>
-                    <strong>{casoActivo ? 1 : 0}</strong>
-                  </div>
                 </div>
 
                 <div className="workspace-flow">

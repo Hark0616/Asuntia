@@ -22,6 +22,7 @@ Guía de arquitectura, convenciones y reglas no negociables para agentes de IA y
 8. **Seguridad e Inyección de Secretos**: Cero credenciales, claves privadas o archivos `.env` subidos a Git o empaquetados en imágenes Docker. Los secretos se inyectan vía `env_file` en Docker Compose o secretos de CI/CD.
 9. **No Borrado Físico (Soft Deletes & Auditoría)**: Prohibido hacer `DELETE` físico de registros de negocio (asuntos, clientes, novedades, comprobantes). Todos los modelos heredan de `BaseModel` con `firma_id`, `created_at`, `updated_at` y `created_by_id`, manejando borrado lógico (`is_active=False`) o archivado histórico.
 10. **Sin Falsas Promesas Jurídicas ni Sobre-explicaciones en UX**: Las comunicaciones y la interfaz deben ser sobrias, elegantes y concisas. Prohibido incluir párrafos extensos explicativos o patronizing copy en la UI. Toda aclaración o contexto adicional debe encapsularse exclusivamente en el componente de Tooltip `<Tooltip content="..." />` con el icono discreto `(i)` (hover en desktop / tap en móvil).
+11. **Sinergia y Fuente Única de Verdad**: Cada dato, estado, acción y flujo debe tener un único propósito y una única fuente de captura. Prohibido pedir, guardar o mantener la misma información en más de un lugar, salvo que exista una necesidad legal o técnica explícita y documentada. Antes de añadir un campo, paso o vista, verificar si la información ya existe, puede derivarse o debe alimentar automáticamente los demás módulos.
 
 ## Estructura del Proyecto (Monorepo Layout)
 
