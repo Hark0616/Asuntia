@@ -11,6 +11,7 @@ from app.core.security import verify_password
 from app.models.firma import Firma
 from app.models.user import User
 from app.repositories.auth_challenge_repository import AuthChallengeRepository
+from app.repositories.cliente_repository import ClienteRepository
 from app.repositories.firma_repository import FirmaRepository
 from app.repositories.user_repository import UserRepository
 
@@ -46,15 +47,22 @@ class AuthService:
 
     async def issue_client_otp(
         self, firma_slug: str, cedula: str
-    ) -> tuple[User | None, str | None]:
+    ) -> tuple[User | None, str | None, str | None]:
         try:
             firma = await self.resolve_firma(firma_slug)
         except UnauthorizedException:
-            return None, None
+            return None, None, None
 
-        user = await UserRepository(self.session, firma.id).get_by_cedula(cedula)
+        cliente = await ClienteRepository(
+            self.session, firma.id
+        ).get_by_document(cedula)
+        if not cliente or not cliente.portal_user_id:
+            return None, None, None
+        user = await UserRepository(
+            self.session, firma.id
+        ).get_by_id(cliente.portal_user_id)
         if not user or user.rol != "cliente":
-            return None, None
+            return None, None, None
 
         repo = AuthChallengeRepository(self.session, firma.id)
         await repo.deactivate_for_user(user.id, self.CLIENT_LOGIN_PURPOSE)
@@ -74,13 +82,20 @@ class AuthService:
             },
             created_by_id=user.id,
         )
-        return user, otp_code
+        return user, otp_code, cliente.email
 
     async def verify_client_otp(
         self, firma_slug: str, cedula: str, code: str
     ) -> User:
         firma = await self.resolve_firma(firma_slug)
-        user = await UserRepository(self.session, firma.id).get_by_cedula(cedula)
+        cliente = await ClienteRepository(
+            self.session, firma.id
+        ).get_by_document(cedula)
+        if not cliente or not cliente.portal_user_id:
+            raise self._invalid_otp()
+        user = await UserRepository(
+            self.session, firma.id
+        ).get_by_id(cliente.portal_user_id)
         if not user or user.rol != "cliente":
             raise self._invalid_otp()
 

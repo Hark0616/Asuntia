@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.deps import require_office_user
 from app.core.db import get_db
 from app.models.user import User
-from app.repositories.user_repository import UserRepository
+from app.repositories.cliente_repository import ClienteRepository
 from app.schemas.cliente import ClienteResponse, ClienteCreate
 from app.core.exceptions import DomainException
 
@@ -18,10 +18,7 @@ async def list_clientes(
     """
     Lista todos los clientes registrados en la firma.
     """
-    repo = UserRepository(db, current_user.firma_id)
-    if current_user.rol == "abogado":
-        return await repo.list_clientes_for_lawyer(current_user.id)
-    return await repo.list_clientes()
+    return await ClienteRepository(db, current_user.firma_id).list()
 
 @router.post("", response_model=ClienteResponse, status_code=status.HTTP_201_CREATED)
 async def create_cliente(
@@ -32,16 +29,10 @@ async def create_cliente(
     """
     Registra un nuevo cliente en la firma.
     """
-    repo = UserRepository(db, current_user.firma_id)
-    if await repo.get_by_cedula(payload.cedula):
+    repo = ClienteRepository(db, current_user.firma_id)
+    if await repo.get_by_document(payload.numero_documento):
         raise DomainException(detail="Ya existe un cliente con esa identificación")
-    if await repo.get_by_email(payload.email):
-        raise DomainException(detail="Ya existe un usuario con ese correo")
     return await repo.create(
-        {
-            **payload.model_dump(),
-            "email": payload.email.strip().lower(),
-            "rol": "cliente",
-        },
+        payload.model_dump(),
         created_by_id=current_user.id,
     )

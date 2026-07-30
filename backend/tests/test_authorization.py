@@ -45,7 +45,9 @@ async def test_lawyer_cannot_apply_administrative_case_corrections(
 
 
 @pytest.mark.asyncio
-async def test_lawyer_only_lists_assigned_cases_and_clients(alejandro_client):
+async def test_lawyer_lists_only_assigned_cases_but_shared_client_directory(
+    alejandro_client,
+):
     asuntos_response = await alejandro_client.get("/api/v1/asuntos")
     assert asuntos_response.status_code == 200
     assert {
@@ -58,9 +60,9 @@ async def test_lawyer_only_lists_assigned_cases_and_clients(alejandro_client):
     assert {
         "Jorge Eliécer Bermúdez",
         "Transportes del Norte S.A.S. (Laura Mejía)",
+        "Carlos Gómez Restrepo",
+        "Dra. María Elena Villamizar",
     }.issubset(nombres)
-    assert "Carlos Gómez Restrepo" not in nombres
-    assert "Dra. María Elena Villamizar" not in nombres
 
 
 @pytest.mark.asyncio

@@ -1,6 +1,7 @@
 from app.models.base import Base, BaseModel
 from app.models.firma import Firma
 from app.models.user import User
+from app.models.cliente import Cliente
 from app.models.estado import EstadoProcesal
 from app.models.asunto import Asunto
 from app.models.asunto_paso import AsuntoPaso
@@ -15,6 +16,7 @@ __all__ = [
     "BaseModel",
     "Firma",
     "User",
+    "Cliente",
     "EstadoProcesal",
     "Asunto",
     "AsuntoPaso",

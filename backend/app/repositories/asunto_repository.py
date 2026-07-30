@@ -3,6 +3,7 @@ from typing import Any, Optional, List
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload, selectinload, with_loader_criteria
 from app.models.asunto import Asunto
+from app.models.cliente import Cliente
 from app.models.novedad import Novedad
 from app.models.tarea import Tarea, TareaEstado, TareaPrioridad, TareaTipo
 from app.repositories.base import BaseRepository
@@ -107,6 +108,35 @@ class AsuntoRepository(BaseRepository[Asunto]):
             select(Asunto)
             .options(*options)
             .where(Asunto.cliente_id == cliente_id)
+            .where(Asunto.firma_id == self.firma_id)
+            .where(Asunto.is_active == True)
+        )
+        result = await self.session.execute(stmt)
+        return list(result.scalars().unique().all())
+
+    async def get_by_portal_user_id(
+        self, portal_user_id: uuid.UUID, solo_publicas: bool = False
+    ) -> List[Asunto]:
+        options = [
+            joinedload(Asunto.cliente),
+            joinedload(Asunto.estado),
+            selectinload(Asunto.novedades),
+            selectinload(Asunto.pasos),
+        ]
+        if solo_publicas:
+            options.append(
+                with_loader_criteria(
+                    Novedad,
+                    Novedad.publicado_al_cliente == True,
+                    include_aliases=True,
+                )
+            )
+        stmt = (
+            select(Asunto)
+            .join(Cliente, Cliente.id == Asunto.cliente_id)
+            .options(*options)
+            .where(Cliente.portal_user_id == portal_user_id)
+            .where(Cliente.is_active == True)
             .where(Asunto.firma_id == self.firma_id)
             .where(Asunto.is_active == True)
         )

@@ -4,6 +4,7 @@ from sqlalchemy import delete
 from app.core.db import AsyncSessionLocal
 from app.models.firma import Firma
 from app.models.user import User
+from app.models.cliente import Cliente
 from app.models.estado import EstadoProcesal
 from app.models.asunto import Asunto
 from app.models.novedad import Novedad
@@ -29,6 +30,7 @@ async def seed_data():
         await session.execute(delete(Tarea))
         await session.execute(delete(AsuntoPaso))
         await session.execute(delete(Asunto))
+        await session.execute(delete(Cliente))
         await session.execute(delete(EstadoProcesal))
         await session.execute(delete(User))
         await session.execute(delete(Firma))
@@ -63,7 +65,7 @@ async def seed_data():
             rol="abogado"
         )
 
-        cliente_carlos = User(
+        portal_carlos = User(
             id=uuid.UUID("00000000-0000-0000-0000-000000000020"),
             firma_id=DEFAULT_FIRMA_ID,
             nombre="Carlos Gómez Restrepo",
@@ -71,7 +73,7 @@ async def seed_data():
             cedula="1.094.852.140",
             rol="cliente"
         )
-        cliente_transportes = User(
+        portal_transportes = User(
             id=uuid.UUID("00000000-0000-0000-0000-000000000030"),
             firma_id=DEFAULT_FIRMA_ID,
             nombre="Transportes del Norte S.A.S. (Laura Mejía)",
@@ -79,7 +81,7 @@ async def seed_data():
             cedula="901.482.910-5",
             rol="cliente"
         )
-        cliente_elena = User(
+        portal_elena = User(
             id=uuid.UUID("00000000-0000-0000-0000-000000000040"),
             firma_id=DEFAULT_FIRMA_ID,
             nombre="Dra. María Elena Villamizar",
@@ -87,7 +89,7 @@ async def seed_data():
             cedula="52.391.804",
             rol="cliente"
         )
-        cliente_jorge = User(
+        portal_jorge = User(
             id=uuid.UUID("00000000-0000-0000-0000-000000000050"),
             firma_id=DEFAULT_FIRMA_ID,
             nombre="Jorge Eliécer Bermúdez",
@@ -96,7 +98,87 @@ async def seed_data():
             rol="cliente"
         )
 
-        session.add_all([abogada_daniela, abogado_alejandro, cliente_carlos, cliente_transportes, cliente_elena, cliente_jorge])
+        session.add_all([
+            abogada_daniela,
+            abogado_alejandro,
+            portal_carlos,
+            portal_transportes,
+            portal_elena,
+            portal_jorge,
+        ])
+
+        # El perfil del cliente es permanente y separado de su acceso al portal.
+        cliente_carlos = Cliente(
+            id=portal_carlos.id,
+            firma_id=DEFAULT_FIRMA_ID,
+            nombre=portal_carlos.nombre,
+            tipo_persona="natural",
+            tipo_documento="CC",
+            numero_documento=portal_carlos.cedula,
+            numero_documento_normalizado="1094852140",
+            email=portal_carlos.email,
+            telefono="300 482 1940",
+            ciudad="Bucaramanga",
+            departamento="Santander",
+            canal_preferido="whatsapp",
+            portal_user_id=portal_carlos.id,
+            created_by_id=abogada_daniela.id,
+        )
+        cliente_transportes = Cliente(
+            id=portal_transportes.id,
+            firma_id=DEFAULT_FIRMA_ID,
+            nombre=portal_transportes.nombre,
+            tipo_persona="juridica",
+            tipo_documento="NIT",
+            numero_documento=portal_transportes.cedula,
+            numero_documento_normalizado="9014829105",
+            email=portal_transportes.email,
+            telefono="607 642 1830",
+            direccion="Zona Industrial Chimitá",
+            ciudad="Girón",
+            departamento="Santander",
+            canal_preferido="email",
+            portal_user_id=portal_transportes.id,
+            created_by_id=abogado_alejandro.id,
+        )
+        cliente_elena = Cliente(
+            id=portal_elena.id,
+            firma_id=DEFAULT_FIRMA_ID,
+            nombre=portal_elena.nombre,
+            tipo_persona="natural",
+            tipo_documento="CC",
+            numero_documento=portal_elena.cedula,
+            numero_documento_normalizado="52391804",
+            email=portal_elena.email,
+            telefono="315 391 8040",
+            ciudad="Bucaramanga",
+            departamento="Santander",
+            canal_preferido="email",
+            portal_user_id=portal_elena.id,
+            created_by_id=abogada_daniela.id,
+        )
+        cliente_jorge = Cliente(
+            id=portal_jorge.id,
+            firma_id=DEFAULT_FIRMA_ID,
+            nombre=portal_jorge.nombre,
+            tipo_persona="natural",
+            tipo_documento="CC",
+            numero_documento=portal_jorge.cedula,
+            numero_documento_normalizado="79482105",
+            email=portal_jorge.email,
+            telefono="310 482 1050",
+            ciudad="Floridablanca",
+            departamento="Santander",
+            canal_preferido="whatsapp",
+            portal_user_id=portal_jorge.id,
+            created_by_id=abogado_alejandro.id,
+        )
+        session.add_all([
+            cliente_carlos,
+            cliente_transportes,
+            cliente_elena,
+            cliente_jorge,
+        ])
 
         # 3. Catálogo Oficial de 10 Estados Procesales
         estados = [

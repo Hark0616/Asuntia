@@ -10,6 +10,7 @@ from app.core.deps import get_current_user, require_office_user, require_roles
 from app.schemas.asunto import AsuntoResponse, AsuntoCreate, AsuntoUpdateEstado
 from app.schemas.flujo import AvanzarPasoRequest
 from app.repositories.asunto_repository import AsuntoRepository
+from app.repositories.cliente_repository import ClienteRepository
 from app.repositories.estado_repository import EstadoRepository
 from app.repositories.user_repository import UserRepository
 from app.core.exceptions import DomainException, NotFoundException
@@ -40,7 +41,7 @@ async def list_asuntos(
     """
     repo = AsuntoRepository(db, current_user.firma_id)
     if current_user.rol == "cliente":
-        asuntos = await repo.get_by_cliente_id(
+        asuntos = await repo.get_by_portal_user_id(
             current_user.id, solo_publicas=True
         )
     elif current_user.rol == "abogado":
@@ -58,10 +59,12 @@ async def create_asunto(
     """
     Crea un nuevo asunto/expediente en la firma.
     """
-    user_repo = UserRepository(db, current_user.firma_id)
-    cliente = await user_repo.get_by_id(payload.cliente_id)
-    if not cliente or cliente.rol != "cliente":
+    cliente = await ClienteRepository(
+        db, current_user.firma_id
+    ).get_by_id(payload.cliente_id)
+    if not cliente:
         raise NotFoundException(detail="Cliente no encontrado")
+    user_repo = UserRepository(db, current_user.firma_id)
     responsable_id = payload.abogado_id
     if (
         current_user.rol == "abogado"

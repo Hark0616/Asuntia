@@ -22,7 +22,7 @@ class Asunto(BaseModel):
     )
     
     cliente_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+        UUID(as_uuid=True), ForeignKey("clientes.id"), nullable=False, index=True
     )
     
     abogado_id: Mapped[Optional[uuid.UUID]] = mapped_column(
@@ -65,7 +65,9 @@ class Asunto(BaseModel):
     )
 
     # Relaciones
-    cliente: Mapped["User"] = relationship("User", foreign_keys=[cliente_id], lazy="joined")
+    cliente: Mapped["Cliente"] = relationship(
+        "Cliente", foreign_keys=[cliente_id], lazy="joined"
+    )
     abogado: Mapped[Optional["User"]] = relationship("User", foreign_keys=[abogado_id], lazy="joined")
     estado: Mapped[Optional["EstadoProcesal"]] = relationship("EstadoProcesal", lazy="joined")
     novedades: Mapped[List["Novedad"]] = relationship("Novedad", back_populates="asunto", lazy="selectin", cascade="all, delete-orphan")
