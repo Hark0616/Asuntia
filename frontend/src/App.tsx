@@ -48,6 +48,7 @@ import { FlujoAsunto } from '@/features/asuntos/components/FlujoAsunto';
 import type { AsuntoPasoAPI } from '@/features/asuntos/api/asuntos';
 import { UserMenu } from '@/components/layout/UserMenu';
 import { MiTrabajo } from '@/features/tareas/components/MiTrabajo';
+import { formatAsuntosCount } from '@/lib/formatAsuntos';
 
 interface NovedadItem {
   id: string;
@@ -76,6 +77,9 @@ interface CasoData {
   estadoBadge: string;
   estadoTipo: 'warning' | 'neutral' | 'mint' | 'danger';
   estadoId?: string;
+  estadoDescripcion?: string;
+  accionActual: string;
+  abogadoId?: string;
   prioridad: 'alta' | 'normal';
   proximoPaso: string;
   solicitudPendiente?: string;
@@ -242,6 +246,10 @@ export default function App() {
           estadoBadge: as.estado?.nombre || 'En trámite',
           estadoTipo: (as.estado?.color_tipo as any) || 'mint',
           estadoId: as.estado?.id,
+          estadoDescripcion: as.estado?.descripcion,
+          accionActual: as.pasos.find((paso) => paso.estado === 'activo')?.titulo
+            || as.etapa_actual,
+          abogadoId: as.abogado_id,
           prioridad: 'normal' as const,
           proximoPaso: as.siguiente_paso,
           milestones: as.pasos.map((paso) => ({
@@ -660,7 +668,9 @@ export default function App() {
                           }}
                         >
                           <strong>{cli.nombre}</strong>
-                          <span className="muted small">{cli.casos ? cli.casos.length : 0} casos</span>
+                          <span className="muted small">
+                            {formatAsuntosCount(cli.casos?.length || 0)}
+                          </span>
                         </NavLink>
                       ))
                     ) : (
@@ -702,14 +712,14 @@ export default function App() {
                   </div>
                   <button className="primary-button" type="button" onClick={() => setCrearAsuntoAbierto(true)}>
                     <Plus size={16} />
-                    Nuevo caso
+                    Nuevo asunto
                   </button>
                 </div>
 
                 <div className="workspace-flow">
                   <section className="panel case-nav-panel">
                     <div className="section-title">
-                      <h3>Casos ({clienteActivo.casos ? clienteActivo.casos.length : 0})</h3>
+                      <h3>Asuntos ({clienteActivo.casos ? clienteActivo.casos.length : 0})</h3>
                     </div>
                     <div className="case-list">
                       {clienteActivo.casos && clienteActivo.casos.length > 0 ? (
@@ -729,11 +739,14 @@ export default function App() {
                                 <span className={`badge ${cs.estadoTipo}`}>{cs.estadoBadge}</span>
                               </div>
                             </div>
+                            <span className="case-card-current">
+                              Acción actual · {cs.accionActual}
+                            </span>
                           </NavLink>
                         ))
                       ) : (
                         <div className="muted small" style={{ padding: '16px' }}>
-                          Sin expedientes. Haz clic en "Nuevo caso".
+                          Sin asuntos. Usa “Nuevo asunto” para abrir el primero.
                         </div>
                       )}
                     </div>
@@ -747,42 +760,51 @@ export default function App() {
                             <h3>{casoActivo.nombre}</h3>
                             <span className="muted small">{casoActivo.codigo} · {casoActivo.responsable}</span>
                           </div>
-                          <span className={`badge ${casoActivo.estadoTipo}`}>{casoActivo.estadoBadge}</span>
+                          <span className="row">
+                            <span className={`badge ${casoActivo.estadoTipo}`}>{casoActivo.estadoBadge}</span>
+                            {casoActivo.estadoDescripcion && (
+                              <Tooltip content={casoActivo.estadoDescripcion} />
+                            )}
+                          </span>
                         </div>
 
                         {usuarioAutenticado.rol === 'administrador' && (
-                          <form onSubmit={handleGuardarEstado}>
-                            <div className="form-grid" style={{ marginTop: '16px' }}>
-                              <div className="field">
-                                <label htmlFor="estado-procesal-select">
-                                  Corrección administrativa
-                                  <Tooltip content="Ajusta el estado público sin modificar la ruta del expediente." />
-                                </label>
-                                <select
-                                  id="estado-procesal-select"
-                                  value={estadoSeleccionadoId || casoActivo.estadoId || ''}
-                                  onChange={(e) => setEstadoSeleccionadoId(e.target.value)}
-                                >
-                                  {estadosAPI && estadosAPI.length > 0 ? (
-                                    estadosAPI.map((est: EstadoProcesalAPI) => (
-                                      <option key={est.id} value={est.id}>
-                                        {est.nombre}
-                                      </option>
-                                    ))
-                                  ) : (
-                                    <option value="">{casoActivo.estadoBadge}</option>
-                                  )}
-                                </select>
-                              </div>
+                          <details className="administrative-correction">
+                            <summary>
+                              Corrección administrativa
+                              <Tooltip content="Ajusta el estado público sin modificar la ruta del expediente." />
+                            </summary>
+                            <form onSubmit={handleGuardarEstado}>
+                              <div className="form-grid">
+                                <div className="field">
+                                  <label htmlFor="estado-procesal-select">Estado público</label>
+                                  <select
+                                    id="estado-procesal-select"
+                                    value={estadoSeleccionadoId || casoActivo.estadoId || ''}
+                                    onChange={(e) => setEstadoSeleccionadoId(e.target.value)}
+                                  >
+                                    {estadosAPI && estadosAPI.length > 0 ? (
+                                      estadosAPI.map((est: EstadoProcesalAPI) => (
+                                        <option key={est.id} value={est.id}>
+                                          {est.nombre}
+                                        </option>
+                                      ))
+                                    ) : (
+                                      <option value="">{casoActivo.estadoBadge}</option>
+                                    )}
+                                  </select>
+                                </div>
 
-                              <div className="field full">
-                                <button className="secondary-button" type="submit">
-                                  <Save size={16} />
-                                  Guardar corrección
-                                </button>
+                                <div className="field">
+                                  <label>&nbsp;</label>
+                                  <button className="secondary-button" type="submit">
+                                    <Save size={16} />
+                                    Guardar corrección
+                                  </button>
+                                </div>
                               </div>
-                            </div>
-                          </form>
+                            </form>
+                          </details>
                         )}
                       </section>
 
@@ -790,7 +812,18 @@ export default function App() {
                         pasos={casoActivo.pasos}
                         flujoEstado={casoActivo.flujoEstado}
                         isLoading={mutacionAvanzarPaso.isPending}
-                        canAdvance={usuarioAutenticado.rol !== 'auxiliar'}
+                        canAdvance={
+                          usuarioAutenticado.rol === 'administrador'
+                          || (
+                            usuarioAutenticado.rol === 'abogado'
+                            && casoActivo.abogadoId === usuarioAutenticado.id
+                          )
+                        }
+                        readOnlyReason={
+                          usuarioAutenticado.rol === 'auxiliar'
+                            ? 'Tu perfil puede consultar esta ruta.'
+                            : 'Este paso está asignado a otro abogado.'
+                        }
                         onAdvance={(pasoCodigo, datos) => mutacionAvanzarPaso.mutateAsync({
                           asuntoId: casoActivo.id,
                           pasoCodigo,
@@ -875,8 +908,8 @@ export default function App() {
                     </section>
                   ) : (
                     <div className="panel" style={{ padding: '32px 24px', textAlign: 'center' }}>
-                      <h3>Sin expedientes para este cliente</h3>
-                      <p className="muted small">Haz clic en "Nuevo caso" para aperturar el primer expediente.</p>
+                      <h3>Sin asuntos para este cliente</h3>
+                      <p className="muted small">Abre el primer asunto para iniciar su ruta de trabajo.</p>
                       <button className="primary-button" style={{ margin: '16px auto 0' }} onClick={() => setCrearAsuntoAbierto(true)}>
                         <Plus size={16} /> Crear expediente
                       </button>

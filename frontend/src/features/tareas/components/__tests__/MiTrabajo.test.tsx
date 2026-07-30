@@ -54,6 +54,7 @@ describe('MiTrabajo', () => {
     renderWork();
 
     expect(await screen.findByText('Carlos Gómez')).toBeInTheDocument();
+    expect(screen.getByText('1 pendiente asignado a ti.')).toBeInTheDocument();
     expect(screen.getByText('Completar recepción y evaluación inicial')).toBeInTheDocument();
     const link = screen.getByRole('link', {
       name: /Abrir AS-2026-001.*recepción/i,
@@ -71,8 +72,9 @@ describe('MiTrabajo', () => {
     renderWork();
 
     await screen.findByText('Sin tareas pendientes');
-    await user.click(screen.getByRole('button', { name: 'Equipo' }));
+    await user.click(screen.getByRole('button', { name: 'Pendientes del equipo' }));
     expect(mockedFetchMiTrabajo).toHaveBeenLastCalledWith('equipo');
+    expect(await screen.findByText('0 pendientes del equipo.')).toBeInTheDocument();
   });
 
   it('oculta el alcance de equipo para abogados', async () => {
@@ -80,6 +82,6 @@ describe('MiTrabajo', () => {
     renderWork(false);
 
     await screen.findByText('Sin tareas pendientes');
-    expect(screen.queryByRole('button', { name: 'Equipo' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Pendientes del equipo' })).not.toBeInTheDocument();
   });
 });

@@ -30,6 +30,14 @@ export function MiTrabajo({ isAdmin }: MiTrabajoProps) {
     staleTime: 30_000,
     refetchOnWindowFocus: true,
   });
+  const total = data?.total || 0;
+  const totalLabel = alcance === 'equipo'
+    ? total === 1
+      ? '1 pendiente del equipo.'
+      : `${total} pendientes del equipo.`
+    : total === 1
+      ? '1 pendiente asignado a ti.'
+      : `${total} pendientes asignados a ti.`;
 
   return (
     <div className="workbench">
@@ -38,11 +46,7 @@ export function MiTrabajo({ isAdmin }: MiTrabajoProps) {
           <span className="page-eyebrow">Bandeja de trabajo</span>
           <h2>Mi trabajo</h2>
           <p className="muted">
-            {isLoading
-              ? 'Consultando trabajo…'
-              : data?.total === 1
-              ? '1 tarea requiere tu atención.'
-              : `${data?.total || 0} tareas requieren tu atención.`}
+            {isLoading ? 'Consultando trabajo…' : totalLabel}
           </p>
         </div>
         <button
@@ -64,7 +68,7 @@ export function MiTrabajo({ isAdmin }: MiTrabajoProps) {
             aria-pressed={alcance === 'mio'}
             onClick={() => setAlcance('mio')}
           >
-            Mis tareas
+            Asignadas a mí
           </button>
           <button
             className={alcance === 'equipo' ? 'active' : ''}
@@ -72,7 +76,7 @@ export function MiTrabajo({ isAdmin }: MiTrabajoProps) {
             aria-pressed={alcance === 'equipo'}
             onClick={() => setAlcance('equipo')}
           >
-            Equipo
+            Pendientes del equipo
           </button>
         </div>
       )}
