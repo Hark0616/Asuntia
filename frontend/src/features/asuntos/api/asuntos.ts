@@ -9,12 +9,53 @@ export interface EstadoProcesalAPI {
 
 export interface ClienteAPI {
   id: string;
+  tipo_persona: 'natural' | 'juridica';
+  tipo_documento: 'CC' | 'CE' | 'NIT' | 'PASAPORTE' | 'OTRO';
+  numero_documento: string;
   nombre: string;
   cedula: string;
   email: string;
   telefono?: string;
+  fecha_expedicion?: string;
+  direccion?: string;
+  direccion_notificacion?: string;
+  ciudad?: string;
+  departamento?: string;
+  canal_preferido: 'email' | 'telefono' | 'whatsapp';
+  observaciones?: string;
+  portal_user_id?: string;
+  asuntos_count: number;
   rol: string;
   created_at: string;
+}
+
+export interface ClienteCreatePayload {
+  tipo_persona: 'natural' | 'juridica';
+  tipo_documento: 'CC' | 'CE' | 'NIT' | 'PASAPORTE' | 'OTRO';
+  numero_documento: string;
+  nombre: string;
+  email: string;
+  telefono?: string;
+  fecha_expedicion?: string;
+  direccion?: string;
+  direccion_notificacion?: string;
+  ciudad?: string;
+  departamento?: string;
+  canal_preferido: 'email' | 'telefono' | 'whatsapp';
+  observaciones?: string;
+}
+
+export interface ResponsableAPI {
+  id: string;
+  nombre: string;
+  rol: 'administrador' | 'abogado';
+}
+
+export interface AperturaAsuntoPayload {
+  cliente_id?: string;
+  cliente_nuevo?: ClienteCreatePayload;
+  abogado_id: string;
+  fecha_apertura: string;
 }
 
 export interface PasoCampoAPI {
@@ -81,13 +122,25 @@ export const fetchClientesAPI = async (): Promise<ClienteAPI[]> => {
   return response.data;
 };
 
-export const crearClienteAPI = async (payload: { nombre: string; cedula: string; email: string; telefono?: string }) => {
+export const fetchResponsablesAPI = async (): Promise<ResponsableAPI[]> => {
+  const response = await apiClient.get<ResponsableAPI[]>(
+    '/equipo/responsables',
+  );
+  return response.data;
+};
+
+export const crearClienteAPI = async (payload: ClienteCreatePayload) => {
   const response = await apiClient.post<ClienteAPI>('/clientes', payload);
   return response.data;
 };
 
 export const crearAsuntoAPI = async (payload: { radicado?: string; cliente_id: string; abogado_id?: string; estado_id?: string; fecha_apertura?: string }) => {
   const response = await apiClient.post<AsuntoAPI>('/asuntos', payload);
+  return response.data;
+};
+
+export const abrirAsuntoAPI = async (payload: AperturaAsuntoPayload) => {
+  const response = await apiClient.post<AsuntoAPI>('/asuntos/apertura', payload);
   return response.data;
 };
 

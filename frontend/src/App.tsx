@@ -26,22 +26,22 @@ import {
   fetchAsuntos, 
   fetchEstadosAPI, 
   fetchClientesAPI,
-  crearClienteAPI,
-  crearAsuntoAPI,
+  fetchResponsablesAPI,
+  abrirAsuntoAPI,
   avanzarPasoAPI,
   crearNovedadAPI, 
   actualizarEstadoAPI, 
   AsuntoAPI, 
   EstadoProcesalAPI,
-  ClienteAPI
+  ClienteAPI,
+  AperturaAsuntoPayload,
 } from '@/features/asuntos/api/asuntos';
 import { ClienteOTPLogin } from '@/features/auth/components/ClienteOTPLogin';
 import { OficinaLogin } from '@/features/auth/components/OficinaLogin';
 import { fetchCurrentUserAPI, logoutAPI } from '@/features/auth/api/auth';
 import type { User } from '@/types/api';
 import { Tooltip } from '@/components/ui/Tooltip';
-import { CrearClienteModal } from '@/components/ui/CrearClienteModal';
-import { CrearAsuntoModal } from '@/components/ui/CrearAsuntoModal';
+import { AperturaAsuntoModal } from '@/components/ui/AperturaAsuntoModal';
 import { DocumentosTab } from '@/features/documentos/components/DocumentosTab';
 import { ConfiguracionAlmacenamiento } from '@/features/firma/components/ConfiguracionAlmacenamiento';
 import { FlujoAsunto } from '@/features/asuntos/components/FlujoAsunto';
@@ -98,6 +98,7 @@ interface ClienteData {
   contacto: string;
   email: string;
   identificacion: string;
+  asuntosRegistrados: number;
   casos: CasoData[];
 }
 
@@ -111,8 +112,8 @@ export default function App() {
   const [clienteIdSeleccionado, setClienteIdSeleccionado] = useState<string>('');
   const [casoIdSeleccionado, setCasoIdSeleccionado] = useState<string>('');
   const [milestoneAbiertoId, setMilestoneAbiertoId] = useState<number | null>(2);
-  const [crearClienteAbierto, setCrearClienteAbierto] = useState(false);
-  const [crearAsuntoAbierto, setCrearAsuntoAbierto] = useState(false);
+  const [aperturaAbierta, setAperturaAbierta] = useState(false);
+  const [clienteInicialAperturaId, setClienteInicialAperturaId] = useState('');
   const asuntoRouteMatch = matchPath(
     '/oficina/asuntos/:asuntoId',
     location.pathname,
@@ -168,27 +169,24 @@ export default function App() {
     retry: 1,
     enabled: officeUser,
   });
-
-  // Mutaciones
-  const mutacionNuevoCliente = useMutation({
-    mutationFn: (payload: { nombre: string; cedula: string; email: string; telefono?: string }) => crearClienteAPI(payload),
-    onSuccess: (newClient) => {
-      queryClient.invalidateQueries({ queryKey: ['clientes'] });
-      setClienteIdSeleccionado(newClient.id);
-      setCrearClienteAbierto(false);
-      setCrearAsuntoAbierto(true);
-      navigate('/oficina/asuntos');
-    }
+  const { data: responsablesAPI } = useQuery({
+    queryKey: ['equipo', 'responsables'],
+    queryFn: fetchResponsablesAPI,
+    retry: 1,
+    enabled: officeUser,
   });
 
-  const mutacionNuevoAsunto = useMutation({
-    mutationFn: (payload: { cliente_id: string; fecha_apertura?: string }) =>
-      crearAsuntoAPI(payload),
+  // Mutaciones
+  const mutacionApertura = useMutation({
+    mutationFn: (payload: AperturaAsuntoPayload) => abrirAsuntoAPI(payload),
     onSuccess: (newAsunto) => {
+      queryClient.invalidateQueries({ queryKey: ['clientes'] });
       queryClient.invalidateQueries({ queryKey: ['asuntos'] });
       queryClient.invalidateQueries({ queryKey: ['tareas'] });
+      setClienteIdSeleccionado(newAsunto.cliente_id);
       setCasoIdSeleccionado(newAsunto.id);
-      setCrearAsuntoAbierto(false);
+      setAperturaAbierta(false);
+      setClienteInicialAperturaId('');
       navigate(`/oficina/asuntos/${newAsunto.id}#paso-activo`);
     }
   });
@@ -223,9 +221,14 @@ export default function App() {
   const clientesFuente: ClienteAPI[] = usuarioAutenticado?.rol === 'cliente'
     ? [{
         id: usuarioAutenticado.id,
+        tipo_persona: 'natural',
+        tipo_documento: 'CC',
+        numero_documento: usuarioAutenticado.cedula,
         nombre: usuarioAutenticado.nombre,
         cedula: usuarioAutenticado.cedula,
         email: usuarioAutenticado.email,
+        canal_preferido: 'email',
+        asuntos_count: (asuntosAPI || []).length,
         rol: usuarioAutenticado.rol,
         created_at: '',
       }]
@@ -240,6 +243,7 @@ export default function App() {
         contacto: cli.nombre.split(' ')[0],
         email: cli.email,
         identificacion: cli.cedula,
+        asuntosRegistrados: cli.asuntos_count,
         casos: casosDelCliente.map((as: AsuntoAPI) => ({
           id: as.id,
           codigo: as.radicado,
@@ -418,20 +422,33 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <CrearClienteModal
-        isOpen={crearClienteAbierto}
-        isLoading={mutacionNuevoCliente.isPending}
-        onClose={() => setCrearClienteAbierto(false)}
-        onSubmit={(payload) => mutacionNuevoCliente.mutate(payload)}
-      />
-      {clienteActivo && (
-        <CrearAsuntoModal
-          isOpen={crearAsuntoAbierto}
-          isLoading={mutacionNuevoAsunto.isPending}
-          cliente={clienteActivo}
-          responsableNombre={usuarioAutenticado.nombre}
-          onClose={() => setCrearAsuntoAbierto(false)}
-          onSubmit={(payload) => mutacionNuevoAsunto.mutate(payload)}
+      {usuarioAutenticado.rol !== 'cliente' && (
+        <AperturaAsuntoModal
+          isOpen={aperturaAbierta}
+          clientes={clientesAPI || []}
+          responsables={
+            usuarioAutenticado.rol === 'abogado'
+              ? (responsablesAPI || []).filter(
+                  (responsable) => responsable.id === usuarioAutenticado.id,
+                )
+              : (responsablesAPI || [])
+          }
+          usuarioActual={usuarioAutenticado}
+          clienteInicialId={clienteInicialAperturaId || undefined}
+          isLoading={mutacionApertura.isPending}
+          errorMessage={
+            mutacionApertura.isError
+              ? 'No pudimos abrir el asunto. Revisa los datos e inténtalo de nuevo.'
+              : undefined
+          }
+          onClose={() => {
+            if (!mutacionApertura.isPending) {
+              setAperturaAbierta(false);
+              setClienteInicialAperturaId('');
+              mutacionApertura.reset();
+            }
+          }}
+          onSubmit={(payload) => mutacionApertura.mutate(payload)}
         />
       )}
 
@@ -654,8 +671,17 @@ export default function App() {
                 <>
                   <div className="sidebar-divider" />
                   <div className="section-title">
-                    <h3>Clientes ({clientes.length})</h3>
-                    <button className="icon-button" type="button" onClick={() => setCrearClienteAbierto(true)} title="Nuevo Cliente">
+                    <h3>Directorio ({clientes.length})</h3>
+                    <button
+                      className="icon-button"
+                      type="button"
+                      onClick={() => {
+                        setClienteInicialAperturaId('');
+                        setAperturaAbierta(true);
+                      }}
+                      aria-label="Abrir asunto"
+                      title="Abrir asunto"
+                    >
                       <Plus size={16} />
                     </button>
                   </div>
@@ -677,7 +703,7 @@ export default function App() {
                         >
                           <strong>{cli.nombre}</strong>
                           <span className="muted small">
-                            {formatAsuntosCount(cli.casos?.length || 0)}
+                            {formatAsuntosCount(cli.asuntosRegistrados)}
                           </span>
                         </NavLink>
                       ))
@@ -718,7 +744,14 @@ export default function App() {
                     <h2>{clienteActivo.nombre}</h2>
                     <span className="muted">{clienteActivo.email} · CC/NIT: {clienteActivo.identificacion}</span>
                   </div>
-                  <button className="primary-button" type="button" onClick={() => setCrearAsuntoAbierto(true)}>
+                  <button
+                    className="primary-button"
+                    type="button"
+                    onClick={() => {
+                      setClienteInicialAperturaId(clienteActivo.id);
+                      setAperturaAbierta(true);
+                    }}
+                  >
                     <Plus size={16} />
                     Nuevo asunto
                   </button>
@@ -727,7 +760,11 @@ export default function App() {
                 <div className="workspace-flow">
                   <section className="panel case-nav-panel">
                     <div className="section-title">
-                      <h3>Asuntos ({clienteActivo.casos ? clienteActivo.casos.length : 0})</h3>
+                      <h3>
+                        {usuarioAutenticado.rol === 'abogado'
+                          ? 'Asuntos a tu cargo'
+                          : 'Asuntos'} ({clienteActivo.casos ? clienteActivo.casos.length : 0})
+                      </h3>
                     </div>
                     <div className="case-list">
                       {clienteActivo.casos && clienteActivo.casos.length > 0 ? (
@@ -918,7 +955,14 @@ export default function App() {
                     <div className="panel" style={{ padding: '32px 24px', textAlign: 'center' }}>
                       <h3>Sin asuntos para este cliente</h3>
                       <p className="muted small">Abre el primer asunto para iniciar su ruta de trabajo.</p>
-                      <button className="primary-button" style={{ margin: '16px auto 0' }} onClick={() => setCrearAsuntoAbierto(true)}>
+                      <button
+                        className="primary-button"
+                        style={{ margin: '16px auto 0' }}
+                        onClick={() => {
+                          setClienteInicialAperturaId(clienteActivo.id);
+                          setAperturaAbierta(true);
+                        }}
+                      >
                         <Plus size={16} /> Crear expediente
                       </button>
                     </div>
@@ -940,7 +984,10 @@ export default function App() {
                     <button
                       className="primary-button"
                       style={{ margin: '16px auto 0' }}
-                      onClick={() => setCrearClienteAbierto(true)}
+                      onClick={() => {
+                        setClienteInicialAperturaId('');
+                        setAperturaAbierta(true);
+                      }}
                     >
                       <Plus size={16} /> Registrar primer cliente
                     </button>

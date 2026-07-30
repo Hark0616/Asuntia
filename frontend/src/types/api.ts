@@ -16,6 +16,26 @@ export interface User {
   firma_id: string;
 }
 
+export interface Cliente {
+  id: string;
+  tipo_persona: 'natural' | 'juridica';
+  tipo_documento: 'CC' | 'CE' | 'NIT' | 'PASAPORTE' | 'OTRO';
+  numero_documento: string;
+  nombre: string;
+  email: string;
+  telefono?: string;
+  fecha_expedicion?: string;
+  direccion?: string;
+  direccion_notificacion?: string;
+  ciudad?: string;
+  departamento?: string;
+  canal_preferido: 'email' | 'telefono' | 'whatsapp';
+  observaciones?: string;
+  portal_user_id?: string;
+  asuntos_count: number;
+  created_at: string;
+}
+
 export interface AuthChallenge {
   id: string;
   user_id: string;
