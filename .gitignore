@@ -15,12 +15,15 @@ backend/__pycache__/
 backend/*/__pycache__/
 backend/*/*/__pycache__/
 backend/*/*/*/__pycache__/
+**/__pycache__/
+*.py[cod]
 backend/.venv/
 backend/venv/
 backend/.pytest_cache/
 backend/*.egg-info/
 backend/dist/
 backend/build/
+backend/storage/
 
 # Base de datos local
 postgres_data/
