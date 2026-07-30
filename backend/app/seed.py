@@ -380,7 +380,7 @@ async def seed_data():
                 firma_id=DEFAULT_FIRMA_ID,
                 asunto_id=asunto1.id,
                 titulo="Revisión inicial del asunto",
-                descripcion="Validación interna de identidad, documentos disponibles y posibles conflictos antes de emitir una conclusión.",
+                descripcion="Validación interna de identidad y documentos disponibles antes de emitir una conclusión.",
                 publicado_al_cliente=False,
                 created_by_id=abogada_daniela.id
             )

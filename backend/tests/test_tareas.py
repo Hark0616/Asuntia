@@ -44,7 +44,6 @@ async def test_advancing_workflow_replaces_open_work_item(client):
             "paso_codigo": "recepcion_evaluacion",
             "datos": {
                 "identidad_verificada": True,
-                "conflicto_interes": "sin_conflicto",
                 "viabilidad_preliminar": "viable",
                 "observaciones": "Recepción completa.",
             },

@@ -17,13 +17,9 @@ RUTA_INSOLVENCIA_PERSONA_NATURAL: list[dict[str, Any]] = [
         "orden": 1,
         "codigo": "recepcion_evaluacion",
         "titulo": "Recepción y evaluación inicial",
-        "descripcion": "Verifica identidad, conflicto de interés y viabilidad preliminar antes de preparar la solicitud.",
+        "descripcion": "Verifica la identidad y la viabilidad preliminar antes de preparar la solicitud.",
         "campos": [
             {"clave": "identidad_verificada", "etiqueta": "Identidad verificada", "tipo": "boolean", "requerido": True},
-            {"clave": "conflicto_interes", "etiqueta": "Control de conflicto", "tipo": "select", "requerido": True, "opciones": [
-                {"valor": "sin_conflicto", "etiqueta": "Sin conflicto identificado"},
-                {"valor": "requiere_revision", "etiqueta": "Requiere revisión"},
-            ]},
             {"clave": "viabilidad_preliminar", "etiqueta": "Viabilidad preliminar", "tipo": "select", "requerido": True, "opciones": [
                 {"valor": "viable", "etiqueta": "Viable"},
                 {"valor": "condicionada", "etiqueta": "Viable con condición"},
@@ -149,14 +145,6 @@ class WorkflowService:
         if step.codigo == "recepcion_evaluacion" and data.get("identidad_verificada") is not True:
             raise DomainException(
                 detail="La identidad debe quedar verificada antes de avanzar"
-            )
-        if (
-            step.codigo == "recepcion_evaluacion"
-            and data.get("conflicto_interes") != "sin_conflicto"
-        ):
-            raise DomainException(
-                detail="El control de conflicto requiere revisión antes de avanzar",
-                status_code=409,
             )
         if (
             step.codigo == "recepcion_evaluacion"

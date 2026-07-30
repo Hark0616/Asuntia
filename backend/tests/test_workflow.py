@@ -41,6 +41,10 @@ async def test_create_case_starts_with_seven_sequential_steps(client):
         "bloqueado",
         "bloqueado",
     ]
+    first_step_keys = {
+        field["clave"] for field in asunto["pasos"][0]["campos"]
+    }
+    assert "conflicto_interes" not in first_step_keys
 
 
 @pytest.mark.asyncio
@@ -65,7 +69,9 @@ async def test_create_case_derives_the_initial_next_action_from_the_route(client
     )
 
     assert response.status_code == 201, response.text
-    assert response.json()["siguiente_paso"].startswith("Verifica identidad")
+    assert response.json()["siguiente_paso"].startswith(
+        "Verifica la identidad"
+    )
     assert response.json()["fecha_apertura"] == "2026-07-15"
 
 
@@ -97,7 +103,6 @@ async def test_workflow_validates_data_and_prevents_skipping(client):
             "paso_codigo": "recepcion_evaluacion",
             "datos": {
                 "identidad_verificada": True,
-                "conflicto_interes": "sin_conflicto",
                 "viabilidad_preliminar": "viable",
                 "observaciones": "La información inicial permite continuar.",
             },
@@ -126,7 +131,6 @@ async def test_workflow_can_complete_all_steps(client):
             "recepcion_evaluacion",
             {
                 "identidad_verificada": True,
-                "conflicto_interes": "sin_conflicto",
                 "viabilidad_preliminar": "viable",
                 "observaciones": "Recepción completa.",
             },
@@ -202,7 +206,6 @@ async def test_lawyer_cannot_advance_another_lawyers_work(alejandro_client):
             "paso_codigo": "recepcion_evaluacion",
             "datos": {
                 "identidad_verificada": True,
-                "conflicto_interes": "sin_conflicto",
                 "viabilidad_preliminar": "viable",
                 "observaciones": "Intento sin asignación.",
             },
@@ -210,28 +213,6 @@ async def test_lawyer_cannot_advance_another_lawyers_work(alejandro_client):
     )
     assert response.status_code == 403
     assert response.json()["detail"] == "Esta tarea está asignada a otro responsable"
-
-
-@pytest.mark.asyncio
-async def test_workflow_stops_when_conflict_requires_review(client):
-    asunto = await create_case(client, uuid.uuid4().hex[:8])
-    response = await client.post(
-        f"/api/v1/asuntos/{asunto['id']}/flujo/avanzar",
-        json={
-            "paso_codigo": "recepcion_evaluacion",
-            "datos": {
-                "identidad_verificada": True,
-                "conflicto_interes": "requiere_revision",
-                "viabilidad_preliminar": "viable",
-                "observaciones": "Existe una coincidencia por revisar.",
-            },
-        },
-    )
-
-    assert response.status_code == 409
-    assert "conflicto" in response.json()["detail"]
-    detail = await client.get(f"/api/v1/asuntos/{asunto['radicado']}")
-    assert detail.json()["paso_actual"] == 1
 
 
 @pytest.mark.asyncio
@@ -243,7 +224,6 @@ async def test_workflow_stops_when_viability_is_not_confirmed(client):
             "paso_codigo": "recepcion_evaluacion",
             "datos": {
                 "identidad_verificada": True,
-                "conflicto_interes": "sin_conflicto",
                 "viabilidad_preliminar": "informacion_insuficiente",
                 "observaciones": "Faltan soportes para concluir.",
             },
