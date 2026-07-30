@@ -31,6 +31,8 @@ import {
   avanzarPasoAPI,
   crearNovedadAPI, 
   actualizarEstadoAPI, 
+  asignarResponsableClienteAPI,
+  asignarResponsableAsuntoAPI,
   AsuntoAPI, 
   EstadoProcesalAPI,
   ClienteAPI,
@@ -45,6 +47,7 @@ import { AperturaAsuntoModal } from '@/components/ui/AperturaAsuntoModal';
 import { DocumentosTab } from '@/features/documentos/components/DocumentosTab';
 import { ConfiguracionAlmacenamiento } from '@/features/firma/components/ConfiguracionAlmacenamiento';
 import { FlujoAsunto } from '@/features/asuntos/components/FlujoAsunto';
+import { ResponsableAsignacion } from '@/features/asuntos/components/ResponsableAsignacion';
 import type { AsuntoPasoAPI } from '@/features/asuntos/api/asuntos';
 import { UserMenu } from '@/components/layout/UserMenu';
 import { MiTrabajo } from '@/features/tareas/components/MiTrabajo';
@@ -98,6 +101,8 @@ interface ClienteData {
   contacto: string;
   email: string;
   identificacion: string;
+  responsableId?: string;
+  responsableNombre: string;
   asuntosRegistrados: number;
   casos: CasoData[];
 }
@@ -175,6 +180,10 @@ export default function App() {
     retry: 1,
     enabled: officeUser,
   });
+  const puedeGestionarAsignaciones = (
+    usuarioAutenticado?.rol === 'administrador'
+    || usuarioAutenticado?.rol === 'auxiliar'
+  );
 
   // Mutaciones
   const mutacionApertura = useMutation({
@@ -217,6 +226,33 @@ export default function App() {
     },
   });
 
+  const mutacionResponsableCliente = useMutation({
+    mutationFn: ({
+      clienteId,
+      responsableId,
+    }: {
+      clienteId: string;
+      responsableId: string;
+    }) => asignarResponsableClienteAPI(clienteId, responsableId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['clientes'] });
+    },
+  });
+
+  const mutacionResponsableAsunto = useMutation({
+    mutationFn: ({
+      asuntoId,
+      responsableId,
+    }: {
+      asuntoId: string;
+      responsableId: string;
+    }) => asignarResponsableAsuntoAPI(asuntoId, responsableId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['asuntos'] });
+      queryClient.invalidateQueries({ queryKey: ['tareas'] });
+    },
+  });
+
   // El cliente autenticado se convierte en la única raíz disponible en su portal.
   const clientesFuente: ClienteAPI[] = usuarioAutenticado?.rol === 'cliente'
     ? [{
@@ -237,6 +273,9 @@ export default function App() {
 
   const clientes: ClienteData[] = clientesFuente.map((cli: ClienteAPI) => {
       const casosDelCliente = (asuntosAPI || []).filter((as: AsuntoAPI) => as.cliente_id === cli.id);
+      const responsableCliente = (responsablesAPI || []).find(
+        (responsable) => responsable.id === cli.responsable_id,
+      );
 
       return {
         id: cli.id,
@@ -244,12 +283,20 @@ export default function App() {
         contacto: cli.nombre.split(' ')[0],
         email: cli.email,
         identificacion: cli.cedula,
+        responsableId: cli.responsable_id,
+        responsableNombre: responsableCliente?.nombre || 'Sin asignar',
         asuntosRegistrados: cli.asuntos_count,
-        casos: casosDelCliente.map((as: AsuntoAPI) => ({
+        casos: casosDelCliente.map((as: AsuntoAPI) => {
+          const responsableAsunto = (responsablesAPI || []).find(
+            (responsable) => responsable.id === as.abogado_id,
+          );
+          return {
           id: as.id,
           codigo: as.radicado,
           nombre: 'Insolvencia Persona Natural',
-          responsable: 'Equipo jurídico asignado',
+          responsable: usuarioAutenticado?.rol === 'cliente'
+            ? 'Equipo jurídico asignado'
+            : (responsableAsunto?.nombre || 'Sin asignar'),
           estadoBadge: as.estado?.nombre || 'En trámite',
           estadoTipo: (as.estado?.color_tipo as any) || 'mint',
           estadoId: as.estado?.id,
@@ -284,7 +331,8 @@ export default function App() {
             texto: nov.descripcion,
             visibilidad: nov.publicado_al_cliente ? 'Cliente' : 'Interno'
           }))
-        }))
+          };
+        })
       };
     });
 
@@ -705,6 +753,8 @@ export default function App() {
                           <strong>{cli.nombre}</strong>
                           <span className="muted small">
                             {formatAsuntosCount(cli.asuntosRegistrados)}
+                            {' · '}
+                            {cli.responsableNombre}
                           </span>
                         </NavLink>
                       ))
@@ -745,17 +795,44 @@ export default function App() {
                     <h2>{clienteActivo.nombre}</h2>
                     <span className="muted">{clienteActivo.email} · CC/NIT: {clienteActivo.identificacion}</span>
                   </div>
-                  <button
-                    className="primary-button"
-                    type="button"
-                    onClick={() => {
-                      setClienteInicialAperturaId(clienteActivo.id);
-                      setAperturaAbierta(true);
-                    }}
-                  >
-                    <Plus size={16} />
-                    Nuevo asunto
-                  </button>
+                  <div className="toolbar-actions">
+                    <ResponsableAsignacion
+                      id={`cliente-${clienteActivo.id}-responsable`}
+                      label="Responsable del cliente"
+                      value={clienteActivo.responsableId}
+                      responsables={responsablesAPI || []}
+                      canEdit={puedeGestionarAsignaciones}
+                      isPending={
+                        mutacionResponsableCliente.isPending
+                        && mutacionResponsableCliente.variables?.clienteId
+                          === clienteActivo.id
+                      }
+                      errorMessage={
+                        mutacionResponsableCliente.isError
+                        && mutacionResponsableCliente.variables?.clienteId
+                          === clienteActivo.id
+                          ? 'No se pudo guardar la asignación.'
+                          : undefined
+                      }
+                      onChange={(responsableId) => {
+                        mutacionResponsableCliente.mutate({
+                          clienteId: clienteActivo.id,
+                          responsableId,
+                        });
+                      }}
+                    />
+                    <button
+                      className="primary-button"
+                      type="button"
+                      onClick={() => {
+                        setClienteInicialAperturaId(clienteActivo.id);
+                        setAperturaAbierta(true);
+                      }}
+                    >
+                      <Plus size={16} />
+                      Nuevo asunto
+                    </button>
+                  </div>
                 </div>
 
                 <div className="workspace-flow">
@@ -779,7 +856,9 @@ export default function App() {
                             <div className="case-card-header">
                               <div>
                                 <strong>{cs.nombre}</strong>
-                                <span className="muted small">{cs.codigo}</span>
+                                <span className="muted small">
+                                  {cs.codigo} · {cs.responsable}
+                                </span>
                               </div>
                             </div>
                             <span className="case-card-current">
@@ -798,19 +877,46 @@ export default function App() {
                   {casoActivo ? (
                     <section>
                       <section className="panel">
-                        <div className="row between">
+                        <div className="case-overview-header">
                           <div>
                             <h3>{casoActivo.nombre}</h3>
-                            <span className="muted small">{casoActivo.codigo} · {casoActivo.responsable}</span>
+                            <span className="muted small">{casoActivo.codigo}</span>
                           </div>
-                          <span className="row case-public-status">
-                            <span className="muted small">Estado comunicado</span>
-                            <span className={`badge ${casoActivo.estadoTipo}`}>{casoActivo.estadoBadge}</span>
-                            <Tooltip
-                              content={casoActivo.estadoDescripcion
-                                || 'Estado procesal que se muestra al cliente.'}
+                          <div className="case-overview-actions">
+                            <ResponsableAsignacion
+                              id={`asunto-${casoActivo.id}-responsable`}
+                              label="Abogado del asunto"
+                              value={casoActivo.abogadoId}
+                              responsables={responsablesAPI || []}
+                              canEdit={puedeGestionarAsignaciones}
+                              isPending={
+                                mutacionResponsableAsunto.isPending
+                                && mutacionResponsableAsunto.variables?.asuntoId
+                                  === casoActivo.id
+                              }
+                              errorMessage={
+                                mutacionResponsableAsunto.isError
+                                && mutacionResponsableAsunto.variables?.asuntoId
+                                  === casoActivo.id
+                                  ? 'No se pudo transferir el asunto.'
+                                  : undefined
+                              }
+                              onChange={(responsableId) => {
+                                mutacionResponsableAsunto.mutate({
+                                  asuntoId: casoActivo.id,
+                                  responsableId,
+                                });
+                              }}
                             />
-                          </span>
+                            <span className="row case-public-status">
+                              <span className="muted small">Estado comunicado</span>
+                              <span className={`badge ${casoActivo.estadoTipo}`}>{casoActivo.estadoBadge}</span>
+                              <Tooltip
+                                content={casoActivo.estadoDescripcion
+                                  || 'Estado procesal que se muestra al cliente.'}
+                              />
+                            </span>
+                          </div>
                         </div>
 
                         {usuarioAutenticado.rol === 'administrador' && (

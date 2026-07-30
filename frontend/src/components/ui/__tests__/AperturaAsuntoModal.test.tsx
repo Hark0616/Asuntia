@@ -99,6 +99,33 @@ describe('apertura de asuntos', () => {
     });
   });
 
+  it('propone el responsable principal al abrir otro asunto del cliente', async () => {
+    const user = userEvent.setup();
+    const clientWithResponsible = {
+      ...clientes[0],
+      responsable_id: 'abogado-1',
+    };
+
+    render(
+      <AperturaAsuntoModal
+        isOpen
+        clientes={[clientWithResponsible]}
+        responsables={responsables}
+        usuarioActual={currentUser}
+        onClose={vi.fn()}
+        onSubmit={vi.fn()}
+      />,
+    );
+
+    await user.click(
+      screen.getByRole('radio', { name: /María Elena Pérez/i }),
+    );
+
+    expect(screen.getByLabelText(/Abogado responsable/i)).toHaveValue(
+      'abogado-1',
+    );
+  });
+
   it('registra un perfil completo y lo vincula al nuevo asunto', async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();

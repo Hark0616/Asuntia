@@ -94,17 +94,26 @@ export function AperturaAsuntoModal({
   const [responsableId, setResponsableId] = useState('');
   const [openingDate, setOpeningDate] = useState(getLocalDateInputValue);
   const [newClient, setNewClient] = useState<NewClientForm>(emptyClientForm);
+  const canAssignSelf = responsables.some(
+    (responsable) => responsable.id === usuarioActual.id,
+  );
+  const defaultResponsableId = canAssignSelf
+    ? usuarioActual.id
+    : (responsables[0]?.id || '');
 
   useEffect(() => {
     if (!isOpen) return;
-    const canAssignSelf = responsables.some(
-      (responsable) => responsable.id === usuarioActual.id,
+    const initialClient = clientes.find(
+      (cliente) => cliente.id === clienteInicialId,
+    );
+    const initialClientResponsible = responsables.find(
+      (responsable) => responsable.id === initialClient?.responsable_id,
     );
     setActiveTab('existing');
     setSearchTerm('');
     setSelectedClientId(clienteInicialId || '');
     setResponsableId(
-      canAssignSelf ? usuarioActual.id : (responsables[0]?.id || ''),
+      initialClientResponsible?.id || defaultResponsableId,
     );
     setOpeningDate(getLocalDateInputValue());
     setNewClient(emptyClientForm());
@@ -223,7 +232,15 @@ export function AperturaAsuntoModal({
               role="tab"
               aria-selected={activeTab === 'existing'}
               aria-controls="existing-client-panel"
-              onClick={() => setActiveTab('existing')}
+              onClick={() => {
+                setActiveTab('existing');
+                const currentClient = clientes.find(
+                  (cliente) => cliente.id === selectedClientId,
+                );
+                setResponsableId(
+                  currentClient?.responsable_id || defaultResponsableId,
+                );
+              }}
             >
               <Building2 size={17} />
               Directorio de clientes
@@ -236,7 +253,10 @@ export function AperturaAsuntoModal({
               role="tab"
               aria-selected={activeTab === 'new'}
               aria-controls="new-client-panel"
-              onClick={() => setActiveTab('new')}
+              onClick={() => {
+                setActiveTab('new');
+                setResponsableId(defaultResponsableId);
+              }}
             >
               <UserPlus size={17} />
               Cliente nuevo
@@ -278,7 +298,19 @@ export function AperturaAsuntoModal({
                           type="button"
                           role="radio"
                           aria-checked={isSelected}
-                          onClick={() => setSelectedClientId(cliente.id)}
+                          onClick={() => {
+                            setSelectedClientId(cliente.id);
+                            if (
+                              cliente.responsable_id
+                              && responsables.some(
+                                (responsable) => (
+                                  responsable.id === cliente.responsable_id
+                                ),
+                              )
+                            ) {
+                              setResponsableId(cliente.responsable_id);
+                            }
+                          }}
                         >
                           <span className="client-option-check" aria-hidden="true">
                             {isSelected && <CircleCheck size={18} />}

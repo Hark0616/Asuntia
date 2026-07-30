@@ -24,6 +24,7 @@ export interface ClienteAPI {
   canal_preferido: 'email' | 'telefono' | 'whatsapp';
   observaciones?: string;
   portal_user_id?: string;
+  responsable_id?: string;
   portal_habilitado: boolean;
   asuntos_count: number;
   rol: string;
@@ -161,5 +162,27 @@ export const crearNovedadAPI = async (asuntoId: string, payload: { titulo: strin
 
 export const actualizarEstadoAPI = async (asuntoId: string, payload: { estado_id?: string }) => {
   const response = await apiClient.patch(`/asuntos/${asuntoId}/estado`, payload);
+  return response.data;
+};
+
+export const asignarResponsableClienteAPI = async (
+  clienteId: string,
+  responsableId: string,
+) => {
+  const response = await apiClient.patch<ClienteAPI>(
+    `/clientes/${clienteId}/responsable`,
+    { responsable_id: responsableId },
+  );
+  return response.data;
+};
+
+export const asignarResponsableAsuntoAPI = async (
+  asuntoId: string,
+  responsableId: string,
+) => {
+  const response = await apiClient.patch<AsuntoAPI>(
+    `/asuntos/${asuntoId}/responsable`,
+    { responsable_id: responsableId },
+  );
   return response.data;
 };
