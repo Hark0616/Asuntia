@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Optional
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -20,6 +20,12 @@ class AsuntoPaso(BaseModel):
     __table_args__ = (
         UniqueConstraint("asunto_id", "orden", name="uq_asunto_paso_orden"),
         UniqueConstraint("asunto_id", "codigo", name="uq_asunto_paso_codigo"),
+        Index(
+            "uq_asunto_paso_activo",
+            "asunto_id",
+            unique=True,
+            postgresql_where=text("estado = 'activo' AND is_active = true"),
+        ),
     )
 
     asunto_id: Mapped[uuid.UUID] = mapped_column(

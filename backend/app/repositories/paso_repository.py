@@ -50,6 +50,10 @@ class PasoRepository(BaseRepository[AsuntoPaso]):
         current.datos = data
         current.completed_at = datetime.now(timezone.utc)
         current.completed_by_id = user_id
+        self.session.add(current)
+        # La restricción de un único paso activo exige cerrar el actual antes
+        # de activar el siguiente, incluso dentro de la misma transacción.
+        await self.session.flush()
 
         if next_step:
             next_step.estado = "activo"
@@ -64,7 +68,6 @@ class PasoRepository(BaseRepository[AsuntoPaso]):
             asunto.etapa_actual = "Flujo inicial completado"
             asunto.siguiente_paso = "Continuar con el seguimiento jurídico del expediente"
 
-        self.session.add(current)
         self.session.add(asunto)
         await self.session.commit()
         return await self._reload_asunto(asunto.id)

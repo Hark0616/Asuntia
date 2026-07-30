@@ -78,6 +78,15 @@ async def anonymous_client():
 
 
 @pytest_asyncio.fixture
+async def db_session():
+    async with TestingSessionLocal() as session:
+        try:
+            yield session
+        finally:
+            await session.rollback()
+
+
+@pytest_asyncio.fixture
 async def client():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as api_client:

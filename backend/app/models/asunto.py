@@ -44,8 +44,8 @@ class Asunto(BaseModel):
     ruta_codigo: Mapped[str] = mapped_column(
         String(80),
         nullable=False,
-        default="insolvencia_persona_natural",
-        server_default="insolvencia_persona_natural",
+        default="insolvencia_persona_natural:v2",
+        server_default="insolvencia_persona_natural:v2",
     )
 
     paso_actual: Mapped[int] = mapped_column(

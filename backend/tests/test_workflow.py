@@ -1,6 +1,10 @@
 import uuid
 
 import pytest
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
+
+from app.models.asunto_paso import AsuntoPaso
 
 
 CLIENTE_CARLOS_ID = "00000000-0000-0000-0000-000000000020"
@@ -251,3 +255,18 @@ async def test_create_case_rejects_duplicate_radicado(client):
     assert (await client.post("/api/v1/asuntos", json=payload)).status_code == 201
     duplicate = await client.post("/api/v1/asuntos", json=payload)
     assert duplicate.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_database_prevents_two_active_steps_for_one_case(client, db_session):
+    asunto = await create_case(client, uuid.uuid4().hex[:8])
+    result = await db_session.execute(
+        select(AsuntoPaso)
+        .where(AsuntoPaso.asunto_id == uuid.UUID(asunto["id"]))
+        .where(AsuntoPaso.orden == 2)
+    )
+    second_step = result.scalar_one()
+    second_step.estado = "activo"
+
+    with pytest.raises(IntegrityError):
+        await db_session.commit()
