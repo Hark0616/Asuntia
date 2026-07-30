@@ -40,3 +40,22 @@ async def test_create_cliente_missing_fields(client):
     }
     response = await client.post("/api/v1/clientes", json=payload)
     assert response.status_code == 422 # Pydantic Validation Error
+
+
+@pytest.mark.asyncio
+async def test_lawyer_keeps_access_to_a_client_created_before_opening_a_case(
+    alejandro_client,
+):
+    suffix = uuid.uuid4().hex[:8]
+    created = await alejandro_client.post(
+        "/api/v1/clientes",
+        json={
+            "nombre": f"Cliente nuevo {suffix}",
+            "cedula": f"1099{suffix[:6]}",
+            "email": f"cliente_{suffix}@example.test",
+        },
+    )
+    assert created.status_code == 201
+
+    listed = await alejandro_client.get("/api/v1/clientes")
+    assert created.json()["id"] in {cliente["id"] for cliente in listed.json()}

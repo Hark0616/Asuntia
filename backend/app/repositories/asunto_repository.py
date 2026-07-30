@@ -43,6 +43,24 @@ class AsuntoRepository(BaseRepository[Asunto]):
         result = await self.session.execute(stmt)
         return list(result.scalars().unique().all())
 
+    async def list_by_abogado_id(
+        self,
+        abogado_id: uuid.UUID,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> List[Asunto]:
+        stmt = (
+            select(Asunto)
+            .options(*self._load_options())
+            .where(Asunto.abogado_id == abogado_id)
+            .where(Asunto.firma_id == self.firma_id)
+            .where(Asunto.is_active == True)
+            .offset(skip)
+            .limit(limit)
+        )
+        result = await self.session.execute(stmt)
+        return list(result.scalars().unique().all())
+
     async def get_by_radicado(self, radicado: str, solo_publicas: bool = False) -> Optional[Asunto]:
         options = [
             joinedload(Asunto.cliente),

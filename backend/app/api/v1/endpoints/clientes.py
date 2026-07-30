@@ -18,7 +18,10 @@ async def list_clientes(
     """
     Lista todos los clientes registrados en la firma.
     """
-    return await UserRepository(db, current_user.firma_id).list_clientes()
+    repo = UserRepository(db, current_user.firma_id)
+    if current_user.rol == "abogado":
+        return await repo.list_clientes_for_lawyer(current_user.id)
+    return await repo.list_clientes()
 
 @router.post("", response_model=ClienteResponse, status_code=status.HTTP_201_CREATED)
 async def create_cliente(

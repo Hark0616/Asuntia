@@ -45,6 +45,45 @@ async def test_lawyer_cannot_apply_administrative_case_corrections(
 
 
 @pytest.mark.asyncio
+async def test_lawyer_only_lists_assigned_cases_and_clients(alejandro_client):
+    asuntos_response = await alejandro_client.get("/api/v1/asuntos")
+    assert asuntos_response.status_code == 200
+    assert {
+        asunto["radicado"] for asunto in asuntos_response.json()
+    } == {"AS-2026-002", "AS-2026-004"}
+
+    clientes_response = await alejandro_client.get("/api/v1/clientes")
+    assert clientes_response.status_code == 200
+    nombres = {cliente["nombre"] for cliente in clientes_response.json()}
+    assert {
+        "Jorge Eliécer Bermúdez",
+        "Transportes del Norte S.A.S. (Laura Mejía)",
+    }.issubset(nombres)
+    assert "Carlos Gómez Restrepo" not in nombres
+    assert "Dra. María Elena Villamizar" not in nombres
+
+
+@pytest.mark.asyncio
+async def test_lawyer_cannot_open_or_modify_another_lawyers_case(alejandro_client):
+    assert (
+        await alejandro_client.get("/api/v1/asuntos/AS-2026-001")
+    ).status_code == 404
+    assert (
+        await alejandro_client.get(
+            "/api/v1/asuntos/00000000-0000-0000-0000-000000000201/documentos"
+        )
+    ).status_code == 404
+    response = await alejandro_client.post(
+        "/api/v1/asuntos",
+        json={
+            "cliente_id": "00000000-0000-0000-0000-000000000020",
+            "abogado_id": "00000000-0000-0000-0000-000000000010",
+        },
+    )
+    assert response.status_code == 403
+
+
+@pytest.mark.asyncio
 async def test_client_only_receives_public_novedades(carlos_client):
     response = await carlos_client.get("/api/v1/asuntos")
     assert response.status_code == 200

@@ -6,6 +6,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_user, require_office_user
+from app.core.access import can_access_asunto
 from app.core.db import get_db
 from app.models.user import User
 from app.repositories.asunto_repository import AsuntoRepository
@@ -44,9 +45,7 @@ async def list_documentos_asunto(
     Si solo_compartidos es True (ej. portal cliente), solo retorna documentos visibles para el cliente.
     """
     asunto = await AsuntoRepository(db, current_user.firma_id).get_by_id(asunto_id)
-    if not asunto or (
-        current_user.rol == "cliente" and asunto.cliente_id != current_user.id
-    ):
+    if not asunto or not can_access_asunto(current_user, asunto):
         raise HTTPException(status_code=404, detail="Asunto no encontrado")
     if current_user.rol == "cliente":
         solo_compartidos = True
@@ -70,7 +69,7 @@ async def upload_documento_asunto(
     """
     asunto_repo = AsuntoRepository(db, current_user.firma_id)
     asunto = await asunto_repo.get_by_id(asunto_id)
-    if not asunto:
+    if not asunto or not can_access_asunto(current_user, asunto):
         raise HTTPException(status_code=404, detail="Asunto no encontrado")
 
     provider = await StorageFactory.get_provider_for_firma(db, current_user.firma_id)
@@ -154,7 +153,7 @@ async def vincular_documento_drive(
     Vincula un archivo ya existente en Google Drive / OneDrive a un expediente.
     """
     asunto = await AsuntoRepository(db, current_user.firma_id).get_by_id(asunto_id)
-    if not asunto:
+    if not asunto or not can_access_asunto(current_user, asunto):
         raise HTTPException(status_code=404, detail="Asunto no encontrado")
 
     repo = DocumentoRepository(db, current_user.firma_id)
@@ -209,16 +208,13 @@ async def preview_documento_proxy(
     doc = await repo.get_by_id(documento_id)
     if not doc:
         raise HTTPException(status_code=404, detail="Documento no encontrado")
-    if current_user.rol == "cliente":
-        asunto = await AsuntoRepository(db, current_user.firma_id).get_by_id(
-            doc.asunto_id
-        )
-        if (
-            not asunto
-            or asunto.cliente_id != current_user.id
-            or not doc.compartido_con_cliente
-        ):
-            raise HTTPException(status_code=404, detail="Documento no encontrado")
+    asunto = await AsuntoRepository(db, current_user.firma_id).get_by_id(
+        doc.asunto_id
+    )
+    if not asunto or not can_access_asunto(current_user, asunto):
+        raise HTTPException(status_code=404, detail="Documento no encontrado")
+    if current_user.rol == "cliente" and not doc.compartido_con_cliente:
+        raise HTTPException(status_code=404, detail="Documento no encontrado")
 
     if doc.provider != "local":
         raise HTTPException(
@@ -253,10 +249,14 @@ async def toggle_visibilidad_documento(
     Alterna si el documento es visible para el cliente (compartido_con_cliente = true/false).
     """
     repo = DocumentoRepository(db, current_user.firma_id)
-    doc = await repo.toggle_visibilidad(documento_id, compartido)
+    doc = await repo.get_by_id(documento_id)
     if not doc:
         raise HTTPException(status_code=404, detail="Documento no encontrado")
-    return doc
+    asunto = await AsuntoRepository(db, current_user.firma_id).get_by_id(doc.asunto_id)
+    if not asunto or not can_access_asunto(current_user, asunto):
+        raise HTTPException(status_code=404, detail="Documento no encontrado")
+    updated = await repo.toggle_visibilidad(documento_id, compartido)
+    return updated
 
 @router.delete("/documentos/{documento_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_documento(
@@ -268,6 +268,12 @@ async def delete_documento(
     Borrado lógico de documento (Soft Delete).
     """
     repo = DocumentoRepository(db, current_user.firma_id)
+    doc = await repo.get_by_id(documento_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Documento no encontrado")
+    asunto = await AsuntoRepository(db, current_user.firma_id).get_by_id(doc.asunto_id)
+    if not asunto or not can_access_asunto(current_user, asunto):
+        raise HTTPException(status_code=404, detail="Documento no encontrado")
     success = await repo.soft_delete(documento_id)
     if not success:
         raise HTTPException(status_code=404, detail="Documento no encontrado")

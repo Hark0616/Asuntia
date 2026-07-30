@@ -5,6 +5,7 @@ from typing import List
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.db import get_db
+from app.core.access import can_access_asunto
 from app.core.deps import get_current_user, require_office_user, require_roles
 from app.schemas.asunto import AsuntoResponse, AsuntoCreate, AsuntoUpdateEstado
 from app.schemas.flujo import AvanzarPasoRequest
@@ -38,11 +39,14 @@ async def list_asuntos(
     Lista todos los asuntos/expedientes de la firma activa.
     """
     repo = AsuntoRepository(db, current_user.firma_id)
-    asuntos = (
-        await repo.get_by_cliente_id(current_user.id, solo_publicas=True)
-        if current_user.rol == "cliente"
-        else await repo.list()
-    )
+    if current_user.rol == "cliente":
+        asuntos = await repo.get_by_cliente_id(
+            current_user.id, solo_publicas=True
+        )
+    elif current_user.rol == "abogado":
+        asuntos = await repo.list_by_abogado_id(current_user.id)
+    else:
+        asuntos = await repo.list()
     return asuntos
 
 @router.post("", response_model=AsuntoResponse, status_code=status.HTTP_201_CREATED)
@@ -59,6 +63,15 @@ async def create_asunto(
     if not cliente or cliente.rol != "cliente":
         raise NotFoundException(detail="Cliente no encontrado")
     responsable_id = payload.abogado_id
+    if (
+        current_user.rol == "abogado"
+        and responsable_id is not None
+        and responsable_id != current_user.id
+    ):
+        raise DomainException(
+            detail="Un abogado sólo puede asignarse asuntos a sí mismo",
+            status_code=status.HTTP_403_FORBIDDEN,
+        )
     if responsable_id:
         abogado = await user_repo.get_by_id(responsable_id)
         if not abogado or abogado.rol not in {"administrador", "abogado"}:
@@ -119,7 +132,7 @@ async def get_asunto(
     asunto = await repo.get_by_radicado(
         radicado, solo_publicas=current_user.rol == "cliente"
     )
-    if asunto and current_user.rol == "cliente" and asunto.cliente_id != current_user.id:
+    if asunto and not can_access_asunto(current_user, asunto):
         asunto = None
     if not asunto:
         raise NotFoundException(detail=f"No se encontró el asunto con radicado {radicado}")
