@@ -18,8 +18,14 @@ class DocumentoAsunto(BaseModel):
     __tablename__ = "documentos_asunto"
 
     asunto_id = Column(UUID(as_uuid=True), ForeignKey("asuntos.id"), nullable=False, index=True)
+    asunto_paso_id = Column(
+        UUID(as_uuid=True), ForeignKey("asunto_pasos.id"), nullable=True, index=True
+    )
     nombre_funcional = Column(String(255), nullable=False)
     tipo_documental = Column(String(50), nullable=False, default=TipoDocumental.OTRO.value)
+    subcarpeta = Column(
+        String(30), nullable=False, default="anexo", server_default="anexo"
+    )
     provider = Column(String(30), nullable=False, default="google_drive")
     external_file_id = Column(String(255), nullable=False)
     web_view_url = Column(Text, nullable=False)

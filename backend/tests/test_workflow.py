@@ -109,6 +109,12 @@ async def test_workflow_validates_data_and_prevents_skipping(client):
     assert body["pasos"][0]["estado"] == "completado"
     assert body["pasos"][1]["estado"] == "activo"
     assert body["pasos"][0]["datos"]["identidad_verificada"] is True
+    activity = await client.get(f"/api/v1/novedades/asunto/{asunto['id']}")
+    step_event = next(
+        item for item in activity.json() if item["tipo"] == "paso_completado"
+    )
+    assert step_event["asunto_paso_id"] == asunto["pasos"][0]["id"]
+    assert step_event["publicado_al_cliente"] is False
 
 
 @pytest.mark.asyncio

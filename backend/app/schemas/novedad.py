@@ -12,6 +12,9 @@ class NovedadCreate(BaseModel):
 class NovedadResponse(BaseSchemaResponse):
     id: uuid.UUID
     asunto_id: uuid.UUID
+    asunto_paso_id: Optional[uuid.UUID] = None
+    documento_id: Optional[uuid.UUID] = None
+    tipo: str
     titulo: str
     descripcion: str
     publicado_al_cliente: bool

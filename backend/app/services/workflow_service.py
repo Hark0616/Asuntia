@@ -7,6 +7,7 @@ from app.core.exceptions import DomainException, ForbiddenException, NotFoundExc
 from app.models.asunto import Asunto
 from app.models.asunto_paso import AsuntoPaso
 from app.repositories.asunto_repository import AsuntoRepository
+from app.repositories.novedad_repository import NovedadRepository
 from app.repositories.paso_repository import PasoRepository
 from app.repositories.tarea_repository import TareaRepository
 
@@ -119,6 +120,7 @@ def initial_workflow_steps() -> list[dict[str, Any]]:
 class WorkflowService:
     def __init__(self, session: AsyncSession, firma_id: uuid.UUID):
         self.asuntos = AsuntoRepository(session, firma_id)
+        self.novedades = NovedadRepository(session, firma_id)
         self.pasos = PasoRepository(session, firma_id)
         self.tareas = TareaRepository(session, firma_id)
 
@@ -229,6 +231,17 @@ class WorkflowService:
                 responsable_id=asunto.abogado_id,
                 solicitante_id=user_id,
             )
+        await self.novedades.stage_create(
+            {
+                "asunto_id": asunto.id,
+                "asunto_paso_id": current.id,
+                "tipo": "paso_completado",
+                "titulo": current.titulo,
+                "descripcion": f"Se completó el paso: {current.titulo}.",
+                "publicado_al_cliente": False,
+            },
+            created_by_id=user_id,
+        )
         return await self.pasos.complete_and_advance(
             asunto=asunto,
             current=current,

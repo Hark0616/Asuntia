@@ -53,6 +53,8 @@ import { formatAsuntosCount } from '@/lib/formatAsuntos';
 interface NovedadItem {
   id: string;
   autor: string;
+  titulo: string;
+  tipo: 'nota' | 'paso_completado' | 'documento_incorporado';
   fecha: string;
   texto: string;
   visibilidad: 'Cliente' | 'Interno';
@@ -266,8 +268,14 @@ export default function App() {
           flujoEstado: as.flujo_estado,
           novedades: as.novedades.map(nov => ({
             id: nov.id,
-            autor: 'Equipo jurídico',
-            fecha: new Date(nov.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            autor: nov.tipo === 'nota' ? 'Nota de la firma' : 'Actividad del sistema',
+            titulo: nov.titulo,
+            tipo: nov.tipo,
+            fecha: new Intl.DateTimeFormat('es-CO', {
+              timeZone: 'America/Bogota',
+              dateStyle: 'medium',
+              timeStyle: 'short',
+            }).format(new Date(nov.created_at)),
             texto: nov.descripcion,
             visibilidad: nov.publicado_al_cliente ? 'Cliente' : 'Interno'
           }))
@@ -836,18 +844,18 @@ export default function App() {
 
                       <form className="panel" onSubmit={handlePublicarAvance} style={{ marginTop: '16px' }}>
                         <div className="section-title">
-                          <h3>Nuevo avance</h3>
+                          <h3>Registrar nota</h3>
                           <Eye size={17} />
                         </div>
                         <div className="form-grid">
                           <div className="field full">
-                            <label htmlFor="update-body">Detalle de la novedad</label>
+                            <label htmlFor="update-body">Contenido</label>
                             <textarea 
                               id="update-body" 
                               required
                               value={nuevoAvanceTexto}
                               onChange={(e) => setNuevoAvanceTexto(e.target.value)}
-                              placeholder="Avance procesal..."
+                              placeholder="Nota sobre el expediente..."
                             />
                           </div>
 
@@ -867,7 +875,7 @@ export default function App() {
                             <label>&nbsp;</label>
                             <button className="primary-button" type="submit">
                               <Send size={16} />
-                              Publicar avance
+                              Registrar nota
                             </button>
                           </div>
                         </div>
@@ -875,7 +883,7 @@ export default function App() {
 
                       <div className="panel">
                         <div className="section-title">
-                          <h3>Timeline</h3>
+                          <h3>Actividad del expediente</h3>
                           <History size={17} />
                         </div>
 
@@ -888,9 +896,10 @@ export default function App() {
                                 </div>
                                 <div className="timeline-body">
                                   <div className="row between">
-                                    <strong>{n.autor}</strong>
+                                    <strong>{n.titulo}</strong>
                                     <span className="muted small">{n.fecha}</span>
                                   </div>
+                                  <span className="muted small">{n.autor}</span>
                                   <p style={{ margin: '4px 0' }}>{n.texto}</p>
                                   <span className={`badge ${n.visibilidad === 'Cliente' ? 'neutral' : 'warning'}`}>
                                     {n.visibilidad}
@@ -900,7 +909,7 @@ export default function App() {
                             ))
                           ) : (
                             <div className="muted small" style={{ padding: '12px' }}>
-                              Sin avances registrados.
+                              Sin actividad registrada.
                             </div>
                           )}
                         </div>

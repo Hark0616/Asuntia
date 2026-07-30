@@ -53,6 +53,9 @@ export interface AsuntoAPI {
   novedades: Array<{
     id: string;
     asunto_id: string;
+    asunto_paso_id?: string;
+    documento_id?: string;
+    tipo: 'nota' | 'paso_completado' | 'documento_incorporado';
     titulo: string;
     descripcion: string;
     publicado_al_cliente: boolean;

@@ -48,7 +48,6 @@ export function DocumentosTab({ asuntoId, isReadOnly = false }: DocumentosTabPro
   const [showUploadForm, setShowUploadForm] = useState(false);
   const [nombreFuncional, setNombreFuncional] = useState('');
   const [tipoDocumental, setTipoDocumental] = useState('anexo');
-  const [subcarpeta, setSubcarpeta] = useState('anexo');
   const [compartido, setCompartido] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -59,6 +58,12 @@ export function DocumentosTab({ asuntoId, isReadOnly = false }: DocumentosTabPro
     queryKey: ['documentos', asuntoId, isReadOnly],
     queryFn: () => fetchDocumentosAsunto(asuntoId, isReadOnly)
   });
+  const gruposDocumentales = SUBCARPETAS
+    .map((carpeta) => ({
+      ...carpeta,
+      documentos: documentos.filter((documento) => documento.subcarpeta === carpeta.id),
+    }))
+    .filter((carpeta) => carpeta.documentos.length > 0);
 
   const mutacionVisibilidad = useMutation({
     mutationFn: ({ docId, val }: { docId: string; val: boolean }) =>
@@ -86,11 +91,11 @@ export function DocumentosTab({ asuntoId, isReadOnly = false }: DocumentosTabPro
       formData.append('file', selectedFile);
       formData.append('nombre_funcional', nombreFuncional);
       formData.append('tipo_documental', tipoDocumental);
-      formData.append('subcarpeta', subcarpeta);
       formData.append('compartido_con_cliente', String(compartido));
 
       await uploadDocumentoAPI(asuntoId, formData);
       queryClient.invalidateQueries({ queryKey: ['documentos', asuntoId] });
+      queryClient.invalidateQueries({ queryKey: ['asuntos'] });
       
       setNombreFuncional('');
       setSelectedFile(null);
@@ -144,7 +149,10 @@ export function DocumentosTab({ asuntoId, isReadOnly = false }: DocumentosTabPro
             </div>
 
             <div className="field">
-              <label htmlFor="doc-tipo">Tipo documental</label>
+              <label htmlFor="doc-tipo">
+                Tipo documental
+                <Tooltip content="El tipo determina automáticamente la carpeta del expediente." />
+              </label>
               <select 
                 id="doc-tipo"
                 value={tipoDocumental}
@@ -157,19 +165,6 @@ export function DocumentosTab({ asuntoId, isReadOnly = false }: DocumentosTabPro
             </div>
 
             <div className="field">
-              <label htmlFor="doc-subcarpeta">Subcarpeta de destino</label>
-              <select 
-                id="doc-subcarpeta"
-                value={subcarpeta}
-                onChange={(e) => setSubcarpeta(e.target.value)}
-              >
-                {SUBCARPETAS.map((sc) => (
-                  <option key={sc.id} value={sc.id}>{sc.label}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="field full">
               <label htmlFor="doc-file">Archivo (PDF / Imagen / Doc)</label>
               <input
                 id="doc-file"
@@ -221,9 +216,13 @@ export function DocumentosTab({ asuntoId, isReadOnly = false }: DocumentosTabPro
       {isLoading ? (
         <div className="muted small" style={{ padding: '16px', textAlign: 'center' }}>Cargando expediente documental...</div>
       ) : documentos.length > 0 ? (
-        <div className="stack" style={{ gap: '10px' }}>
-          {documentos.map((doc: DocumentoAPI) => (
-            <div key={doc.id} className="panel" style={{ padding: '12px 16px', backgroundColor: 'var(--panel-subtle)' }}>
+        <div className="document-groups">
+          {gruposDocumentales.map((grupo) => (
+            <section className="document-group" key={grupo.id}>
+              <h4>{grupo.label.replace('📁 ', '')}</h4>
+              <div className="stack">
+                {grupo.documentos.map((doc: DocumentoAPI) => (
+                  <div key={doc.id} className="document-row">
               <div className="row between wrap">
                 <div className="row" style={{ gap: '12px' }}>
                   <FileText size={20} style={{ color: 'var(--brand)' }} />
@@ -293,7 +292,10 @@ export function DocumentosTab({ asuntoId, isReadOnly = false }: DocumentosTabPro
                   )}
                 </div>
               </div>
-            </div>
+                  </div>
+                ))}
+              </div>
+            </section>
           ))}
         </div>
       ) : (

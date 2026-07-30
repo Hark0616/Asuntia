@@ -1,5 +1,5 @@
 import uuid
-from typing import List, Optional
+from typing import Any, List, Optional
 from sqlalchemy import select
 from app.repositories.base import BaseRepository
 from app.models.documento import DocumentoAsunto
@@ -7,6 +7,20 @@ from app.models.documento import DocumentoAsunto
 class DocumentoRepository(BaseRepository[DocumentoAsunto]):
     def __init__(self, session, firma_id: uuid.UUID):
         super().__init__(DocumentoAsunto, session, firma_id)
+
+    async def stage_create(
+        self,
+        data: dict[str, Any],
+        created_by_id: uuid.UUID,
+    ) -> DocumentoAsunto:
+        documento = DocumentoAsunto(
+            **data,
+            firma_id=self.firma_id,
+            created_by_id=created_by_id,
+        )
+        self.session.add(documento)
+        await self.session.flush()
+        return documento
 
     async def list_by_asunto(self, asunto_id: uuid.UUID, solo_compartidos: bool = False) -> List[DocumentoAsunto]:
         stmt = select(DocumentoAsunto).where(
