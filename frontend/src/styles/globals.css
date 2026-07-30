@@ -1677,6 +1677,39 @@ button {
   font-weight: 650;
 }
 
+.client-portal-state {
+  color: var(--brand-dark);
+  font-weight: 650;
+}
+
+.opening-portal-toggle {
+  color: var(--text);
+  background: var(--panel-soft);
+  border-radius: var(--radius-md);
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  display: flex;
+}
+
+.opening-portal-toggle > input {
+  width: 1.125rem;
+  height: 1.125rem;
+  flex: 0 0 auto;
+  margin-top: var(--space-1);
+  accent-color: var(--brand);
+}
+
+.opening-portal-toggle > span {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.opening-portal-toggle > span > span {
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
 .opening-empty {
   place-items: center;
   gap: var(--space-1);

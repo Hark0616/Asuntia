@@ -21,6 +21,7 @@ from app.repositories.user_repository import UserRepository
 from app.core.exceptions import DomainException, NotFoundException
 from app.models.user import User
 from app.services.workflow_service import WorkflowService, initial_workflow_steps
+from app.services.cliente_service import ClienteService
 
 router = APIRouter()
 
@@ -159,16 +160,12 @@ async def open_asunto(
     """Abre un asunto con un cliente existente o un perfil nuevo."""
     cliente_id = payload.cliente_id
     if payload.cliente_nuevo:
-        cliente_repo = ClienteRepository(db, current_user.firma_id)
-        if await cliente_repo.get_by_document(
-            payload.cliente_nuevo.numero_documento
-        ):
-            raise DomainException(
-                detail="Ya existe un cliente con esa identificación"
-            )
-        cliente = await cliente_repo.create_pending(
-            payload.cliente_nuevo.model_dump(),
+        cliente = await ClienteService(
+            db, current_user.firma_id
+        ).create(
+            payload.cliente_nuevo,
             created_by_id=current_user.id,
+            commit=False,
         )
         cliente_id = cliente.id
 

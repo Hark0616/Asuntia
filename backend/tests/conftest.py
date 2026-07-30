@@ -110,7 +110,7 @@ async def _login_client(api_client: AsyncClient, cedula: str) -> None:
     assert request_response.status_code == 200
     verify_response = await api_client.post(
         "/api/v1/auth/otp/verify",
-        json={"firma_slug": "demo", "cedula": cedula, "code": "123456"},
+        json={"firma_slug": "demo", "cedula": cedula, "code": "12345"},
     )
     assert verify_response.status_code == 200
 

@@ -22,6 +22,7 @@ class ClienteCreate(BaseModel):
     departamento: Optional[str] = Field(default=None, max_length=120)
     canal_preferido: Literal["email", "telefono", "whatsapp"] = "email"
     observaciones: Optional[str] = Field(default=None, max_length=2000)
+    habilitar_portal: bool = True
 
 class ClienteResponse(BaseModel):
     id: uuid.UUID
@@ -41,6 +42,7 @@ class ClienteResponse(BaseModel):
     canal_preferido: str
     observaciones: Optional[str] = None
     portal_user_id: Optional[uuid.UUID] = None
+    portal_habilitado: bool
     asuntos_count: int = 0
     rol: str = "cliente"
     created_at: datetime

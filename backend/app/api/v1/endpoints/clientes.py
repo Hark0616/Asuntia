@@ -6,7 +6,7 @@ from app.core.db import get_db
 from app.models.user import User
 from app.repositories.cliente_repository import ClienteRepository
 from app.schemas.cliente import ClienteResponse, ClienteCreate
-from app.core.exceptions import DomainException
+from app.services.cliente_service import ClienteService
 
 router = APIRouter()
 
@@ -29,10 +29,8 @@ async def create_cliente(
     """
     Registra un nuevo cliente en la firma.
     """
-    repo = ClienteRepository(db, current_user.firma_id)
-    if await repo.get_by_document(payload.numero_documento):
-        raise DomainException(detail="Ya existe un cliente con esa identificación")
-    return await repo.create(
-        payload.model_dump(),
+    return await ClienteService(db, current_user.firma_id).create(
+        payload,
         created_by_id=current_user.id,
+        commit=True,
     )

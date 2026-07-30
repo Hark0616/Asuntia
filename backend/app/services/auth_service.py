@@ -35,7 +35,9 @@ class AuthService:
         self, firma_slug: str, email: str, password: str
     ) -> User:
         firma = await self.resolve_firma(firma_slug)
-        user = await UserRepository(self.session, firma.id).get_by_email(email)
+        user = await UserRepository(
+            self.session, firma.id
+        ).get_office_by_email(email)
         if (
             not user
             or user.rol not in self.OFFICE_ROLES
@@ -67,7 +69,7 @@ class AuthService:
         repo = AuthChallengeRepository(self.session, firma.id)
         await repo.deactivate_for_user(user.id, self.CLIENT_LOGIN_PURPOSE)
         otp_code = (
-            "123456"
+            "12345"
             if settings.ENVIRONMENT == "development"
             else f"{secrets.randbelow(1_000_000):06d}"
         )

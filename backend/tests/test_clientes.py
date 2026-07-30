@@ -92,7 +92,8 @@ async def test_create_cliente_with_complete_directory_profile(client):
     assert data["direccion"] == payload["direccion"]
     assert data["direccion_notificacion"] == payload["direccion_notificacion"]
     assert data["canal_preferido"] == "whatsapp"
-    assert data["portal_user_id"] is None
+    assert data["portal_user_id"] is not None
+    assert data["portal_habilitado"] is True
 
 
 @pytest.mark.asyncio
@@ -110,6 +111,42 @@ async def test_duplicate_client_document_is_rejected(client):
     assert response.json()["detail"] == (
         "Ya existe un cliente con esa identificación"
     )
+
+
+@pytest.mark.asyncio
+async def test_client_can_be_created_without_portal_access(
+    client,
+    anonymous_client,
+):
+    suffix = uuid.uuid4().hex[:8]
+    document = f"66{suffix[:6]}"
+    response = await client.post(
+        "/api/v1/clientes",
+        json={
+            "nombre": f"Cliente sin portal {suffix}",
+            "numero_documento": document,
+            "email": f"sinportal.{suffix}@example.com",
+            "habilitar_portal": False,
+        },
+    )
+
+    assert response.status_code == 201
+    assert response.json()["portal_habilitado"] is False
+    assert response.json()["portal_user_id"] is None
+
+    await anonymous_client.post(
+        "/api/v1/auth/otp/request",
+        json={"cedula": document, "firma_slug": "demo"},
+    )
+    verify = await anonymous_client.post(
+        "/api/v1/auth/otp/verify",
+        json={
+            "cedula": document,
+            "code": "12345",
+            "firma_slug": "demo",
+        },
+    )
+    assert verify.status_code == 401
 
 
 @pytest.mark.asyncio

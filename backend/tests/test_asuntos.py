@@ -111,7 +111,10 @@ async def test_open_case_with_existing_client(client):
 
 
 @pytest.mark.asyncio
-async def test_open_case_creates_complete_new_client_atomically(client):
+async def test_open_case_creates_complete_new_client_atomically(
+    client,
+    anonymous_client,
+):
     suffix = uuid.uuid4().hex[:8]
     response = await client.post(
         "/api/v1/asuntos/apertura",
@@ -134,12 +137,30 @@ async def test_open_case_creates_complete_new_client_atomically(client):
 
     assert response.status_code == 201
     client_id = response.json()["cliente_id"]
+    case_id = response.json()["id"]
     listed_clients = await client.get("/api/v1/clientes")
     created_client = next(
         item for item in listed_clients.json() if item["id"] == client_id
     )
     assert created_client["direccion"] == "Calle 45 # 20-18"
     assert created_client["canal_preferido"] == "whatsapp"
+    assert created_client["portal_habilitado"] is True
+
+    await anonymous_client.post(
+        "/api/v1/auth/otp/request",
+        json={"cedula": f"88{suffix[:6]}", "firma_slug": "demo"},
+    )
+    verified = await anonymous_client.post(
+        "/api/v1/auth/otp/verify",
+        json={
+            "cedula": f"88{suffix[:6]}",
+            "code": "12345",
+            "firma_slug": "demo",
+        },
+    )
+    assert verified.status_code == 200
+    own_cases = await anonymous_client.get("/api/v1/asuntos")
+    assert case_id in {item["id"] for item in own_cases.json()}
 
 
 @pytest.mark.asyncio

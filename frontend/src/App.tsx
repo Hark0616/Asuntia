@@ -228,6 +228,7 @@ export default function App() {
         cedula: usuarioAutenticado.cedula,
         email: usuarioAutenticado.email,
         canal_preferido: 'email',
+        portal_habilitado: true,
         asuntos_count: (asuntosAPI || []).length,
         rol: usuarioAutenticado.rol,
         created_at: '',

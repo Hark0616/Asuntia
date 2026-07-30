@@ -16,7 +16,7 @@ async def test_request_otp_success(client):
 @pytest.mark.asyncio
 async def test_verify_otp_success(client):
     """
-    Prueba verificación exitosa con el código OTP dev (123456).
+    Prueba verificación exitosa con el código temporal local (12345).
     """
     await client.post(
         "/api/v1/auth/otp/request",
@@ -26,7 +26,7 @@ async def test_verify_otp_success(client):
         "/api/v1/auth/otp/verify",
         json={
             "cedula": "1.094.852.140",
-            "code": "123456",
+            "code": "12345",
             "firma_slug": "demo",
         },
     )
@@ -45,7 +45,7 @@ async def test_otp_cannot_be_reused(anonymous_client):
     )
     payload = {
         "cedula": "1.094.852.140",
-        "code": "123456",
+        "code": "12345",
         "firma_slug": "demo",
     }
     first = await anonymous_client.post("/api/v1/auth/otp/verify", json=payload)

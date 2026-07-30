@@ -24,6 +24,7 @@ export interface ClienteAPI {
   canal_preferido: 'email' | 'telefono' | 'whatsapp';
   observaciones?: string;
   portal_user_id?: string;
+  portal_habilitado: boolean;
   asuntos_count: number;
   rol: string;
   created_at: string;
@@ -43,6 +44,7 @@ export interface ClienteCreatePayload {
   departamento?: string;
   canal_preferido: 'email' | 'telefono' | 'whatsapp';
   observaciones?: string;
+  habilitar_portal: boolean;
 }
 
 export interface ResponsableAPI {

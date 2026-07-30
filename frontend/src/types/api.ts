@@ -32,6 +32,7 @@ export interface Cliente {
   canal_preferido: 'email' | 'telefono' | 'whatsapp';
   observaciones?: string;
   portal_user_id?: string;
+  portal_habilitado: boolean;
   asuntos_count: number;
   created_at: string;
 }

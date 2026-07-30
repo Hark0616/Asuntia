@@ -68,6 +68,10 @@ class Cliente(BaseModel):
         return sum(1 for asunto in asuntos if asunto.is_active)
 
     @property
+    def portal_habilitado(self) -> bool:
+        return self.portal_user_id is not None
+
+    @property
     def cedula(self) -> str:
         """Alias temporal para clientes de API anteriores."""
         return self.numero_documento

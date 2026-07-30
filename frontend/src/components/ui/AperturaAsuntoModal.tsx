@@ -44,6 +44,7 @@ interface NewClientForm {
   departamento: string;
   canal_preferido: ClienteCreatePayload['canal_preferido'];
   observaciones: string;
+  habilitar_portal: boolean;
 }
 
 const emptyClientForm = (): NewClientForm => ({
@@ -60,6 +61,7 @@ const emptyClientForm = (): NewClientForm => ({
   departamento: '',
   canal_preferido: 'email',
   observaciones: '',
+  habilitar_portal: true,
 });
 
 function getLocalDateInputValue() {
@@ -165,6 +167,7 @@ export function AperturaAsuntoModal({
         departamento: optionalValue(newClient.departamento),
         canal_preferido: newClient.canal_preferido,
         observaciones: optionalValue(newClient.observaciones),
+        habilitar_portal: newClient.habilitar_portal,
       },
       abogado_id: responsableId,
       fecha_apertura: openingDate,
@@ -289,6 +292,11 @@ export function AperturaAsuntoModal({
                           <span className="client-option-contact">
                             <span>{cliente.email}</span>
                             <span>{cliente.telefono || 'Sin teléfono'}</span>
+                            <span className="client-portal-state">
+                              {cliente.portal_habilitado
+                                ? 'Portal habilitado'
+                                : 'Sin acceso al portal'}
+                            </span>
                           </span>
                           <span className="client-option-meta">
                             <strong>
@@ -509,6 +517,22 @@ export function AperturaAsuntoModal({
                       placeholder="Preferencias de contacto o información operativa relevante"
                     />
                   </div>
+                  <label className="opening-portal-toggle opening-field-wide">
+                    <input
+                      type="checkbox"
+                      checked={newClient.habilitar_portal}
+                      onChange={(event) => setNewClient({
+                        ...newClient,
+                        habilitar_portal: event.target.checked,
+                      })}
+                    />
+                    <span>
+                      <strong>Habilitar acceso al portal</strong>
+                      <span>
+                        Primer ingreso con el código temporal 12345.
+                      </span>
+                    </span>
+                  </label>
                 </div>
               </section>
             )}
