@@ -1,53 +1,91 @@
 # Asuntia
 
-MVP web para seguimiento de asuntos legales entre una firma de abogados y sus clientes.
+Plataforma de gestión de asuntos legales para firmas de abogados y sus clientes.
 
 ## Stack
 
-- Next.js
-- React
-- TypeScript
-- Persistencia local para demo (`localStorage`)
+- Frontend: React 19, Vite, TypeScript y TanStack Query.
+- Backend: FastAPI, Pydantic v2, SQLAlchemy 2 Async y Alembic.
+- Base de datos: PostgreSQL 16.
+- Desarrollo local: Docker Compose y Mailpit.
 
-## Ejecutar
+El frontend consume exclusivamente la API REST de FastAPI. PostgreSQL no se
+expone directamente a React.
 
-```bash
+## Desarrollo local
+
+### 1. Infraestructura y backend
+
+```powershell
+docker compose up -d --build
+```
+
+Este comando inicia:
+
+- API: `http://localhost:8000`
+- Swagger: `http://localhost:8000/docs`
+- PostgreSQL: `localhost:5432`
+- Mailpit: `http://localhost:8025`
+
+`docker-compose.override.yml` monta el código de `backend/app` y las migraciones
+en los contenedores locales. Uvicorn recarga los cambios sin conservar una copia
+antigua del backend dentro de la imagen.
+
+Para comprobar el estado:
+
+```powershell
+docker compose ps
+docker compose logs backend --tail 50
+```
+
+### 2. Datos iniciales
+
+La carga semilla reinicia los datos de demostración. Úsala solamente en una base
+local que pueda reemplazarse:
+
+```powershell
+cd backend
+.venv\Scripts\python.exe app/seed.py
+```
+
+Las migraciones se aplican automáticamente al iniciar Compose. También pueden
+ejecutarse manualmente:
+
+```powershell
+cd backend
+.venv\Scripts\alembic.exe upgrade head
+```
+
+### 3. Frontend
+
+```powershell
+cd frontend
 npm install
 npm run dev
 ```
 
-## Verificar
+Aplicación: `http://localhost:5173`
 
-```bash
-npm run typecheck
-npm run lint
+## Verificación
+
+```powershell
+cd backend
+.venv\Scripts\pytest.exe
+
+cd ..\frontend
+npm test
 npm run build
-npm run test:e2e
 ```
 
-Las pruebas e2e levantan o reutilizan el servidor local en `http://localhost:3000` y validan los flujos principales de firma y cliente.
+## Accesos locales
 
-La primera version funciona como demo local sin base de datos externa. El objetivo es validar el flujo principal antes de conectar Supabase/Auth/Storage.
+Los usuarios de demostración se crean desde `backend/app/seed.py`. Las
+credenciales de prueba no deben incluirse como valores precargados en la
+interfaz ni utilizarse en producción.
 
-## Flujo MVP
+## Documentación
 
-- `/`: entrada principal con consulta por codigo/radicado, captcha MVP y acceso interno de firma.
-- `/cliente`: portal aislado de seguimiento del asunto, hitos, solicitudes y documentos publicados.
-- `/firma`: espacio interno aislado para crear clientes, crear casos, cambiar estados, agregar avances, registrar solicitudes y documentos.
-
-El captcha actual es de demo y se valida en cliente. En produccion debe reemplazarse por Turnstile/hCaptcha con verificacion del lado servidor.
-
-## Siguiente fase tecnica
-
-- Supabase Auth para login real.
-- Supabase Postgres para datos multi-tenant.
-- Supabase Storage o Cloudflare R2 para documentos.
-- Auditoria persistente.
-- Deploy en Vercel.
-
-## Documentacion De Producto Y Tecnologia
-
-- [Alcance MVP](docs/mvp-scope.md)
-- [Principios de ingenieria](docs/engineering-principles.md)
+- [Plan de ejecución](docs/ROADMAP_EJECUCION.md)
+- [Alcance funcional](docs/SCOPE_FINAL.md)
+- [Principios de ingeniería](docs/engineering-principles.md)
 - [Estrategia de base de datos](docs/database-strategy.md)
-- [Handoff de sesion 2026-07-05](docs/session-handoff-2026-07-05.md)
