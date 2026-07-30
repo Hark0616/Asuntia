@@ -1,10 +1,11 @@
 import uuid
 from datetime import date, datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from typing import Optional, List
 from app.schemas.base import BaseSchemaResponse
 from app.schemas.novedad import NovedadResponse
 from app.schemas.flujo import AsuntoPasoResponse
+from app.schemas.cliente import ClienteCreate
 
 class EstadoProcesalResponse(BaseSchemaResponse):
     id: uuid.UUID
@@ -20,6 +21,21 @@ class AsuntoCreate(BaseModel):
     abogado_id: Optional[uuid.UUID] = None
     estado_id: Optional[uuid.UUID] = None
     fecha_apertura: date = Field(default_factory=date.today)
+
+
+class AperturaAsuntoCreate(BaseModel):
+    cliente_id: Optional[uuid.UUID] = None
+    cliente_nuevo: Optional[ClienteCreate] = None
+    abogado_id: Optional[uuid.UUID] = None
+    fecha_apertura: date = Field(default_factory=date.today)
+
+    @model_validator(mode="after")
+    def validate_client_source(self):
+        if (self.cliente_id is None) == (self.cliente_nuevo is None):
+            raise ValueError(
+                "Debes seleccionar un cliente o registrar uno nuevo"
+            )
+        return self
 
 class AsuntoUpdateEstado(BaseModel):
     estado_id: Optional[uuid.UUID] = None

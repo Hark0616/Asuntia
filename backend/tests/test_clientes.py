@@ -11,6 +11,10 @@ async def test_list_clientes_success(client):
     data = response.json()
     assert isinstance(data, list)
     assert len(data) >= 1
+    carlos = next(
+        item for item in data if item["nombre"] == "Carlos Gómez Restrepo"
+    )
+    assert carlos["asuntos_count"] >= 1
 
 @pytest.mark.asyncio
 async def test_create_cliente_success(client):
@@ -133,4 +137,7 @@ async def test_client_remains_in_directory_after_case_is_archived(client):
     assert archived.status_code == 204
 
     listed = await client.get("/api/v1/clientes")
-    assert client_id in {item["id"] for item in listed.json()}
+    persisted = next(
+        item for item in listed.json() if item["id"] == client_id
+    )
+    assert persisted["asuntos_count"] == 0

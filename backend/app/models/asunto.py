@@ -66,7 +66,10 @@ class Asunto(BaseModel):
 
     # Relaciones
     cliente: Mapped["Cliente"] = relationship(
-        "Cliente", foreign_keys=[cliente_id], lazy="joined"
+        "Cliente",
+        foreign_keys=[cliente_id],
+        back_populates="asuntos",
+        lazy="joined",
     )
     abogado: Mapped[Optional["User"]] = relationship("User", foreign_keys=[abogado_id], lazy="joined")
     estado: Mapped[Optional["EstadoProcesal"]] = relationship("EstadoProcesal", lazy="joined")

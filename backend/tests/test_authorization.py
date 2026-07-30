@@ -50,9 +50,13 @@ async def test_lawyer_lists_only_assigned_cases_but_shared_client_directory(
 ):
     asuntos_response = await alejandro_client.get("/api/v1/asuntos")
     assert asuntos_response.status_code == 200
+    asuntos = asuntos_response.json()
     assert {
-        asunto["radicado"] for asunto in asuntos_response.json()
-    } == {"AS-2026-002", "AS-2026-004"}
+        asunto["radicado"] for asunto in asuntos
+    }.issuperset({"AS-2026-002", "AS-2026-004"})
+    assert {
+        asunto["abogado_id"] for asunto in asuntos
+    } == {"00000000-0000-0000-0000-000000000011"}
 
     clientes_response = await alejandro_client.get("/api/v1/clientes")
     assert clientes_response.status_code == 200

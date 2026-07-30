@@ -7,7 +7,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.db import get_db
 from app.core.access import can_access_asunto
 from app.core.deps import get_current_user, require_office_user, require_roles
-from app.schemas.asunto import AsuntoResponse, AsuntoCreate, AsuntoUpdateEstado
+from app.schemas.asunto import (
+    AperturaAsuntoCreate,
+    AsuntoResponse,
+    AsuntoCreate,
+    AsuntoUpdateEstado,
+)
 from app.schemas.flujo import AvanzarPasoRequest
 from app.repositories.asunto_repository import AsuntoRepository
 from app.repositories.cliente_repository import ClienteRepository
@@ -30,6 +35,77 @@ async def _resolve_internal_case_code(repo: AsuntoRepository, supplied_code: str
         if not await repo.get_by_radicado(code):
             return code
     raise DomainException(detail="No fue posible asignar un código interno al expediente", status_code=503)
+
+
+async def _open_case(
+    *,
+    cliente_id: uuid.UUID,
+    abogado_id: uuid.UUID | None,
+    estado_id: uuid.UUID | None,
+    fecha_apertura: date,
+    supplied_code: str | None,
+    db: AsyncSession,
+    current_user: User,
+) -> AsuntoResponse:
+    cliente = await ClienteRepository(
+        db, current_user.firma_id
+    ).get_by_id(cliente_id)
+    if not cliente:
+        raise NotFoundException(detail="Cliente no encontrado")
+    user_repo = UserRepository(db, current_user.firma_id)
+    responsable_id = abogado_id
+    if (
+        current_user.rol == "abogado"
+        and responsable_id is not None
+        and responsable_id != current_user.id
+    ):
+        raise DomainException(
+            detail="Un abogado sólo puede asignarse asuntos a sí mismo",
+            status_code=status.HTTP_403_FORBIDDEN,
+        )
+    if responsable_id:
+        abogado = await user_repo.get_by_id(responsable_id)
+        if not abogado or abogado.rol not in {"administrador", "abogado"}:
+            raise NotFoundException(detail="Abogado no encontrado")
+    elif current_user.rol in {"administrador", "abogado"}:
+        responsable_id = current_user.id
+    else:
+        raise DomainException(
+            detail="Debes asignar un abogado responsable al abrir el asunto",
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        )
+    repo = AsuntoRepository(db, current_user.firma_id)
+    radicado = await _resolve_internal_case_code(repo, supplied_code)
+    if await repo.get_by_radicado(radicado):
+        raise DomainException(detail="Ya existe un expediente con ese radicado")
+
+    estado_repo = EstadoRepository(db, current_user.firma_id)
+    if estado_id:
+        if not await estado_repo.get_by_id(estado_id):
+            raise NotFoundException(detail="Estado procesal no encontrado")
+    else:
+        estados = await estado_repo.list_ordered()
+        estado_id = estados[0].id if estados else None
+
+    steps = initial_workflow_steps()
+    return await repo.create_with_workflow(
+        {
+            "cliente_id": cliente_id,
+            "abogado_id": responsable_id,
+            "estado_id": estado_id,
+            "fecha_apertura": fecha_apertura,
+            "radicado": radicado,
+            "etapa_actual": (
+                f"Paso 1 de {len(steps)}: {steps[0]['titulo']}"
+            ),
+            "siguiente_paso": steps[0]["descripcion"],
+            "ruta_codigo": "insolvencia_persona_natural:v2",
+            "paso_actual": 1,
+            "flujo_estado": "activo",
+        },
+        steps,
+        created_by_id=current_user.id,
+    )
 
 @router.get("", response_model=List[AsuntoResponse])
 async def list_asuntos(
@@ -59,67 +135,56 @@ async def create_asunto(
     """
     Crea un nuevo asunto/expediente en la firma.
     """
-    cliente = await ClienteRepository(
-        db, current_user.firma_id
-    ).get_by_id(payload.cliente_id)
-    if not cliente:
-        raise NotFoundException(detail="Cliente no encontrado")
-    user_repo = UserRepository(db, current_user.firma_id)
-    responsable_id = payload.abogado_id
-    if (
-        current_user.rol == "abogado"
-        and responsable_id is not None
-        and responsable_id != current_user.id
-    ):
-        raise DomainException(
-            detail="Un abogado sólo puede asignarse asuntos a sí mismo",
-            status_code=status.HTTP_403_FORBIDDEN,
+    return await _open_case(
+        cliente_id=payload.cliente_id,
+        abogado_id=payload.abogado_id,
+        estado_id=payload.estado_id,
+        fecha_apertura=payload.fecha_apertura,
+        supplied_code=payload.radicado,
+        db=db,
+        current_user=current_user,
+    )
+
+
+@router.post(
+    "/apertura",
+    response_model=AsuntoResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def open_asunto(
+    payload: AperturaAsuntoCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_office_user),
+):
+    """Abre un asunto con un cliente existente o un perfil nuevo."""
+    cliente_id = payload.cliente_id
+    if payload.cliente_nuevo:
+        cliente_repo = ClienteRepository(db, current_user.firma_id)
+        if await cliente_repo.get_by_document(
+            payload.cliente_nuevo.numero_documento
+        ):
+            raise DomainException(
+                detail="Ya existe un cliente con esa identificación"
+            )
+        cliente = await cliente_repo.create_pending(
+            payload.cliente_nuevo.model_dump(),
+            created_by_id=current_user.id,
         )
-    if responsable_id:
-        abogado = await user_repo.get_by_id(responsable_id)
-        if not abogado or abogado.rol not in {"administrador", "abogado"}:
-            raise NotFoundException(detail="Abogado no encontrado")
-    elif current_user.rol in {"administrador", "abogado"}:
-        responsable_id = current_user.id
-    else:
+        cliente_id = cliente.id
+
+    if cliente_id is None:
         raise DomainException(
-            detail="Debes asignar un abogado responsable al abrir el asunto",
+            detail="Debes seleccionar un cliente",
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         )
-    repo = AsuntoRepository(db, current_user.firma_id)
-    radicado = await _resolve_internal_case_code(repo, payload.radicado)
-    if await repo.get_by_radicado(radicado):
-        raise DomainException(detail="Ya existe un expediente con ese radicado")
-
-    estado_repo = EstadoRepository(db, current_user.firma_id)
-    estado_id = payload.estado_id
-    if estado_id:
-        if not await estado_repo.get_by_id(estado_id):
-            raise NotFoundException(detail="Estado procesal no encontrado")
-    else:
-        estados = await estado_repo.list_ordered()
-        estado_id = estados[0].id if estados else None
-
-    data = payload.model_dump()
-    data["radicado"] = radicado
-    data.update(
-        {
-            "abogado_id": responsable_id,
-            "estado_id": estado_id,
-            "etapa_actual": (
-                f"Paso 1 de {len(initial_workflow_steps())}: "
-                f"{initial_workflow_steps()[0]['titulo']}"
-            ),
-            "siguiente_paso": initial_workflow_steps()[0]["descripcion"],
-            "ruta_codigo": "insolvencia_persona_natural:v2",
-            "paso_actual": 1,
-            "flujo_estado": "activo",
-        }
-    )
-    return await repo.create_with_workflow(
-        data,
-        initial_workflow_steps(),
-        created_by_id=current_user.id,
+    return await _open_case(
+        cliente_id=cliente_id,
+        abogado_id=payload.abogado_id,
+        estado_id=None,
+        fecha_apertura=payload.fecha_apertura,
+        supplied_code=None,
+        db=db,
+        current_user=current_user,
     )
 
 @router.get("/{radicado}", response_model=AsuntoResponse)

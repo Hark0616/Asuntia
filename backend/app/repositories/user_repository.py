@@ -38,6 +38,17 @@ class UserRepository(BaseRepository[User]):
             None,
         )
 
+    async def list_case_responsibles(self) -> list[User]:
+        stmt = (
+            select(User)
+            .where(User.firma_id == self.firma_id)
+            .where(User.rol.in_(("administrador", "abogado")))
+            .where(User.is_active == True)
+            .order_by(User.nombre.asc())
+        )
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())
+
     @staticmethod
     def normalize_cedula(cedula: str) -> str:
         return "".join(character for character in cedula if character.isalnum()).lower()

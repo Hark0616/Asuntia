@@ -41,6 +41,7 @@ class ClienteResponse(BaseModel):
     canal_preferido: str
     observaciones: Optional[str] = None
     portal_user_id: Optional[uuid.UUID] = None
+    asuntos_count: int = 0
     rol: str = "cliente"
     created_at: datetime
 

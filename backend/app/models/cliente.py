@@ -1,6 +1,6 @@
 import uuid
 from datetime import date
-from typing import Optional
+from typing import List, Optional
 
 from sqlalchemy import Date, ForeignKey, Index, String, Text
 from sqlalchemy.dialects.postgresql import UUID
@@ -58,6 +58,14 @@ class Cliente(BaseModel):
     portal_user: Mapped[Optional["User"]] = relationship(
         "User", foreign_keys=[portal_user_id], lazy="joined"
     )
+    asuntos: Mapped[List["Asunto"]] = relationship(
+        "Asunto", back_populates="cliente", lazy="raise"
+    )
+
+    @property
+    def asuntos_count(self) -> int:
+        asuntos = self.__dict__.get("asuntos", ())
+        return sum(1 for asunto in asuntos if asunto.is_active)
 
     @property
     def cedula(self) -> str:
