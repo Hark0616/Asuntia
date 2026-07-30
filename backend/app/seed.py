@@ -64,6 +64,15 @@ async def seed_data():
             cedula="79.382.910",
             rol="abogado"
         )
+        auxiliar_sandra = User(
+            id=uuid.UUID("00000000-0000-0000-0000-000000000012"),
+            firma_id=DEFAULT_FIRMA_ID,
+            nombre="Sandra Pérez",
+            email="sandra.perez@asuntia.com",
+            hashed_password=get_password_hash("admin123"),
+            cedula="63.482.105",
+            rol="auxiliar"
+        )
 
         portal_carlos = User(
             id=uuid.UUID("00000000-0000-0000-0000-000000000020"),
@@ -101,6 +110,7 @@ async def seed_data():
         session.add_all([
             abogada_daniela,
             abogado_alejandro,
+            auxiliar_sandra,
             portal_carlos,
             portal_transportes,
             portal_elena,
@@ -122,6 +132,7 @@ async def seed_data():
             departamento="Santander",
             canal_preferido="whatsapp",
             portal_user_id=portal_carlos.id,
+            responsable_id=abogada_daniela.id,
             created_by_id=abogada_daniela.id,
         )
         cliente_transportes = Cliente(
@@ -139,6 +150,7 @@ async def seed_data():
             departamento="Santander",
             canal_preferido="email",
             portal_user_id=portal_transportes.id,
+            responsable_id=abogado_alejandro.id,
             created_by_id=abogado_alejandro.id,
         )
         cliente_elena = Cliente(
@@ -155,6 +167,7 @@ async def seed_data():
             departamento="Santander",
             canal_preferido="email",
             portal_user_id=portal_elena.id,
+            responsable_id=abogada_daniela.id,
             created_by_id=abogada_daniela.id,
         )
         cliente_jorge = Cliente(
@@ -171,6 +184,7 @@ async def seed_data():
             departamento="Santander",
             canal_preferido="whatsapp",
             portal_user_id=portal_jorge.id,
+            responsable_id=abogado_alejandro.id,
             created_by_id=abogado_alejandro.id,
         )
         session.add_all([

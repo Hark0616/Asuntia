@@ -54,9 +54,18 @@ class Cliente(BaseModel):
         nullable=True,
         unique=True,
     )
+    responsable_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", name="fk_clientes_responsable_id_users"),
+        nullable=True,
+        index=True,
+    )
 
     portal_user: Mapped[Optional["User"]] = relationship(
         "User", foreign_keys=[portal_user_id], lazy="joined"
+    )
+    responsable: Mapped[Optional["User"]] = relationship(
+        "User", foreign_keys=[responsable_id], lazy="joined"
     )
     asuntos: Mapped[List["Asunto"]] = relationship(
         "Asunto", back_populates="cliente", lazy="raise"

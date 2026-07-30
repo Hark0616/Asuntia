@@ -9,6 +9,7 @@ from app.core.access import can_access_asunto
 from app.core.deps import get_current_user, require_office_user, require_roles
 from app.schemas.asunto import (
     AperturaAsuntoCreate,
+    AsuntoAsignarResponsable,
     AsuntoResponse,
     AsuntoCreate,
     AsuntoUpdateEstado,
@@ -22,6 +23,7 @@ from app.core.exceptions import DomainException, NotFoundException
 from app.models.user import User
 from app.services.workflow_service import WorkflowService, initial_workflow_steps
 from app.services.cliente_service import ClienteService
+from app.services.asignacion_service import AsignacionService
 
 router = APIRouter()
 
@@ -53,28 +55,12 @@ async def _open_case(
     ).get_by_id(cliente_id)
     if not cliente:
         raise NotFoundException(detail="Cliente no encontrado")
-    user_repo = UserRepository(db, current_user.firma_id)
-    responsable_id = abogado_id
-    if (
-        current_user.rol == "abogado"
-        and responsable_id is not None
-        and responsable_id != current_user.id
-    ):
-        raise DomainException(
-            detail="Un abogado sólo puede asignarse asuntos a sí mismo",
-            status_code=status.HTTP_403_FORBIDDEN,
-        )
-    if responsable_id:
-        abogado = await user_repo.get_by_id(responsable_id)
-        if not abogado or abogado.rol not in {"administrador", "abogado"}:
-            raise NotFoundException(detail="Abogado no encontrado")
-    elif current_user.rol in {"administrador", "abogado"}:
-        responsable_id = current_user.id
-    else:
-        raise DomainException(
-            detail="Debes asignar un abogado responsable al abrir el asunto",
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        )
+    responsable_id = await _resolve_case_responsible(
+        db=db,
+        current_user=current_user,
+        requested_id=abogado_id,
+    )
+
     repo = AsuntoRepository(db, current_user.firma_id)
     radicado = await _resolve_internal_case_code(repo, supplied_code)
     if await repo.get_by_radicado(radicado):
@@ -107,6 +93,37 @@ async def _open_case(
         steps,
         created_by_id=current_user.id,
     )
+
+
+async def _resolve_case_responsible(
+    *,
+    db: AsyncSession,
+    current_user: User,
+    requested_id: uuid.UUID | None,
+) -> uuid.UUID:
+    user_repo = UserRepository(db, current_user.firma_id)
+    responsable_id = requested_id
+    if (
+        current_user.rol == "abogado"
+        and responsable_id is not None
+        and responsable_id != current_user.id
+    ):
+        raise DomainException(
+            detail="Un abogado sólo puede asignarse asuntos a sí mismo",
+            status_code=status.HTTP_403_FORBIDDEN,
+        )
+    if responsable_id:
+        abogado = await user_repo.get_case_responsible(responsable_id)
+        if not abogado:
+            raise NotFoundException(detail="Abogado no encontrado")
+    elif current_user.rol in {"administrador", "abogado"}:
+        responsable_id = current_user.id
+    else:
+        raise DomainException(
+            detail="Debes asignar un abogado responsable al abrir el asunto",
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        )
+    return responsable_id
 
 @router.get("", response_model=List[AsuntoResponse])
 async def list_asuntos(
@@ -159,6 +176,11 @@ async def open_asunto(
 ):
     """Abre un asunto con un cliente existente o un perfil nuevo."""
     cliente_id = payload.cliente_id
+    responsable_id = await _resolve_case_responsible(
+        db=db,
+        current_user=current_user,
+        requested_id=payload.abogado_id,
+    )
     if payload.cliente_nuevo:
         cliente = await ClienteService(
             db, current_user.firma_id
@@ -166,6 +188,7 @@ async def open_asunto(
             payload.cliente_nuevo,
             created_by_id=current_user.id,
             commit=False,
+            responsable_id=responsable_id,
         )
         cliente_id = cliente.id
 
@@ -176,13 +199,31 @@ async def open_asunto(
         )
     return await _open_case(
         cliente_id=cliente_id,
-        abogado_id=payload.abogado_id,
+        abogado_id=responsable_id,
         estado_id=None,
         fecha_apertura=payload.fecha_apertura,
         supplied_code=None,
         db=db,
         current_user=current_user,
     )
+
+
+@router.patch(
+    "/{asunto_id}/responsable",
+    response_model=AsuntoResponse,
+)
+async def assign_case_responsible(
+    asunto_id: uuid.UUID,
+    payload: AsuntoAsignarResponsable,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(
+        require_roles("administrador", "auxiliar")
+    ),
+):
+    """Transfiere el asunto y todo su trabajo abierto a otro responsable."""
+    return await AsignacionService(
+        db, current_user.firma_id
+    ).assign_case(asunto_id, payload.responsable_id)
 
 @router.get("/{radicado}", response_model=AsuntoResponse)
 async def get_asunto(

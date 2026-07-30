@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, time, timedelta, timezone
 from typing import Optional
 
-from sqlalchemy import case, func, select
+from sqlalchemy import case, func, select, update
 from sqlalchemy.orm import joinedload
 
 from app.models.asunto import Asunto
@@ -152,3 +152,25 @@ class TareaRepository(BaseRepository[Tarea]):
         tarea.completed_by_id = actor_id
         tarea.resultado = resultado
         self.session.add(tarea)
+
+    async def reassign_open_for_asunto(
+        self,
+        asunto_id: uuid.UUID,
+        responsable_id: uuid.UUID,
+    ) -> int:
+        result = await self.session.execute(
+            update(Tarea)
+            .where(Tarea.asunto_id == asunto_id)
+            .where(Tarea.firma_id == self.firma_id)
+            .where(Tarea.is_active == True)
+            .where(
+                Tarea.estado.in_(
+                    [
+                        TareaEstado.PENDIENTE.value,
+                        TareaEstado.EN_PROGRESO.value,
+                    ]
+                )
+            )
+            .values(responsable_id=responsable_id)
+        )
+        return result.rowcount or 0

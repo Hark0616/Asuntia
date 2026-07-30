@@ -22,6 +22,7 @@ class ClienteService:
         *,
         created_by_id: uuid.UUID,
         commit: bool,
+        responsable_id: uuid.UUID | None = None,
     ) -> Cliente:
         cliente_repo = ClienteRepository(self.session, self.firma_id)
         if await cliente_repo.get_by_document(payload.numero_documento):
@@ -30,6 +31,7 @@ class ClienteService:
             )
 
         cliente_data = payload.model_dump(exclude={"habilitar_portal"})
+        cliente_data["responsable_id"] = responsable_id
         if payload.habilitar_portal:
             portal_user = await UserRepository(
                 self.session, self.firma_id

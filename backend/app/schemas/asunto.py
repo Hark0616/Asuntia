@@ -40,6 +40,11 @@ class AperturaAsuntoCreate(BaseModel):
 class AsuntoUpdateEstado(BaseModel):
     estado_id: Optional[uuid.UUID] = None
 
+
+class AsuntoAsignarResponsable(BaseModel):
+    responsable_id: uuid.UUID
+
+
 class AsuntoResponse(BaseSchemaResponse):
     id: uuid.UUID
     radicado: str

@@ -196,3 +196,11 @@ class AsuntoRepository(BaseRepository[Asunto]):
         if created is None:
             raise RuntimeError("El asunto creado no pudo recargarse")
         return created
+
+    def stage_responsible(
+        self,
+        asunto: Asunto,
+        responsable_id: uuid.UUID,
+    ) -> None:
+        asunto.abogado_id = responsable_id
+        self.session.add(asunto)

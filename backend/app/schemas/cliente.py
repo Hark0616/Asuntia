@@ -42,9 +42,14 @@ class ClienteResponse(BaseModel):
     canal_preferido: str
     observaciones: Optional[str] = None
     portal_user_id: Optional[uuid.UUID] = None
+    responsable_id: Optional[uuid.UUID] = None
     portal_habilitado: bool
     asuntos_count: int = 0
     rol: str = "cliente"
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ClienteAsignarResponsable(BaseModel):
+    responsable_id: uuid.UUID

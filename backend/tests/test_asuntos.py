@@ -145,6 +145,9 @@ async def test_open_case_creates_complete_new_client_atomically(
     assert created_client["direccion"] == "Calle 45 # 20-18"
     assert created_client["canal_preferido"] == "whatsapp"
     assert created_client["portal_habilitado"] is True
+    assert created_client["responsable_id"] == (
+        "00000000-0000-0000-0000-000000000010"
+    )
 
     await anonymous_client.post(
         "/api/v1/auth/otp/request",

@@ -12,6 +12,17 @@ class ClienteRepository(BaseRepository[Cliente]):
     def __init__(self, session, firma_id: uuid.UUID):
         super().__init__(Cliente, session, firma_id)
 
+    async def get_by_id(self, id: uuid.UUID) -> Optional[Cliente]:
+        stmt = (
+            select(Cliente)
+            .options(selectinload(Cliente.asuntos))
+            .where(Cliente.id == id)
+            .where(Cliente.firma_id == self.firma_id)
+            .where(Cliente.is_active == True)
+        )
+        result = await self.session.execute(stmt)
+        return result.scalars().first()
+
     async def list(self, skip: int = 0, limit: int = 200) -> list[Cliente]:
         stmt = (
             select(Cliente)
@@ -80,6 +91,14 @@ class ClienteRepository(BaseRepository[Cliente]):
         self.session.add(cliente)
         await self.session.flush()
         return cliente
+
+    def stage_responsible(
+        self,
+        cliente: Cliente,
+        responsable_id: uuid.UUID,
+    ) -> None:
+        cliente.responsable_id = responsable_id
+        self.session.add(cliente)
 
     @staticmethod
     def normalize_document(document: str) -> str:

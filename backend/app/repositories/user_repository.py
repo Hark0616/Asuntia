@@ -50,6 +50,14 @@ class UserRepository(BaseRepository[User]):
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
+    async def get_case_responsible(
+        self, user_id: uuid.UUID
+    ) -> Optional[User]:
+        user = await self.get_by_id(user_id)
+        if user and user.rol in {"administrador", "abogado"}:
+            return user
+        return None
+
     async def create_pending(
         self,
         obj_in_data: dict[str, Any],
