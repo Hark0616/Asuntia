@@ -743,9 +743,6 @@ export default function App() {
                                 <strong>{cs.nombre}</strong>
                                 <span className="muted small">{cs.codigo}</span>
                               </div>
-                              <div className="case-card-badges">
-                                <span className={`badge ${cs.estadoTipo}`}>{cs.estadoBadge}</span>
-                              </div>
                             </div>
                             <span className="case-card-current">
                               Acción actual · {cs.accionActual}
@@ -768,11 +765,13 @@ export default function App() {
                             <h3>{casoActivo.nombre}</h3>
                             <span className="muted small">{casoActivo.codigo} · {casoActivo.responsable}</span>
                           </div>
-                          <span className="row">
+                          <span className="row case-public-status">
+                            <span className="muted small">Estado comunicado</span>
                             <span className={`badge ${casoActivo.estadoTipo}`}>{casoActivo.estadoBadge}</span>
-                            {casoActivo.estadoDescripcion && (
-                              <Tooltip content={casoActivo.estadoDescripcion} />
-                            )}
+                            <Tooltip
+                              content={casoActivo.estadoDescripcion
+                                || 'Estado procesal que se muestra al cliente.'}
+                            />
                           </span>
                         </div>
 
