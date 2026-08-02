@@ -53,14 +53,14 @@ async def request_otp(payload: OTPRequest, db: AsyncSession = Depends(get_db)):
     """
     Solicita un código OTP por correo electrónico usando la cédula del cliente.
     """
-    user, otp_code = await AuthService(db).issue_client_otp(
+    user, otp_code, destination_email = await AuthService(db).issue_client_otp(
         payload.firma_slug, payload.cedula
     )
     
     # Intentar enviar correo vía Mailpit / SMTP de forma segura sin romper la API
-    if user and otp_code:
+    if user and otp_code and destination_email:
         try:
-            send_otp_email(user.email, otp_code)
+            send_otp_email(destination_email, otp_code)
         except Exception as err:
             print(f"[OTP Dev Warning] No se pudo contactar servidor SMTP: {err}")
     

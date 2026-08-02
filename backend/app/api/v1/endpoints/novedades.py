@@ -3,6 +3,7 @@ from typing import List
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.deps import get_current_user, require_office_user
+from app.core.access import can_access_asunto
 from app.core.db import get_db
 from app.schemas.novedad import NovedadCreate, NovedadResponse
 from app.repositories.novedad_repository import NovedadRepository
@@ -23,9 +24,7 @@ async def list_novedades(
     Obtiene el historial de novedades de un asunto.
     """
     asunto = await AsuntoRepository(db, current_user.firma_id).get_by_id(asunto_id)
-    if not asunto or (
-        current_user.rol == "cliente" and asunto.cliente_id != current_user.id
-    ):
+    if not asunto or not can_access_asunto(current_user, asunto):
         raise NotFoundException(detail="Asunto no encontrado")
 
     repo = NovedadRepository(db, current_user.firma_id)
@@ -46,7 +45,7 @@ async def create_novedad(
     """
     asunto_repo = AsuntoRepository(db, current_user.firma_id)
     asunto = await asunto_repo.get_by_id(asunto_id)
-    if not asunto:
+    if not asunto or not can_access_asunto(current_user, asunto):
         raise NotFoundException(detail="Asunto no encontrado")
 
     repo = NovedadRepository(db, current_user.firma_id)

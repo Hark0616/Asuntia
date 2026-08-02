@@ -29,8 +29,10 @@ class DocumentoResponse(PydanticBaseModel):
     id: uuid.UUID
     firma_id: uuid.UUID
     asunto_id: uuid.UUID
+    asunto_paso_id: Optional[uuid.UUID] = None
     nombre_funcional: str
     tipo_documental: str
+    subcarpeta: str
     provider: str
     external_file_id: str
     web_view_url: str

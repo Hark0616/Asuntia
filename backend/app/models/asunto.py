@@ -1,6 +1,7 @@
 import uuid
+from datetime import date
 from typing import Optional, List
-from sqlalchemy import Integer, String, ForeignKey
+from sqlalchemy import Date, Integer, String, ForeignKey, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from app.models.base import BaseModel
@@ -12,9 +13,16 @@ class Asunto(BaseModel):
     __tablename__ = "asuntos"
 
     radicado: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+
+    fecha_apertura: Mapped[date] = mapped_column(
+        Date,
+        nullable=False,
+        default=date.today,
+        server_default=text("CURRENT_DATE"),
+    )
     
     cliente_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True
+        UUID(as_uuid=True), ForeignKey("clientes.id"), nullable=False, index=True
     )
     
     abogado_id: Mapped[Optional[uuid.UUID]] = mapped_column(
@@ -36,8 +44,8 @@ class Asunto(BaseModel):
     ruta_codigo: Mapped[str] = mapped_column(
         String(80),
         nullable=False,
-        default="insolvencia_persona_natural",
-        server_default="insolvencia_persona_natural",
+        default="insolvencia_persona_natural:v2",
+        server_default="insolvencia_persona_natural:v2",
     )
 
     paso_actual: Mapped[int] = mapped_column(
@@ -57,7 +65,12 @@ class Asunto(BaseModel):
     )
 
     # Relaciones
-    cliente: Mapped["User"] = relationship("User", foreign_keys=[cliente_id], lazy="joined")
+    cliente: Mapped["Cliente"] = relationship(
+        "Cliente",
+        foreign_keys=[cliente_id],
+        back_populates="asuntos",
+        lazy="joined",
+    )
     abogado: Mapped[Optional["User"]] = relationship("User", foreign_keys=[abogado_id], lazy="joined")
     estado: Mapped[Optional["EstadoProcesal"]] = relationship("EstadoProcesal", lazy="joined")
     novedades: Mapped[List["Novedad"]] = relationship("Novedad", back_populates="asunto", lazy="selectin", cascade="all, delete-orphan")
@@ -68,4 +81,11 @@ class Asunto(BaseModel):
         lazy="selectin",
         cascade="all, delete-orphan",
         order_by="AsuntoPaso.orden",
+    )
+    tareas: Mapped[List["Tarea"]] = relationship(
+        "Tarea",
+        back_populates="asunto",
+        lazy="selectin",
+        cascade="all, delete-orphan",
+        order_by="Tarea.created_at",
     )

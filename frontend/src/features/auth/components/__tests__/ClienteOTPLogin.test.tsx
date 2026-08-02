@@ -13,7 +13,7 @@ vi.mock('@/lib/axios', () => ({
         return Promise.reject({ response: { data: { detail: 'Cédula no encontrada' } } });
       }
       if (url === '/auth/otp/verify') {
-        if (body.code === '123456') {
+        if (body.code === '12345') {
           return Promise.resolve({
             data: { user: { nombre: 'Carlos Gómez', rol: 'cliente' } }
           });

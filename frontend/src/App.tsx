@@ -1,7 +1,14 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  Navigate,
+  NavLink,
+  matchPath,
+  useLocation,
+  useNavigate,
+} from 'react-router';
 import { 
-  LogOut, 
+  BriefcaseBusiness,
   CircleCheck, 
   ChevronRight, 
   ChevronDown, 
@@ -12,37 +19,45 @@ import {
   Eye, 
   Send, 
   Clock3,
-  UserCheck,
-  HardDrive
+  HardDrive,
+  UsersRound,
 } from 'lucide-react';
 import { 
   fetchAsuntos, 
   fetchEstadosAPI, 
   fetchClientesAPI,
-  crearClienteAPI,
-  crearAsuntoAPI,
+  fetchResponsablesAPI,
+  abrirAsuntoAPI,
   avanzarPasoAPI,
   crearNovedadAPI, 
   actualizarEstadoAPI, 
+  asignarResponsableClienteAPI,
+  asignarResponsableAsuntoAPI,
   AsuntoAPI, 
   EstadoProcesalAPI,
-  ClienteAPI
+  ClienteAPI,
+  AperturaAsuntoPayload,
 } from '@/features/asuntos/api/asuntos';
 import { ClienteOTPLogin } from '@/features/auth/components/ClienteOTPLogin';
 import { OficinaLogin } from '@/features/auth/components/OficinaLogin';
 import { fetchCurrentUserAPI, logoutAPI } from '@/features/auth/api/auth';
 import type { User } from '@/types/api';
 import { Tooltip } from '@/components/ui/Tooltip';
-import { CrearClienteModal } from '@/components/ui/CrearClienteModal';
-import { CrearAsuntoModal } from '@/components/ui/CrearAsuntoModal';
+import { AperturaAsuntoModal } from '@/components/ui/AperturaAsuntoModal';
 import { DocumentosTab } from '@/features/documentos/components/DocumentosTab';
 import { ConfiguracionAlmacenamiento } from '@/features/firma/components/ConfiguracionAlmacenamiento';
 import { FlujoAsunto } from '@/features/asuntos/components/FlujoAsunto';
+import { ResponsableAsignacion } from '@/features/asuntos/components/ResponsableAsignacion';
 import type { AsuntoPasoAPI } from '@/features/asuntos/api/asuntos';
+import { UserMenu } from '@/components/layout/UserMenu';
+import { MiTrabajo } from '@/features/tareas/components/MiTrabajo';
+import { formatAsuntosCount } from '@/lib/formatAsuntos';
 
 interface NovedadItem {
   id: string;
   autor: string;
+  titulo: string;
+  tipo: 'nota' | 'paso_completado' | 'documento_incorporado';
   fecha: string;
   texto: string;
   visibilidad: 'Cliente' | 'Interno';
@@ -67,6 +82,9 @@ interface CasoData {
   estadoBadge: string;
   estadoTipo: 'warning' | 'neutral' | 'mint' | 'danger';
   estadoId?: string;
+  estadoDescripcion?: string;
+  accionActual: string;
+  abogadoId?: string;
   prioridad: 'alta' | 'normal';
   proximoPaso: string;
   solicitudPendiente?: string;
@@ -83,20 +101,42 @@ interface ClienteData {
   contacto: string;
   email: string;
   identificacion: string;
+  responsableId?: string;
+  responsableNombre: string;
+  asuntosRegistrados: number;
   casos: CasoData[];
 }
 
 export default function App() {
   const queryClient = useQueryClient();
+  const location = useLocation();
+  const navigate = useNavigate();
   
   const [usuarioAutenticado, setUsuarioAutenticado] = useState<User | null | undefined>(undefined);
   const [view, setView] = useState<'cliente' | 'firma'>('firma');
-  const [seccionFirma, setSeccionFirma] = useState<'expedientes' | 'config_almacenamiento'>('expedientes');
   const [clienteIdSeleccionado, setClienteIdSeleccionado] = useState<string>('');
   const [casoIdSeleccionado, setCasoIdSeleccionado] = useState<string>('');
   const [milestoneAbiertoId, setMilestoneAbiertoId] = useState<number | null>(2);
-  const [crearClienteAbierto, setCrearClienteAbierto] = useState(false);
-  const [crearAsuntoAbierto, setCrearAsuntoAbierto] = useState(false);
+  const [aperturaAbierta, setAperturaAbierta] = useState(false);
+  const [clienteInicialAperturaId, setClienteInicialAperturaId] = useState('');
+  const asuntoRouteMatch = matchPath(
+    '/oficina/asuntos/:asuntoId',
+    location.pathname,
+  );
+  const seccionFirma = location.pathname === '/oficina/ajustes/almacenamiento'
+    ? 'config_almacenamiento'
+    : location.pathname === '/oficina/asuntos' || asuntoRouteMatch
+      ? 'expedientes'
+      : 'trabajo';
+  const validOfficeRoute = (
+    location.pathname === '/oficina/trabajo'
+    || location.pathname === '/oficina/asuntos'
+    || Boolean(asuntoRouteMatch)
+    || (
+      usuarioAutenticado?.rol === 'administrador'
+      && location.pathname === '/oficina/ajustes/almacenamiento'
+    )
+  );
 
   const { data: sessionUser, isLoading: sessionLoading } = useQuery({
     queryKey: ['auth', 'me'],
@@ -116,7 +156,7 @@ export default function App() {
   // Consultas API protegidas por la sesión y el rol.
   const authenticated = Boolean(usuarioAutenticado);
   const officeUser = authenticated && usuarioAutenticado?.rol !== 'cliente';
-  const { data: asuntosAPI, isSuccess: apiConectada } = useQuery({
+  const { data: asuntosAPI } = useQuery({
     queryKey: ['asuntos'],
     queryFn: fetchAsuntos,
     retry: 1,
@@ -134,23 +174,29 @@ export default function App() {
     retry: 1,
     enabled: officeUser,
   });
+  const { data: responsablesAPI } = useQuery({
+    queryKey: ['equipo', 'responsables'],
+    queryFn: fetchResponsablesAPI,
+    retry: 1,
+    enabled: officeUser,
+  });
+  const puedeGestionarAsignaciones = (
+    usuarioAutenticado?.rol === 'administrador'
+    || usuarioAutenticado?.rol === 'auxiliar'
+  );
 
   // Mutaciones
-  const mutacionNuevoCliente = useMutation({
-    mutationFn: (payload: { nombre: string; cedula: string; email: string; telefono?: string }) => crearClienteAPI(payload),
-    onSuccess: (newClient) => {
-      queryClient.invalidateQueries({ queryKey: ['clientes'] });
-      setClienteIdSeleccionado(newClient.id);
-      setCrearClienteAbierto(false);
-    }
-  });
-
-  const mutacionNuevoAsunto = useMutation({
-    mutationFn: (payload: { radicado: string; cliente_id: string }) => crearAsuntoAPI(payload),
+  const mutacionApertura = useMutation({
+    mutationFn: (payload: AperturaAsuntoPayload) => abrirAsuntoAPI(payload),
     onSuccess: (newAsunto) => {
+      queryClient.invalidateQueries({ queryKey: ['clientes'] });
       queryClient.invalidateQueries({ queryKey: ['asuntos'] });
+      queryClient.invalidateQueries({ queryKey: ['tareas'] });
+      setClienteIdSeleccionado(newAsunto.cliente_id);
       setCasoIdSeleccionado(newAsunto.id);
-      setCrearAsuntoAbierto(false);
+      setAperturaAbierta(false);
+      setClienteInicialAperturaId('');
+      navigate(`/oficina/asuntos/${newAsunto.id}#paso-activo`);
     }
   });
 
@@ -159,6 +205,7 @@ export default function App() {
       avanzarPasoAPI(asuntoId, { paso_codigo: pasoCodigo, datos }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['asuntos'] });
+      queryClient.invalidateQueries({ queryKey: ['tareas'] });
     },
   });
 
@@ -167,14 +214,42 @@ export default function App() {
       crearNovedadAPI(asuntoId, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['asuntos'] });
+      setNuevoAvanceTexto('');
     },
   });
 
   const mutacionEstado = useMutation({
-    mutationFn: ({ asuntoId, payload }: { asuntoId: string; payload: { estado_id?: string; siguiente_paso?: string } }) =>
+    mutationFn: ({ asuntoId, payload }: { asuntoId: string; payload: { estado_id?: string } }) =>
       actualizarEstadoAPI(asuntoId, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['asuntos'] });
+    },
+  });
+
+  const mutacionResponsableCliente = useMutation({
+    mutationFn: ({
+      clienteId,
+      responsableId,
+    }: {
+      clienteId: string;
+      responsableId: string;
+    }) => asignarResponsableClienteAPI(clienteId, responsableId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['clientes'] });
+    },
+  });
+
+  const mutacionResponsableAsunto = useMutation({
+    mutationFn: ({
+      asuntoId,
+      responsableId,
+    }: {
+      asuntoId: string;
+      responsableId: string;
+    }) => asignarResponsableAsuntoAPI(asuntoId, responsableId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['asuntos'] });
+      queryClient.invalidateQueries({ queryKey: ['tareas'] });
     },
   });
 
@@ -182,9 +257,15 @@ export default function App() {
   const clientesFuente: ClienteAPI[] = usuarioAutenticado?.rol === 'cliente'
     ? [{
         id: usuarioAutenticado.id,
+        tipo_persona: 'natural',
+        tipo_documento: 'CC',
+        numero_documento: usuarioAutenticado.cedula,
         nombre: usuarioAutenticado.nombre,
         cedula: usuarioAutenticado.cedula,
         email: usuarioAutenticado.email,
+        canal_preferido: 'email',
+        portal_habilitado: true,
+        asuntos_count: (asuntosAPI || []).length,
         rol: usuarioAutenticado.rol,
         created_at: '',
       }]
@@ -192,6 +273,9 @@ export default function App() {
 
   const clientes: ClienteData[] = clientesFuente.map((cli: ClienteAPI) => {
       const casosDelCliente = (asuntosAPI || []).filter((as: AsuntoAPI) => as.cliente_id === cli.id);
+      const responsableCliente = (responsablesAPI || []).find(
+        (responsable) => responsable.id === cli.responsable_id,
+      );
 
       return {
         id: cli.id,
@@ -199,14 +283,27 @@ export default function App() {
         contacto: cli.nombre.split(' ')[0],
         email: cli.email,
         identificacion: cli.cedula,
-        casos: casosDelCliente.map((as: AsuntoAPI) => ({
+        responsableId: cli.responsable_id,
+        responsableNombre: responsableCliente?.nombre || 'Sin asignar',
+        asuntosRegistrados: cli.asuntos_count,
+        casos: casosDelCliente.map((as: AsuntoAPI) => {
+          const responsableAsunto = (responsablesAPI || []).find(
+            (responsable) => responsable.id === as.abogado_id,
+          );
+          return {
           id: as.id,
           codigo: as.radicado,
           nombre: 'Insolvencia Persona Natural',
-          responsable: 'Equipo jurídico asignado',
+          responsable: usuarioAutenticado?.rol === 'cliente'
+            ? 'Equipo jurídico asignado'
+            : (responsableAsunto?.nombre || 'Sin asignar'),
           estadoBadge: as.estado?.nombre || 'En trámite',
           estadoTipo: (as.estado?.color_tipo as any) || 'mint',
           estadoId: as.estado?.id,
+          estadoDescripcion: as.estado?.descripcion,
+          accionActual: as.pasos.find((paso) => paso.estado === 'activo')?.titulo
+            || as.etapa_actual,
+          abogadoId: as.abogado_id,
           prioridad: 'normal' as const,
           proximoPaso: as.siguiente_paso,
           milestones: as.pasos.map((paso) => ({
@@ -223,26 +320,59 @@ export default function App() {
           flujoEstado: as.flujo_estado,
           novedades: as.novedades.map(nov => ({
             id: nov.id,
-            autor: 'Equipo jurídico',
-            fecha: new Date(nov.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            autor: nov.tipo === 'nota' ? 'Nota de la firma' : 'Actividad del sistema',
+            titulo: nov.titulo,
+            tipo: nov.tipo,
+            fecha: new Intl.DateTimeFormat('es-CO', {
+              timeZone: 'America/Bogota',
+              dateStyle: 'medium',
+              timeStyle: 'short',
+            }).format(new Date(nov.created_at)),
             texto: nov.descripcion,
             visibilidad: nov.publicado_al_cliente ? 'Cliente' : 'Interno'
           }))
-        }))
+          };
+        })
       };
     });
 
   // Selección activa
-  const clienteActivo = clientes.find(c => c.id === clienteIdSeleccionado) || clientes[0] || null;
+  const clienteActivo = usuarioAutenticado?.rol === 'cliente'
+    ? clientes[0] || null
+    : clientes.find(c => c.id === clienteIdSeleccionado) || null;
   const casoActivo = clienteActivo && clienteActivo.casos ? (clienteActivo.casos.find(c => c.id === casoIdSeleccionado) || clienteActivo.casos[0] || null) : null;
 
   const [estadoSeleccionadoId, setEstadoSeleccionadoId] = useState<string>('');
   const [nuevoAvanceTexto, setNuevoAvanceTexto] = useState('');
   const [nuevoAvanceVisibilidad, setNuevoAvanceVisibilidad] = useState<'client' | 'internal'>('client');
 
+  React.useEffect(() => {
+    setEstadoSeleccionadoId(casoActivo?.estadoId || '');
+  }, [casoActivo?.id, casoActivo?.estadoId]);
+
+  React.useEffect(() => {
+    const asuntoId = asuntoRouteMatch?.params.asuntoId;
+    if (!asuntoId || !asuntosAPI) return;
+    const asunto = asuntosAPI.find((item) => item.id === asuntoId);
+    if (asunto) {
+      setClienteIdSeleccionado(asunto.cliente_id);
+      setCasoIdSeleccionado(asunto.id);
+    }
+  }, [asuntoRouteMatch?.params.asuntoId, asuntosAPI]);
+
+  React.useEffect(() => {
+    if (!casoActivo || location.hash !== '#paso-activo') return;
+    const frame = window.requestAnimationFrame(() => {
+      const activeStep = document.getElementById('paso-activo');
+      activeStep?.scrollIntoView({ block: 'start' });
+      activeStep?.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [casoActivo?.id, location.hash]);
+
   const handleGuardarEstado = (e: React.FormEvent) => {
     e.preventDefault();
-    if (apiConectada && casoActivo) {
+    if (casoActivo) {
       mutacionEstado.mutate({
         asuntoId: casoActivo.id,
         payload: {
@@ -256,7 +386,7 @@ export default function App() {
     e.preventDefault();
     if (!nuevoAvanceTexto.trim()) return;
 
-    if (apiConectada && casoActivo) {
+    if (casoActivo) {
       mutacionNovedad.mutate({
         asuntoId: casoActivo.id,
         payload: {
@@ -267,13 +397,13 @@ export default function App() {
       });
     }
 
-    setNuevoAvanceTexto('');
   };
 
   const handleAuthenticated = (user: User) => {
     queryClient.setQueryData(['auth', 'me'], user);
     setUsuarioAutenticado(user);
     setView(user.rol === 'cliente' ? 'cliente' : 'firma');
+    navigate(user.rol === 'cliente' ? '/cliente' : '/oficina/trabajo');
   };
 
   const handleLogout = async () => {
@@ -283,7 +413,7 @@ export default function App() {
       queryClient.clear();
       setUsuarioAutenticado(null);
       setView('firma');
-      setSeccionFirma('expedientes');
+      navigate('/');
     }
   };
 
@@ -328,22 +458,48 @@ export default function App() {
     );
   }
 
+  if (
+    usuarioAutenticado.rol === 'cliente'
+    && location.pathname !== '/cliente'
+  ) {
+    return <Navigate to="/cliente" replace />;
+  }
+
+  if (usuarioAutenticado.rol !== 'cliente' && !validOfficeRoute) {
+    return <Navigate to="/oficina/trabajo" replace />;
+  }
+
   return (
     <div className="app-shell">
-      <CrearClienteModal
-        isOpen={crearClienteAbierto}
-        isLoading={mutacionNuevoCliente.isPending}
-        onClose={() => setCrearClienteAbierto(false)}
-        onSubmit={(payload) => mutacionNuevoCliente.mutate(payload)}
-      />
-      <CrearAsuntoModal
-        isOpen={crearAsuntoAbierto}
-        isLoading={mutacionNuevoAsunto.isPending}
-        clientes={clientes}
-        clienteSeleccionadoId={clienteActivo?.id}
-        onClose={() => setCrearAsuntoAbierto(false)}
-        onSubmit={(payload) => mutacionNuevoAsunto.mutate(payload)}
-      />
+      {usuarioAutenticado.rol !== 'cliente' && (
+        <AperturaAsuntoModal
+          isOpen={aperturaAbierta}
+          clientes={clientesAPI || []}
+          responsables={
+            usuarioAutenticado.rol === 'abogado'
+              ? (responsablesAPI || []).filter(
+                  (responsable) => responsable.id === usuarioAutenticado.id,
+                )
+              : (responsablesAPI || [])
+          }
+          usuarioActual={usuarioAutenticado}
+          clienteInicialId={clienteInicialAperturaId || undefined}
+          isLoading={mutacionApertura.isPending}
+          errorMessage={
+            mutacionApertura.isError
+              ? 'No pudimos abrir el asunto. Revisa los datos e inténtalo de nuevo.'
+              : undefined
+          }
+          onClose={() => {
+            if (!mutacionApertura.isPending) {
+              setAperturaAbierta(false);
+              setClienteInicialAperturaId('');
+              mutacionApertura.reset();
+            }
+          }}
+          onSubmit={(payload) => mutacionApertura.mutate(payload)}
+        />
+      )}
 
       {/* Topbar */}
       <header className="topbar">
@@ -351,42 +507,27 @@ export default function App() {
           <div className="brand-mark">A</div>
           <div>
             <h1>Asuntia</h1>
-            <span>{view === 'cliente' ? (casoActivo?.codigo || 'Cliente') : 'Firma'}</span>
+            <span>
+              {view === 'cliente'
+                ? (casoActivo?.codigo || 'Cliente')
+                : seccionFirma === 'config_almacenamiento'
+                  ? 'Ajustes'
+                  : seccionFirma === 'trabajo'
+                    ? 'Mi trabajo'
+                    : 'Asuntos'}
+            </span>
           </div>
         </div>
 
-        <div className="row wrap">
-          <span className={`badge ${apiConectada ? 'mint' : 'neutral'}`} style={{ gap: '6px' }}>
-            <span style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: apiConectada ? '#10b981' : '#94a3b8' }}></span>
-            {apiConectada ? 'BD Conectada' : 'Sin conexión'}
-          </span>
-
-          <span className="badge neutral" style={{ gap: '4px' }}>
-            <UserCheck size={13} />
-            {usuarioAutenticado.nombre}
-          </span>
-
-          {usuarioAutenticado.rol === 'administrador' && (
-              <button 
-                className="secondary-button" 
-                type="button"
-                onClick={() => setSeccionFirma(seccionFirma === 'expedientes' ? 'config_almacenamiento' : 'expedientes')}
-                style={{ fontWeight: 600 }}
-              >
-                <HardDrive size={15} />
-                {seccionFirma === 'expedientes' ? 'Almacenamiento' : 'Ver Expedientes'}
-              </button>
-          )}
-
-          <button 
-            className="secondary-button" 
-            type="button"
-            onClick={handleLogout}
-          >
-            <LogOut size={16} />
-            Salir
-          </button>
-        </div>
+        <UserMenu
+          user={usuarioAutenticado}
+          onLogout={handleLogout}
+          onOpenSettings={
+            usuarioAutenticado.rol === 'administrador' && view === 'firma'
+              ? () => navigate('/oficina/ajustes/almacenamiento')
+              : undefined
+          }
+        />
       </header>
 
       {/* VISTA CLIENTE */}
@@ -534,42 +675,119 @@ export default function App() {
         <div className="layout">
           <aside className="sidebar">
             <div className="sidebar-inner">
-              <div className="section-title">
-                <h3>Clientes ({clientes.length})</h3>
-                <button className="icon-button" type="button" onClick={() => setCrearClienteAbierto(true)} title="Nuevo Cliente">
-                  <Plus size={16} />
-                </button>
-              </div>
-              <div className="stack">
-                {clientes.length > 0 ? (
-                  clientes.map(cli => (
-                    <button 
-                      key={cli.id}
-                      className={`client-entry ${clienteActivo && cli.id === clienteActivo.id ? 'active' : ''}`}
+              <nav className="office-nav" aria-label="Navegación de oficina">
+                <NavLink
+                  className={({ isActive }) => isActive ? 'active' : ''}
+                  to="/oficina/trabajo"
+                >
+                  <BriefcaseBusiness size={17} />
+                  Mi trabajo
+                </NavLink>
+                <NavLink
+                  className={seccionFirma === 'expedientes' ? 'active' : ''}
+                  to="/oficina/asuntos"
+                >
+                  <UsersRound size={17} />
+                  Clientes y asuntos
+                </NavLink>
+              </nav>
+
+              {seccionFirma === 'config_almacenamiento' ? (
+                <>
+                  <div className="sidebar-divider" />
+                  <div className="settings-sidebar-heading">
+                    <span className="settings-icon"><HardDrive size={17} /></span>
+                    <div>
+                      <h3>Ajustes</h3>
+                      <span className="muted small">Administración</span>
+                    </div>
+                  </div>
+                  <nav className="settings-nav" aria-label="Ajustes de la firma">
+                    <button type="button" className="active">
+                      <HardDrive size={16} />
+                      Almacenamiento
+                    </button>
+                  </nav>
+                  <button
+                    className="secondary-button settings-back"
+                    type="button"
+                    onClick={() => navigate('/oficina/trabajo')}
+                  >
+                    Volver a mi trabajo
+                  </button>
+                </>
+              ) : seccionFirma === 'expedientes' ? (
+                <>
+                  <div className="sidebar-divider" />
+                  <div className="section-title">
+                    <h3>Directorio ({clientes.length})</h3>
+                    <button
+                      className="icon-button"
                       type="button"
                       onClick={() => {
-                        setClienteIdSeleccionado(cli.id);
-                        if (cli.casos && cli.casos.length > 0) {
-                          setCasoIdSeleccionado(cli.casos[0].id);
-                        }
+                        setClienteInicialAperturaId('');
+                        setAperturaAbierta(true);
                       }}
+                      aria-label="Abrir asunto"
+                      title="Abrir asunto"
                     >
-                      <strong>{cli.nombre}</strong>
-                      <span className="muted small">{cli.casos ? cli.casos.length : 0} casos</span>
+                      <Plus size={16} />
                     </button>
-                  ))
-                ) : (
-                  <div className="muted small" style={{ padding: '12px' }}>
-                    Sin clientes registrados.
                   </div>
-                )}
-              </div>
+                  <div className="stack">
+                    {clientes.length > 0 ? (
+                      clientes.map(cli => (
+                        <NavLink
+                          key={cli.id}
+                          className={`client-entry ${clienteActivo && cli.id === clienteActivo.id ? 'active' : ''}`}
+                          to={cli.casos?.[0]
+                            ? `/oficina/asuntos/${cli.casos[0].id}`
+                            : '/oficina/asuntos'}
+                          onClick={() => {
+                            setClienteIdSeleccionado(cli.id);
+                            if (cli.casos && cli.casos.length > 0) {
+                              setCasoIdSeleccionado(cli.casos[0].id);
+                            }
+                          }}
+                        >
+                          <strong>{cli.nombre}</strong>
+                          <span className="muted small">
+                            {formatAsuntosCount(cli.asuntosRegistrados)}
+                            {' · '}
+                            {cli.responsableNombre}
+                          </span>
+                        </NavLink>
+                      ))
+                    ) : (
+                      <div className="muted small" style={{ padding: '12px' }}>
+                        Sin clientes registrados.
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div className="office-nav-note">
+                  <span className="muted small">Tu bandeja reúne los pasos abiertos de los asuntos asignados.</span>
+                </div>
+              )}
             </div>
           </aside>
 
           <section className="main">
             {seccionFirma === 'config_almacenamiento' ? (
-              <ConfiguracionAlmacenamiento />
+              <div className="settings-content">
+                <div className="toolbar settings-toolbar">
+                  <div>
+                    <h2>Ajustes de la firma</h2>
+                    <span className="muted">Configuración disponible solo para administradores.</span>
+                  </div>
+                </div>
+                <ConfiguracionAlmacenamiento />
+              </div>
+            ) : seccionFirma === 'trabajo' ? (
+              <MiTrabajo
+                isAdmin={usuarioAutenticado.rol === 'administrador'}
+              />
             ) : clienteActivo ? (
               <>
                 <div className="toolbar">
@@ -577,59 +795,80 @@ export default function App() {
                     <h2>{clienteActivo.nombre}</h2>
                     <span className="muted">{clienteActivo.email} · CC/NIT: {clienteActivo.identificacion}</span>
                   </div>
-                  <button className="primary-button" type="button" onClick={() => setCrearAsuntoAbierto(true)}>
-                    <Plus size={16} />
-                    Nuevo caso
-                  </button>
-                </div>
-
-                <div className="grid metrics">
-                  <div className="metric">
-                    <span>Clientes</span>
-                    <strong>{clientes.length}</strong>
-                  </div>
-                  <div className="metric">
-                    <span>Casos Activos</span>
-                    <strong>{clientes.reduce((acc, curr) => acc + (curr.casos ? curr.casos.length : 0), 0)}</strong>
-                  </div>
-                  <div className="metric">
-                    <span>Pendientes</span>
-                    <strong>{casoActivo ? 1 : 0}</strong>
-                  </div>
-                  <div className="metric">
-                    <span>Solicitudes</span>
-                    <strong>{casoActivo ? 1 : 0}</strong>
+                  <div className="toolbar-actions">
+                    <ResponsableAsignacion
+                      id={`cliente-${clienteActivo.id}-responsable`}
+                      label="Responsable del cliente"
+                      value={clienteActivo.responsableId}
+                      responsables={responsablesAPI || []}
+                      canEdit={puedeGestionarAsignaciones}
+                      isPending={
+                        mutacionResponsableCliente.isPending
+                        && mutacionResponsableCliente.variables?.clienteId
+                          === clienteActivo.id
+                      }
+                      errorMessage={
+                        mutacionResponsableCliente.isError
+                        && mutacionResponsableCliente.variables?.clienteId
+                          === clienteActivo.id
+                          ? 'No se pudo guardar la asignación.'
+                          : undefined
+                      }
+                      onChange={(responsableId) => {
+                        mutacionResponsableCliente.mutate({
+                          clienteId: clienteActivo.id,
+                          responsableId,
+                        });
+                      }}
+                    />
+                    <button
+                      className="primary-button"
+                      type="button"
+                      onClick={() => {
+                        setClienteInicialAperturaId(clienteActivo.id);
+                        setAperturaAbierta(true);
+                      }}
+                    >
+                      <Plus size={16} />
+                      Nuevo asunto
+                    </button>
                   </div>
                 </div>
 
                 <div className="workspace-flow">
                   <section className="panel case-nav-panel">
                     <div className="section-title">
-                      <h3>Casos ({clienteActivo.casos ? clienteActivo.casos.length : 0})</h3>
+                      <h3>
+                        {usuarioAutenticado.rol === 'abogado'
+                          ? 'Asuntos a tu cargo'
+                          : 'Asuntos'} ({clienteActivo.casos ? clienteActivo.casos.length : 0})
+                      </h3>
                     </div>
                     <div className="case-list">
                       {clienteActivo.casos && clienteActivo.casos.length > 0 ? (
                         clienteActivo.casos.map(cs => (
-                          <button 
+                          <NavLink
                             key={cs.id}
                             className={`case-card ${casoActivo && cs.id === casoActivo.id ? 'active' : ''}`}
-                            type="button"
+                            to={`/oficina/asuntos/${cs.id}`}
                             onClick={() => setCasoIdSeleccionado(cs.id)}
                           >
                             <div className="case-card-header">
                               <div>
                                 <strong>{cs.nombre}</strong>
-                                <span className="muted small">{cs.codigo}</span>
-                              </div>
-                              <div className="case-card-badges">
-                                <span className={`badge ${cs.estadoTipo}`}>{cs.estadoBadge}</span>
+                                <span className="muted small">
+                                  {cs.codigo} · {cs.responsable}
+                                </span>
                               </div>
                             </div>
-                          </button>
+                            <span className="case-card-current">
+                              Acción actual · {cs.accionActual}
+                            </span>
+                          </NavLink>
                         ))
                       ) : (
                         <div className="muted small" style={{ padding: '16px' }}>
-                          Sin expedientes. Haz clic en "Nuevo caso".
+                          Sin asuntos. Usa “Nuevo asunto” para abrir el primero.
                         </div>
                       )}
                     </div>
@@ -637,51 +876,105 @@ export default function App() {
 
                   {casoActivo ? (
                     <section>
-                      <form className="panel" onSubmit={handleGuardarEstado}>
-                        <div className="row between">
+                      <section className="panel">
+                        <div className="case-overview-header">
                           <div>
                             <h3>{casoActivo.nombre}</h3>
-                            <span className="muted small">{casoActivo.codigo} · {casoActivo.responsable}</span>
+                            <span className="muted small">{casoActivo.codigo}</span>
                           </div>
-                          <span className={`badge ${casoActivo.estadoTipo}`}>{casoActivo.estadoBadge}</span>
+                          <div className="case-overview-actions">
+                            <ResponsableAsignacion
+                              id={`asunto-${casoActivo.id}-responsable`}
+                              label="Abogado del asunto"
+                              value={casoActivo.abogadoId}
+                              responsables={responsablesAPI || []}
+                              canEdit={puedeGestionarAsignaciones}
+                              isPending={
+                                mutacionResponsableAsunto.isPending
+                                && mutacionResponsableAsunto.variables?.asuntoId
+                                  === casoActivo.id
+                              }
+                              errorMessage={
+                                mutacionResponsableAsunto.isError
+                                && mutacionResponsableAsunto.variables?.asuntoId
+                                  === casoActivo.id
+                                  ? 'No se pudo transferir el asunto.'
+                                  : undefined
+                              }
+                              onChange={(responsableId) => {
+                                mutacionResponsableAsunto.mutate({
+                                  asuntoId: casoActivo.id,
+                                  responsableId,
+                                });
+                              }}
+                            />
+                            <span className="row case-public-status">
+                              <span className="muted small">Estado comunicado</span>
+                              <span className={`badge ${casoActivo.estadoTipo}`}>{casoActivo.estadoBadge}</span>
+                              <Tooltip
+                                content={casoActivo.estadoDescripcion
+                                  || 'Estado procesal que se muestra al cliente.'}
+                              />
+                            </span>
+                          </div>
                         </div>
 
-                        <div className="form-grid" style={{ marginTop: '16px' }}>
-                          <div className="field">
-                            <label htmlFor="estado-procesal-select">
-                              Estado Procesal
-                              <Tooltip content="Cambia el estado público del asunto en la base de datos." />
-                            </label>
-                            <select
-                              id="estado-procesal-select"
-                              value={estadoSeleccionadoId || casoActivo.estadoId || ''}
-                              onChange={(e) => setEstadoSeleccionadoId(e.target.value)}
-                            >
-                              {estadosAPI && estadosAPI.length > 0 ? (
-                                estadosAPI.map((est: EstadoProcesalAPI) => (
-                                  <option key={est.id} value={est.id}>
-                                    {est.nombre}
-                                  </option>
-                                ))
-                              ) : (
-                                <option value="">{casoActivo.estadoBadge}</option>
-                              )}
-                            </select>
-                          </div>
+                        {usuarioAutenticado.rol === 'administrador' && (
+                          <details className="administrative-correction">
+                            <summary>
+                              Corrección administrativa
+                              <Tooltip content="Ajusta el estado público sin modificar la ruta del expediente." />
+                            </summary>
+                            <form onSubmit={handleGuardarEstado}>
+                              <div className="form-grid">
+                                <div className="field">
+                                  <label htmlFor="estado-procesal-select">Estado público</label>
+                                  <select
+                                    id="estado-procesal-select"
+                                    value={estadoSeleccionadoId || casoActivo.estadoId || ''}
+                                    onChange={(e) => setEstadoSeleccionadoId(e.target.value)}
+                                  >
+                                    {estadosAPI && estadosAPI.length > 0 ? (
+                                      estadosAPI.map((est: EstadoProcesalAPI) => (
+                                        <option key={est.id} value={est.id}>
+                                          {est.nombre}
+                                        </option>
+                                      ))
+                                    ) : (
+                                      <option value="">{casoActivo.estadoBadge}</option>
+                                    )}
+                                  </select>
+                                </div>
 
-                          <div className="field full">
-                            <button className="secondary-button" type="submit">
-                              <Save size={16} />
-                              Guardar cambios
-                            </button>
-                          </div>
-                        </div>
-                      </form>
+                                <div className="field">
+                                  <label>&nbsp;</label>
+                                  <button className="secondary-button" type="submit">
+                                    <Save size={16} />
+                                    Guardar corrección
+                                  </button>
+                                </div>
+                              </div>
+                            </form>
+                          </details>
+                        )}
+                      </section>
 
                       <FlujoAsunto
                         pasos={casoActivo.pasos}
                         flujoEstado={casoActivo.flujoEstado}
                         isLoading={mutacionAvanzarPaso.isPending}
+                        canAdvance={
+                          usuarioAutenticado.rol === 'administrador'
+                          || (
+                            usuarioAutenticado.rol === 'abogado'
+                            && casoActivo.abogadoId === usuarioAutenticado.id
+                          )
+                        }
+                        readOnlyReason={
+                          usuarioAutenticado.rol === 'auxiliar'
+                            ? 'Tu perfil puede consultar esta ruta.'
+                            : 'Este paso está asignado a otro abogado.'
+                        }
                         onAdvance={(pasoCodigo, datos) => mutacionAvanzarPaso.mutateAsync({
                           asuntoId: casoActivo.id,
                           pasoCodigo,
@@ -694,18 +987,18 @@ export default function App() {
 
                       <form className="panel" onSubmit={handlePublicarAvance} style={{ marginTop: '16px' }}>
                         <div className="section-title">
-                          <h3>Nuevo avance</h3>
+                          <h3>Registrar nota</h3>
                           <Eye size={17} />
                         </div>
                         <div className="form-grid">
                           <div className="field full">
-                            <label htmlFor="update-body">Detalle de la novedad</label>
+                            <label htmlFor="update-body">Contenido</label>
                             <textarea 
                               id="update-body" 
                               required
                               value={nuevoAvanceTexto}
                               onChange={(e) => setNuevoAvanceTexto(e.target.value)}
-                              placeholder="Avance procesal..."
+                              placeholder="Nota sobre el expediente..."
                             />
                           </div>
 
@@ -725,7 +1018,7 @@ export default function App() {
                             <label>&nbsp;</label>
                             <button className="primary-button" type="submit">
                               <Send size={16} />
-                              Publicar avance
+                              Registrar nota
                             </button>
                           </div>
                         </div>
@@ -733,7 +1026,7 @@ export default function App() {
 
                       <div className="panel">
                         <div className="section-title">
-                          <h3>Timeline</h3>
+                          <h3>Actividad del expediente</h3>
                           <History size={17} />
                         </div>
 
@@ -746,9 +1039,10 @@ export default function App() {
                                 </div>
                                 <div className="timeline-body">
                                   <div className="row between">
-                                    <strong>{n.autor}</strong>
+                                    <strong>{n.titulo}</strong>
                                     <span className="muted small">{n.fecha}</span>
                                   </div>
+                                  <span className="muted small">{n.autor}</span>
                                   <p style={{ margin: '4px 0' }}>{n.texto}</p>
                                   <span className={`badge ${n.visibilidad === 'Cliente' ? 'neutral' : 'warning'}`}>
                                     {n.visibilidad}
@@ -758,7 +1052,7 @@ export default function App() {
                             ))
                           ) : (
                             <div className="muted small" style={{ padding: '12px' }}>
-                              Sin avances registrados.
+                              Sin actividad registrada.
                             </div>
                           )}
                         </div>
@@ -766,9 +1060,16 @@ export default function App() {
                     </section>
                   ) : (
                     <div className="panel" style={{ padding: '32px 24px', textAlign: 'center' }}>
-                      <h3>Sin expedientes para este cliente</h3>
-                      <p className="muted small">Haz clic en "Nuevo caso" para aperturar el primer expediente.</p>
-                      <button className="primary-button" style={{ margin: '16px auto 0' }} onClick={() => setCrearAsuntoAbierto(true)}>
+                      <h3>Sin asuntos para este cliente</h3>
+                      <p className="muted small">Abre el primer asunto para iniciar su ruta de trabajo.</p>
+                      <button
+                        className="primary-button"
+                        style={{ margin: '16px auto 0' }}
+                        onClick={() => {
+                          setClienteInicialAperturaId(clienteActivo.id);
+                          setAperturaAbierta(true);
+                        }}
+                      >
                         <Plus size={16} /> Crear expediente
                       </button>
                     </div>
@@ -777,13 +1078,28 @@ export default function App() {
               </>
             ) : (
               <div className="panel" style={{ padding: '48px 24px', textAlign: 'center' }}>
-                <h3>No hay clientes registrados</h3>
-                <p className="muted small" style={{ marginBottom: '16px' }}>
-                  La base de datos está limpia. Registra tu primer cliente para comenzar las pruebas reales.
-                </p>
-                <button className="primary-button" style={{ margin: '0 auto' }} onClick={() => setCrearClienteAbierto(true)}>
-                  <Plus size={16} /> Registrar primer cliente
-                </button>
+                {clientes.length > 0 ? (
+                  <>
+                    <h3>Selecciona un cliente</h3>
+                    <p className="muted small">
+                      Elige un cliente en la barra lateral para consultar sus asuntos.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <h3>No hay clientes registrados</h3>
+                    <button
+                      className="primary-button"
+                      style={{ margin: '16px auto 0' }}
+                      onClick={() => {
+                        setClienteInicialAperturaId('');
+                        setAperturaAbierta(true);
+                      }}
+                    >
+                      <Plus size={16} /> Registrar primer cliente
+                    </button>
+                  </>
+                )}
               </div>
             )}
           </section>

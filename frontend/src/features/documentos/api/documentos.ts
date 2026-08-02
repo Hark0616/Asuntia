@@ -4,8 +4,10 @@ export interface DocumentoAPI {
   id: string;
   firma_id: string;
   asunto_id: string;
+  asunto_paso_id?: string;
   nombre_funcional: string;
   tipo_documental: string;
+  subcarpeta: string;
   provider: string;
   external_file_id: string;
   web_view_url: string;

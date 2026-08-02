@@ -6,6 +6,7 @@ async def test_protected_endpoints_require_session(anonymous_client):
     assert (await anonymous_client.get("/api/v1/asuntos")).status_code == 401
     assert (await anonymous_client.get("/api/v1/clientes")).status_code == 401
     assert (await anonymous_client.get("/api/v1/estados")).status_code == 401
+    assert (await anonymous_client.get("/api/v1/tareas/mi-trabajo")).status_code == 401
 
 
 @pytest.mark.asyncio
@@ -27,7 +28,63 @@ async def test_client_cannot_list_customers_or_mutate_asunto(elena_client):
     assert (await elena_client.get("/api/v1/clientes")).status_code == 403
     response = await elena_client.patch(
         "/api/v1/asuntos/00000000-0000-0000-0000-000000000203/estado",
-        json={"siguiente_paso": "Cambio no autorizado"},
+        json={"estado_id": "00000000-0000-0000-0000-000000000102"},
+    )
+    assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_lawyer_cannot_apply_administrative_case_corrections(
+    alejandro_client,
+):
+    response = await alejandro_client.patch(
+        "/api/v1/asuntos/00000000-0000-0000-0000-000000000202/estado",
+        json={"estado_id": "00000000-0000-0000-0000-000000000102"},
+    )
+    assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_lawyer_lists_only_assigned_cases_but_shared_client_directory(
+    alejandro_client,
+):
+    asuntos_response = await alejandro_client.get("/api/v1/asuntos")
+    assert asuntos_response.status_code == 200
+    asuntos = asuntos_response.json()
+    assert {
+        asunto["radicado"] for asunto in asuntos
+    }.issuperset({"AS-2026-002", "AS-2026-004"})
+    assert {
+        asunto["abogado_id"] for asunto in asuntos
+    } == {"00000000-0000-0000-0000-000000000011"}
+
+    clientes_response = await alejandro_client.get("/api/v1/clientes")
+    assert clientes_response.status_code == 200
+    nombres = {cliente["nombre"] for cliente in clientes_response.json()}
+    assert {
+        "Jorge Eliécer Bermúdez",
+        "Transportes del Norte S.A.S. (Laura Mejía)",
+        "Carlos Gómez Restrepo",
+        "Dra. María Elena Villamizar",
+    }.issubset(nombres)
+
+
+@pytest.mark.asyncio
+async def test_lawyer_cannot_open_or_modify_another_lawyers_case(alejandro_client):
+    assert (
+        await alejandro_client.get("/api/v1/asuntos/AS-2026-001")
+    ).status_code == 404
+    assert (
+        await alejandro_client.get(
+            "/api/v1/asuntos/00000000-0000-0000-0000-000000000201/documentos"
+        )
+    ).status_code == 404
+    response = await alejandro_client.post(
+        "/api/v1/asuntos",
+        json={
+            "cliente_id": "00000000-0000-0000-0000-000000000020",
+            "abogado_id": "00000000-0000-0000-0000-000000000010",
+        },
     )
     assert response.status_code == 403
 
@@ -37,10 +94,10 @@ async def test_client_only_receives_public_novedades(carlos_client):
     response = await carlos_client.get("/api/v1/asuntos")
     assert response.status_code == 200
     asuntos = response.json()
-    assert len(asuntos) == 1
+    asunto = next(item for item in asuntos if item["radicado"] == "AS-2026-001")
     assert all(
         novedad["publicado_al_cliente"]
-        for novedad in asuntos[0]["novedades"]
+        for novedad in asunto["novedades"]
     )
 
 

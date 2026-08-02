@@ -1,6 +1,15 @@
 import pytest
 import uuid
 
+from app.api.v1.endpoints.documentos import folder_for_document_type
+
+
+def test_document_folder_is_derived_from_its_type():
+    assert folder_for_document_type("auto_admisorio") == "audiencia"
+    assert folder_for_document_type("escrito_solicitud") == "solicitud"
+    assert folder_for_document_type("tipo_desconocido") == "anexo"
+
+
 @pytest.mark.asyncio
 async def test_list_documentos_asunto_empty(client):
     """
@@ -23,7 +32,7 @@ async def test_upload_and_preview_real_local_pdf(client):
         data={
             "nombre_funcional": "Soporte real local",
             "tipo_documental": "anexo",
-            "subcarpeta": "anexo",
+            "subcarpeta": "liquidacion",
             "compartido_con_cliente": "true",
         },
         files={"file": ("soporte.pdf", pdf_content, "application/pdf")},
@@ -33,6 +42,15 @@ async def test_upload_and_preview_real_local_pdf(client):
     document = upload.json()
     assert document["provider"] == "local"
     assert document["tamano_bytes"] == len(pdf_content)
+    assert document["subcarpeta"] == "anexo"
+    assert document["asunto_paso_id"]
+
+    activity = await client.get(f"/api/v1/novedades/asunto/{asunto_id}")
+    document_event = next(
+        item for item in activity.json() if item["documento_id"] == document["id"]
+    )
+    assert document_event["tipo"] == "documento_incorporado"
+    assert document_event["asunto_paso_id"] == document["asunto_paso_id"]
 
     preview = await client.get(f"/api/v1/documentos/{document['id']}/preview")
     assert preview.status_code == 200
@@ -62,6 +80,7 @@ async def test_vincular_y_toggle_visibilidad_documento(client):
     doc_data = res_link.json()
     assert doc_data["nombre_funcional"] == payload["nombre_funcional"]
     assert doc_data["compartido_con_cliente"] is False
+    assert doc_data["subcarpeta"] == "audiencia"
     doc_id = doc_data["id"]
 
     # 2. Verificar que en la lista de sólo compartidos (portal cliente) NO aparece aún

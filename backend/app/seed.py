@@ -4,6 +4,7 @@ from sqlalchemy import delete
 from app.core.db import AsyncSessionLocal
 from app.models.firma import Firma
 from app.models.user import User
+from app.models.cliente import Cliente
 from app.models.estado import EstadoProcesal
 from app.models.asunto import Asunto
 from app.models.novedad import Novedad
@@ -11,6 +12,7 @@ from app.models.documento import DocumentoAsunto
 from app.models.firma_storage import FirmaStorageConfig
 from app.models.auth_challenge import AuthChallenge
 from app.models.asunto_paso import AsuntoPaso
+from app.models.tarea import Tarea, TareaEstado, TareaPrioridad, TareaTipo
 from app.core.security import get_password_hash
 from app.services.workflow_service import initial_workflow_steps
 
@@ -25,8 +27,10 @@ async def seed_data():
         await session.execute(delete(DocumentoAsunto))
         await session.execute(delete(FirmaStorageConfig))
         await session.execute(delete(Novedad))
+        await session.execute(delete(Tarea))
         await session.execute(delete(AsuntoPaso))
         await session.execute(delete(Asunto))
+        await session.execute(delete(Cliente))
         await session.execute(delete(EstadoProcesal))
         await session.execute(delete(User))
         await session.execute(delete(Firma))
@@ -60,8 +64,17 @@ async def seed_data():
             cedula="79.382.910",
             rol="abogado"
         )
+        auxiliar_sandra = User(
+            id=uuid.UUID("00000000-0000-0000-0000-000000000012"),
+            firma_id=DEFAULT_FIRMA_ID,
+            nombre="Sandra Pérez",
+            email="sandra.perez@asuntia.com",
+            hashed_password=get_password_hash("admin123"),
+            cedula="63.482.105",
+            rol="auxiliar"
+        )
 
-        cliente_carlos = User(
+        portal_carlos = User(
             id=uuid.UUID("00000000-0000-0000-0000-000000000020"),
             firma_id=DEFAULT_FIRMA_ID,
             nombre="Carlos Gómez Restrepo",
@@ -69,7 +82,7 @@ async def seed_data():
             cedula="1.094.852.140",
             rol="cliente"
         )
-        cliente_transportes = User(
+        portal_transportes = User(
             id=uuid.UUID("00000000-0000-0000-0000-000000000030"),
             firma_id=DEFAULT_FIRMA_ID,
             nombre="Transportes del Norte S.A.S. (Laura Mejía)",
@@ -77,7 +90,7 @@ async def seed_data():
             cedula="901.482.910-5",
             rol="cliente"
         )
-        cliente_elena = User(
+        portal_elena = User(
             id=uuid.UUID("00000000-0000-0000-0000-000000000040"),
             firma_id=DEFAULT_FIRMA_ID,
             nombre="Dra. María Elena Villamizar",
@@ -85,7 +98,7 @@ async def seed_data():
             cedula="52.391.804",
             rol="cliente"
         )
-        cliente_jorge = User(
+        portal_jorge = User(
             id=uuid.UUID("00000000-0000-0000-0000-000000000050"),
             firma_id=DEFAULT_FIRMA_ID,
             nombre="Jorge Eliécer Bermúdez",
@@ -94,7 +107,92 @@ async def seed_data():
             rol="cliente"
         )
 
-        session.add_all([abogada_daniela, abogado_alejandro, cliente_carlos, cliente_transportes, cliente_elena, cliente_jorge])
+        session.add_all([
+            abogada_daniela,
+            abogado_alejandro,
+            auxiliar_sandra,
+            portal_carlos,
+            portal_transportes,
+            portal_elena,
+            portal_jorge,
+        ])
+
+        # El perfil del cliente es permanente y separado de su acceso al portal.
+        cliente_carlos = Cliente(
+            id=portal_carlos.id,
+            firma_id=DEFAULT_FIRMA_ID,
+            nombre=portal_carlos.nombre,
+            tipo_persona="natural",
+            tipo_documento="CC",
+            numero_documento=portal_carlos.cedula,
+            numero_documento_normalizado="1094852140",
+            email=portal_carlos.email,
+            telefono="300 482 1940",
+            ciudad="Bucaramanga",
+            departamento="Santander",
+            canal_preferido="whatsapp",
+            portal_user_id=portal_carlos.id,
+            responsable_id=abogada_daniela.id,
+            created_by_id=abogada_daniela.id,
+        )
+        cliente_transportes = Cliente(
+            id=portal_transportes.id,
+            firma_id=DEFAULT_FIRMA_ID,
+            nombre=portal_transportes.nombre,
+            tipo_persona="juridica",
+            tipo_documento="NIT",
+            numero_documento=portal_transportes.cedula,
+            numero_documento_normalizado="9014829105",
+            email=portal_transportes.email,
+            telefono="607 642 1830",
+            direccion="Zona Industrial Chimitá",
+            ciudad="Girón",
+            departamento="Santander",
+            canal_preferido="email",
+            portal_user_id=portal_transportes.id,
+            responsable_id=abogado_alejandro.id,
+            created_by_id=abogado_alejandro.id,
+        )
+        cliente_elena = Cliente(
+            id=portal_elena.id,
+            firma_id=DEFAULT_FIRMA_ID,
+            nombre=portal_elena.nombre,
+            tipo_persona="natural",
+            tipo_documento="CC",
+            numero_documento=portal_elena.cedula,
+            numero_documento_normalizado="52391804",
+            email=portal_elena.email,
+            telefono="315 391 8040",
+            ciudad="Bucaramanga",
+            departamento="Santander",
+            canal_preferido="email",
+            portal_user_id=portal_elena.id,
+            responsable_id=abogada_daniela.id,
+            created_by_id=abogada_daniela.id,
+        )
+        cliente_jorge = Cliente(
+            id=portal_jorge.id,
+            firma_id=DEFAULT_FIRMA_ID,
+            nombre=portal_jorge.nombre,
+            tipo_persona="natural",
+            tipo_documento="CC",
+            numero_documento=portal_jorge.cedula,
+            numero_documento_normalizado="79482105",
+            email=portal_jorge.email,
+            telefono="310 482 1050",
+            ciudad="Floridablanca",
+            departamento="Santander",
+            canal_preferido="whatsapp",
+            portal_user_id=portal_jorge.id,
+            responsable_id=abogado_alejandro.id,
+            created_by_id=abogado_alejandro.id,
+        )
+        session.add_all([
+            cliente_carlos,
+            cliente_transportes,
+            cliente_elena,
+            cliente_jorge,
+        ])
 
         # 3. Catálogo Oficial de 10 Estados Procesales
         estados = [
@@ -189,8 +287,9 @@ async def seed_data():
             cliente_id=cliente_carlos.id,
             abogado_id=abogada_daniela.id,
             estado_id=estados[0].id,
-            etapa_actual="Paso 1 de 5: Radicación",
+            etapa_actual=f"Paso 1 de {len(initial_workflow_steps())}: {initial_workflow_steps()[0]['titulo']}",
             siguiente_paso=initial_workflow_steps()[0]["descripcion"],
+            ruta_codigo="insolvencia_persona_natural:v2",
             created_by_id=abogada_daniela.id,
         )
         asunto2 = Asunto(
@@ -200,8 +299,9 @@ async def seed_data():
             cliente_id=cliente_transportes.id,
             abogado_id=abogado_alejandro.id,
             estado_id=estados[0].id,
-            etapa_actual="Paso 1 de 5: Radicación",
+            etapa_actual=f"Paso 1 de {len(initial_workflow_steps())}: {initial_workflow_steps()[0]['titulo']}",
             siguiente_paso=initial_workflow_steps()[0]["descripcion"],
+            ruta_codigo="insolvencia_persona_natural:v2",
             created_by_id=abogado_alejandro.id,
         )
         asunto3 = Asunto(
@@ -211,8 +311,9 @@ async def seed_data():
             cliente_id=cliente_elena.id,
             abogado_id=abogada_daniela.id,
             estado_id=estados[0].id,
-            etapa_actual="Paso 1 de 5: Radicación",
+            etapa_actual=f"Paso 1 de {len(initial_workflow_steps())}: {initial_workflow_steps()[0]['titulo']}",
             siguiente_paso=initial_workflow_steps()[0]["descripcion"],
+            ruta_codigo="insolvencia_persona_natural:v2",
             created_by_id=abogada_daniela.id,
         )
         asunto4 = Asunto(
@@ -222,24 +323,46 @@ async def seed_data():
             cliente_id=cliente_jorge.id,
             abogado_id=abogado_alejandro.id,
             estado_id=estados[0].id,
-            etapa_actual="Paso 1 de 5: Radicación",
+            etapa_actual=f"Paso 1 de {len(initial_workflow_steps())}: {initial_workflow_steps()[0]['titulo']}",
             siguiente_paso=initial_workflow_steps()[0]["descripcion"],
+            ruta_codigo="insolvencia_persona_natural:v2",
             created_by_id=abogado_alejandro.id,
         )
 
         session.add_all([asunto1, asunto2, asunto3, asunto4])
-        session.add_all(
-            [
+        pasos_por_asunto: dict[uuid.UUID, list[AsuntoPaso]] = {}
+        for asunto in (asunto1, asunto2, asunto3, asunto4):
+            pasos = [
                 AsuntoPaso(
                     **step,
                     asunto_id=asunto.id,
                     firma_id=DEFAULT_FIRMA_ID,
                     created_by_id=asunto.abogado_id,
                 )
-                for asunto in (asunto1, asunto2, asunto3, asunto4)
                 for step in initial_workflow_steps()
             ]
-        )
+            pasos_por_asunto[asunto.id] = pasos
+            session.add_all(pasos)
+        await session.flush()
+
+        for asunto in (asunto1, asunto2, asunto3, asunto4):
+            primer_paso = pasos_por_asunto[asunto.id][0]
+            session.add(
+                Tarea(
+                    firma_id=DEFAULT_FIRMA_ID,
+                    asunto_id=asunto.id,
+                    asunto_paso_id=primer_paso.id,
+                    codigo=f"paso:{primer_paso.codigo}",
+                    tipo=TareaTipo.COMPLETAR_PASO.value,
+                    titulo=f"Completar {primer_paso.titulo.lower()}",
+                    instruccion=primer_paso.descripcion,
+                    estado=TareaEstado.PENDIENTE.value,
+                    prioridad=TareaPrioridad.NORMAL.value,
+                    responsable_id=asunto.abogado_id,
+                    solicitante_id=asunto.created_by_id,
+                    created_by_id=asunto.created_by_id,
+                )
+            )
 
         # 5. Crear Novedades Procesales
         novedades = [
@@ -247,8 +370,8 @@ async def seed_data():
                 id=uuid.UUID("00000000-0000-0000-0000-000000000301"),
                 firma_id=DEFAULT_FIRMA_ID,
                 asunto_id=asunto1.id,
-                titulo="Auto de Admisión Expedido",
-                descripcion="El Centro de Conciliación admitió la solicitud de negociación de pasivos de acuerdo con la Ley de Insolvencia.",
+                titulo="Documentos iniciales solicitados",
+                descripcion="El equipo jurídico inició la recepción del asunto y solicitó la información necesaria para evaluar la solicitud.",
                 publicado_al_cliente=True,
                 created_by_id=abogada_daniela.id
             ),
@@ -256,8 +379,8 @@ async def seed_data():
                 id=uuid.UUID("00000000-0000-0000-0000-000000000302"),
                 firma_id=DEFAULT_FIRMA_ID,
                 asunto_id=asunto1.id,
-                titulo="Verificación interna de acreencias",
-                descripcion="Revisión de saldos reportados con Bancolombia y Davivienda por el equipo legal.",
+                titulo="Revisión inicial del asunto",
+                descripcion="Validación interna de identidad y documentos disponibles antes de emitir una conclusión.",
                 publicado_al_cliente=False,
                 created_by_id=abogada_daniela.id
             )

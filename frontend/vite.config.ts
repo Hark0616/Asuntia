@@ -22,6 +22,7 @@ export default defineConfig({
     setupFiles: './src/test/setup.ts',
   },
   server: {
+    allowedHosts: true,
     proxy: {
       '/api/v1': {
         target: 'http://127.0.0.1:8000',

@@ -28,6 +28,7 @@ async def test_create_and_delete_novedad(client):
     assert res_create.status_code == 201
     novedad_data = res_create.json()
     assert novedad_data["titulo"] == payload["titulo"]
+    assert novedad_data["tipo"] == "nota"
     novedad_id = novedad_data["id"]
 
     # 2. Eliminar Novedad (Soft Delete)

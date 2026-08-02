@@ -17,7 +17,7 @@ export function ClienteOTPLogin({ onSuccess }: ClienteOTPLoginProps) {
   const isDevelopment = import.meta.env.DEV;
   const [step, setStep] = useState<'cedula' | 'otp'>('cedula');
   const [cedula, setCedula] = useState('1.094.852.140');
-  const [code, setCode] = useState(isDevelopment ? '123456' : '');
+  const [code, setCode] = useState(isDevelopment ? '12345' : '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -116,11 +116,11 @@ export function ClienteOTPLogin({ onSuccess }: ClienteOTPLoginProps) {
           <form onSubmit={handleVerificarOTP} className="stack">
             <div className="badge warning" style={{ width: '100%', justifyContent: 'center', padding: '6px' }}>
               <Mail size={13} />
-              Código enviado al correo{isDevelopment ? ' (Dev: 123456)' : ''}
+              Código enviado al correo{isDevelopment ? ' (Local: 12345)' : ''}
             </div>
 
             <div className="field" style={{ marginTop: '12px' }}>
-              <label htmlFor="otp-code" style={{ textAlign: 'left' }}>Código de seguridad (6 dígitos)</label>
+              <label htmlFor="otp-code" style={{ textAlign: 'left' }}>Código de seguridad</label>
               <input
                 id="otp-code"
                 type="text"
@@ -128,7 +128,7 @@ export function ClienteOTPLogin({ onSuccess }: ClienteOTPLoginProps) {
                 required
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
-                placeholder="123456"
+                placeholder="12345"
                 style={{ height: '48px', fontSize: '20px', textAlign: 'center', letterSpacing: '4px', fontWeight: 'bold' }}
               />
             </div>

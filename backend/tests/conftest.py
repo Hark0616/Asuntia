@@ -78,6 +78,15 @@ async def anonymous_client():
 
 
 @pytest_asyncio.fixture
+async def db_session():
+    async with TestingSessionLocal() as session:
+        try:
+            yield session
+        finally:
+            await session.rollback()
+
+
+@pytest_asyncio.fixture
 async def client():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as api_client:
@@ -101,7 +110,7 @@ async def _login_client(api_client: AsyncClient, cedula: str) -> None:
     assert request_response.status_code == 200
     verify_response = await api_client.post(
         "/api/v1/auth/otp/verify",
-        json={"firma_slug": "demo", "cedula": cedula, "code": "123456"},
+        json={"firma_slug": "demo", "cedula": cedula, "code": "12345"},
     )
     assert verify_response.status_code == 200
 
@@ -111,6 +120,38 @@ async def carlos_client():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as api_client:
         await _login_client(api_client, "1.094.852.140")
+        yield api_client
+
+
+@pytest_asyncio.fixture
+async def alejandro_client():
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as api_client:
+        response = await api_client.post(
+            "/api/v1/auth/login",
+            json={
+                "firma_slug": "demo",
+                "email": "alejandro.morales@asuntia.com",
+                "password": "admin123",
+            },
+        )
+        assert response.status_code == 200
+        yield api_client
+
+
+@pytest_asyncio.fixture
+async def sandra_client():
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as api_client:
+        response = await api_client.post(
+            "/api/v1/auth/login",
+            json={
+                "firma_slug": "demo",
+                "email": "sandra.perez@asuntia.com",
+                "password": "admin123",
+            },
+        )
+        assert response.status_code == 200
         yield api_client
 
 
