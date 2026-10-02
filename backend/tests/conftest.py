@@ -13,7 +13,7 @@ from app.models.base import Base
 
 TEST_DATABASE_NAME = "asuntia_test"
 TEST_DATABASE_URL = (
-    f"postgresql+asyncpg://asuntia:asuntia_dev@localhost:5432/{TEST_DATABASE_NAME}"
+    f"postgresql+asyncpg://asuntia:asuntia_dev@127.0.0.1:5432/{TEST_DATABASE_NAME}"
 )
 
 engine = create_async_engine(TEST_DATABASE_URL, poolclass=NullPool)
@@ -41,7 +41,7 @@ async def prepare_test_database():
     admin_connection = await asyncpg.connect(
         user="asuntia",
         password="asuntia_dev",
-        host="localhost",
+        host="127.0.0.1",
         port=5432,
         database="postgres",
     )

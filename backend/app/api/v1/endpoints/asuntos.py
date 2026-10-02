@@ -15,6 +15,7 @@ from app.schemas.asunto import (
     AsuntoUpdateEstado,
 )
 from app.schemas.flujo import AvanzarPasoRequest
+from app.schemas.portal import AsuntoPortalResponse
 from app.repositories.asunto_repository import AsuntoRepository
 from app.repositories.cliente_repository import ClienteRepository
 from app.repositories.estado_repository import EstadoRepository
@@ -125,7 +126,7 @@ async def _resolve_case_responsible(
         )
     return responsable_id
 
-@router.get("", response_model=List[AsuntoResponse])
+@router.get("", response_model=List[AsuntoResponse | AsuntoPortalResponse])
 async def list_asuntos(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -138,6 +139,7 @@ async def list_asuntos(
         asuntos = await repo.get_by_portal_user_id(
             current_user.id, solo_publicas=True
         )
+        return [AsuntoPortalResponse.from_asunto(asunto) for asunto in asuntos]
     elif current_user.rol == "abogado":
         asuntos = await repo.list_by_abogado_id(current_user.id)
     else:
@@ -225,7 +227,7 @@ async def assign_case_responsible(
         db, current_user.firma_id
     ).assign_case(asunto_id, payload.responsable_id)
 
-@router.get("/{radicado}", response_model=AsuntoResponse)
+@router.get("/{radicado}", response_model=AsuntoResponse | AsuntoPortalResponse)
 async def get_asunto(
     radicado: str,
     db: AsyncSession = Depends(get_db),
@@ -242,6 +244,8 @@ async def get_asunto(
         asunto = None
     if not asunto:
         raise NotFoundException(detail=f"No se encontró el asunto con radicado {radicado}")
+    if current_user.rol == "cliente":
+        return AsuntoPortalResponse.from_asunto(asunto)
     return asunto
 
 @router.patch("/{asunto_id}/estado", response_model=AsuntoResponse)

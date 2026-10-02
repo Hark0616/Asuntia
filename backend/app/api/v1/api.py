@@ -9,6 +9,7 @@ from app.api.v1.endpoints import (
     firma_storage,
     novedades,
     oauth_storage,
+    portal,
     tareas,
 )
 
@@ -24,3 +25,4 @@ api_router.include_router(firma_storage.router, prefix="/firma/storage", tags=["
 api_router.include_router(oauth_storage.router, prefix="/storage", tags=["OAuth2 Almacenamiento"])
 api_router.include_router(documentos.router, tags=["Gestión Documental"])
 api_router.include_router(tareas.router, prefix="/tareas", tags=["Trabajo"])
+api_router.include_router(portal.router, prefix="/portal", tags=["Portal del cliente"])

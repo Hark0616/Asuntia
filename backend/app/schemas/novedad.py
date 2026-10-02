@@ -7,7 +7,7 @@ from app.schemas.base import BaseSchemaResponse
 class NovedadCreate(BaseModel):
     titulo: str
     descripcion: str
-    publicado_al_cliente: bool = True
+    publicado_al_cliente: bool = False
 
 class NovedadResponse(BaseSchemaResponse):
     id: uuid.UUID
