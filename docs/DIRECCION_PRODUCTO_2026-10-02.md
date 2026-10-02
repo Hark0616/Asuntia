@@ -73,7 +73,7 @@ Esta es una revisión del producto desde la perspectiva jurídica, no una conclu
 
 La matriz de roles es **una política de producto propuesta para estos hitos**, no una distribución de permisos impuesta literalmente por esas leyes: auxiliar captura información interna; abogado responsable o administrador autorizan publicación y retiro según su acceso. Las decisiones profesionales requieren la habilitación y revisión correspondientes, que no se infieren del nombre del rol.
 
-## Evidencia técnica de la revisión
+## Evidencia técnica de la revisión de la base `842ac5c`
 
 - `backend/app/schemas/asunto.py` y `repositories/asunto_repository.py`: respuesta compartida entre oficina y portal, carga de pasos internos y filtrado de novedades.
 - `backend/app/services/workflow_service.py`: avance secuencial, resultados binarios, viabilidad no confirmada rechazada y evento de paso privado.
@@ -82,4 +82,18 @@ La matriz de roles es **una política de producto propuesta para estos hitos**, 
 - `backend/app/api/v1/endpoints/documentos.py` y `repositories/documento_repository.py`: visibilidad documental y generación del evento asociado.
 - `frontend/src/App.tsx`: relación entre usuario y perfil de cliente, hitos derivados de pasos y presentación del estado.
 
-Los hitos deben entregarse en commits separados y subir a Git después de su verificación. La validación incluye `npm run build`, pruebas del frontend apropiadas al cambio y `pytest`, con casos de acceso autorizado y denegado, registros retirados y estados de error. Los resultados de implementación y pruebas se registrarán al cierre; este documento no declara verificaciones aprobadas.
+Los hitos se entregan en commits separados y se suben a Git después de su verificación. La validación incluye `npm run build`, pruebas del frontend apropiadas al cambio y `pytest`, con casos de acceso autorizado y denegado, registros retirados y estados de error.
+
+## Entrega y verificación de H1 y H2
+
+- **H1 (`b9c4225`):** contrato público independiente, lecturas anteriores también reducidas para el cliente, permisos de publicación y retiro en servidor, sincronización transaccional documento/evento y protección del borrado directo de eventos derivados. El preview local requiere autorización y fuerza descarga de formatos activos o desconocidos con `nosniff`.
+- **H2 (`a48e453`):** portal con último avance, historial publicado y documentos; consultas separadas de la oficina; carga, error y reintento; captura privada por defecto; permisos visibles coherentes; ayudas accesibles por teclado y tap; foco y retorno en previsualización.
+- **Backend:** 108 pruebas aprobadas mediante `pytest -q --durations=5`, Python 3.12 y PostgreSQL 16.15 local en una instancia nueva con datos sintéticos. Se usó la configuración de desarrollo que espera la suite OTP y `SMTP_HOST=127.0.0.1`. La conexión de pruebas utiliza IPv4 explícito para evitar la espera de resolución local observada en Windows.
+- **Frontend:** 64 pruebas aprobadas mediante `npm test -- --run`; `npm run build` aprobado con Node 24 y React Compiler activo. No se añadieron dependencias ni se modificaron modelos de BD.
+- **Navegador:** acceso de oficina y OTP de demostración; subida real privada y compartida; ausencia de contenido privado en el portal; foco al abrir preview y retorno al cerrar; Escape en ayudas; revisión a 1280, 390 y 320 píxeles y fechas con texto de 14 píxeles en móvil.
+
+Las lecturas de cliente de `/asuntos`, `/novedades` y `/documentos` cambian a contratos reducidos; la interfaz de esta entrega ya los consume. Cualquier consumidor externo debe adoptar esa proyección. La fecha visible sigue siendo la fecha de registro del avance, no un certificado de publicación.
+
+El navegador integrado recibió el PDF mediante la API, pero su visor embebido no mostró el contenido; se ofrece apertura alternativa. Los documentos cloud conservan el enlace de su proveedor: estos hitos no incorporan un proxy cloud ni certifican sus permisos externos.
+
+La siguiente prioridad es guardar la evaluación incompleta sin obligar a completar o avanzar el paso, antes de ampliar las rutas procesales.
