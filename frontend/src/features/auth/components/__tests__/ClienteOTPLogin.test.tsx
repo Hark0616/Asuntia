@@ -32,6 +32,7 @@ describe('ClienteOTPLogin Component', () => {
 
     expect(screen.getByText('Consulta de Expediente')).toBeInTheDocument();
     expect(screen.getByLabelText(/Cédula de ciudadanía/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Cédula de ciudadanía/i)).toHaveValue('');
     expect(screen.getByRole('button', { name: /Continuar/i })).toBeInTheDocument();
   });
 
@@ -39,12 +40,33 @@ describe('ClienteOTPLogin Component', () => {
     const onSuccessMock = vi.fn();
     render(<ClienteOTPLogin onSuccess={onSuccessMock} />);
 
+    fireEvent.change(screen.getByLabelText(/Cédula de ciudadanía/i), {
+      target: { value: '1094852140' },
+    });
     const button = screen.getByRole('button', { name: /Continuar/i });
     fireEvent.click(button);
 
     // Esperar mensaje del paso 2
     const otpInput = await screen.findByLabelText(/Código de seguridad/i);
     expect(otpInput).toBeInTheDocument();
+    expect(otpInput).toHaveValue('');
+    expect(screen.queryByText(/Local: 12345/i)).not.toBeInTheDocument();
+  });
+
+  it('verifica el código introducido por el cliente sin valores prefijados', async () => {
+    const onSuccessMock = vi.fn();
+    render(<ClienteOTPLogin onSuccess={onSuccessMock} />);
+    fireEvent.change(screen.getByLabelText(/Cédula de ciudadanía/i), {
+      target: { value: '1094852140' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Continuar/i }));
+
+    const otpInput = await screen.findByLabelText(/Código de seguridad/i);
+    fireEvent.change(otpInput, { target: { value: '12345' } });
+    fireEvent.click(screen.getByRole('button', { name: /Ingresar/i }));
+
+    await screen.findByRole('button', { name: /Ingresar/i });
+    expect(onSuccessMock).toHaveBeenCalledWith({ nombre: 'Carlos Gómez', rol: 'cliente' });
   });
 
   it('[CASO BORDE / ERROR] debe mostrar mensaje de error cuando falla la solicitud', async () => {

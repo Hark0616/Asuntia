@@ -9,10 +9,6 @@ import {
 } from 'react-router';
 import { 
   BriefcaseBusiness,
-  CircleCheck, 
-  ChevronRight, 
-  ChevronDown, 
-  CalendarClock, 
   History, 
   Plus, 
   Save, 
@@ -24,6 +20,7 @@ import {
 } from 'lucide-react';
 import { 
   fetchAsuntos, 
+  fetchAsuntosPortalAPI,
   fetchEstadosAPI, 
   fetchClientesAPI,
   fetchResponsablesAPI,
@@ -51,6 +48,7 @@ import { ResponsableAsignacion } from '@/features/asuntos/components/Responsable
 import type { AsuntoPasoAPI } from '@/features/asuntos/api/asuntos';
 import { UserMenu } from '@/components/layout/UserMenu';
 import { MiTrabajo } from '@/features/tareas/components/MiTrabajo';
+import { PortalCliente } from '@/features/portal-cliente/components/PortalCliente';
 import { formatAsuntosCount } from '@/lib/formatAsuntos';
 
 interface NovedadItem {
@@ -61,17 +59,6 @@ interface NovedadItem {
   fecha: string;
   texto: string;
   visibilidad: 'Cliente' | 'Interno';
-}
-
-interface Milestone {
-  id: number;
-  fecha: string;
-  titulo: string;
-  estadoBadge: string;
-  tipoBadge?: 'neutral' | 'warning';
-  estadoItem: 'completed' | 'current' | 'upcoming';
-  detalle?: string;
-  subtexto?: string;
 }
 
 interface CasoData {
@@ -86,10 +73,6 @@ interface CasoData {
   accionActual: string;
   abogadoId?: string;
   prioridad: 'alta' | 'normal';
-  proximoPaso: string;
-  solicitudPendiente?: string;
-  fechaLimiteSolicitud?: string;
-  milestones: Milestone[];
   novedades: NovedadItem[];
   pasos: AsuntoPasoAPI[];
   flujoEstado: 'activo' | 'completado';
@@ -116,7 +99,6 @@ export default function App() {
   const [view, setView] = useState<'cliente' | 'firma'>('firma');
   const [clienteIdSeleccionado, setClienteIdSeleccionado] = useState<string>('');
   const [casoIdSeleccionado, setCasoIdSeleccionado] = useState<string>('');
-  const [milestoneAbiertoId, setMilestoneAbiertoId] = useState<number | null>(2);
   const [aperturaAbierta, setAperturaAbierta] = useState(false);
   const [clienteInicialAperturaId, setClienteInicialAperturaId] = useState('');
   const asuntoRouteMatch = matchPath(
@@ -156,24 +138,32 @@ export default function App() {
   // Consultas API protegidas por la sesión y el rol.
   const authenticated = Boolean(usuarioAutenticado);
   const officeUser = authenticated && usuarioAutenticado?.rol !== 'cliente';
-  const { data: asuntosAPI } = useQuery({
+  const asuntosQuery = useQuery({
     queryKey: ['asuntos'],
     queryFn: fetchAsuntos,
     retry: 1,
-    enabled: authenticated,
+    enabled: officeUser,
+  });
+  const { data: asuntosAPI } = asuntosQuery;
+  const portalQuery = useQuery({
+    queryKey: ['portal', 'asuntos'],
+    queryFn: fetchAsuntosPortalAPI,
+    retry: 1,
+    enabled: authenticated && usuarioAutenticado?.rol === 'cliente',
   });
   const { data: estadosAPI } = useQuery({
     queryKey: ['estados'],
     queryFn: fetchEstadosAPI,
     retry: 1,
-    enabled: authenticated,
+    enabled: officeUser,
   });
-  const { data: clientesAPI } = useQuery({
+  const clientesQuery = useQuery({
     queryKey: ['clientes'],
     queryFn: fetchClientesAPI,
     retry: 1,
     enabled: officeUser,
   });
+  const { data: clientesAPI } = clientesQuery;
   const { data: responsablesAPI } = useQuery({
     queryKey: ['equipo', 'responsables'],
     queryFn: fetchResponsablesAPI,
@@ -215,6 +205,7 @@ export default function App() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['asuntos'] });
       setNuevoAvanceTexto('');
+      setNuevoAvanceVisibilidad('internal');
     },
   });
 
@@ -253,25 +244,7 @@ export default function App() {
     },
   });
 
-  // El cliente autenticado se convierte en la única raíz disponible en su portal.
-  const clientesFuente: ClienteAPI[] = usuarioAutenticado?.rol === 'cliente'
-    ? [{
-        id: usuarioAutenticado.id,
-        tipo_persona: 'natural',
-        tipo_documento: 'CC',
-        numero_documento: usuarioAutenticado.cedula,
-        nombre: usuarioAutenticado.nombre,
-        cedula: usuarioAutenticado.cedula,
-        email: usuarioAutenticado.email,
-        canal_preferido: 'email',
-        portal_habilitado: true,
-        asuntos_count: (asuntosAPI || []).length,
-        rol: usuarioAutenticado.rol,
-        created_at: '',
-      }]
-    : (clientesAPI || []);
-
-  const clientes: ClienteData[] = clientesFuente.map((cli: ClienteAPI) => {
+  const clientes: ClienteData[] = (clientesAPI || []).map((cli: ClienteAPI) => {
       const casosDelCliente = (asuntosAPI || []).filter((as: AsuntoAPI) => as.cliente_id === cli.id);
       const responsableCliente = (responsablesAPI || []).find(
         (responsable) => responsable.id === cli.responsable_id,
@@ -294,9 +267,7 @@ export default function App() {
           id: as.id,
           codigo: as.radicado,
           nombre: 'Insolvencia Persona Natural',
-          responsable: usuarioAutenticado?.rol === 'cliente'
-            ? 'Equipo jurídico asignado'
-            : (responsableAsunto?.nombre || 'Sin asignar'),
+          responsable: responsableAsunto?.nombre || 'Sin asignar',
           estadoBadge: as.estado?.nombre || 'En trámite',
           estadoTipo: (as.estado?.color_tipo as any) || 'mint',
           estadoId: as.estado?.id,
@@ -305,17 +276,6 @@ export default function App() {
             || as.etapa_actual,
           abogadoId: as.abogado_id,
           prioridad: 'normal' as const,
-          proximoPaso: as.siguiente_paso,
-          milestones: as.pasos.map((paso) => ({
-            id: paso.orden,
-            fecha: paso.completed_at
-              ? new Date(paso.completed_at).toLocaleDateString()
-              : paso.estado === 'activo' ? 'En curso' : 'Pendiente',
-            titulo: `Paso ${paso.orden}: ${paso.titulo}`,
-            estadoBadge: paso.estado === 'completado' ? 'Completado' : paso.estado === 'activo' ? 'Actual' : 'Pendiente',
-            estadoItem: paso.estado === 'completado' ? 'completed' : paso.estado === 'activo' ? 'current' : 'upcoming',
-            detalle: paso.descripcion,
-          })),
           pasos: as.pasos,
           flujoEstado: as.flujo_estado,
           novedades: as.novedades.map(nov => ({
@@ -337,14 +297,12 @@ export default function App() {
     });
 
   // Selección activa
-  const clienteActivo = usuarioAutenticado?.rol === 'cliente'
-    ? clientes[0] || null
-    : clientes.find(c => c.id === clienteIdSeleccionado) || null;
+  const clienteActivo = clientes.find(c => c.id === clienteIdSeleccionado) || null;
   const casoActivo = clienteActivo && clienteActivo.casos ? (clienteActivo.casos.find(c => c.id === casoIdSeleccionado) || clienteActivo.casos[0] || null) : null;
 
   const [estadoSeleccionadoId, setEstadoSeleccionadoId] = useState<string>('');
   const [nuevoAvanceTexto, setNuevoAvanceTexto] = useState('');
-  const [nuevoAvanceVisibilidad, setNuevoAvanceVisibilidad] = useState<'client' | 'internal'>('client');
+  const [nuevoAvanceVisibilidad, setNuevoAvanceVisibilidad] = useState<'client' | 'internal'>('internal');
 
   React.useEffect(() => {
     setEstadoSeleccionadoId(casoActivo?.estadoId || '');
@@ -392,7 +350,8 @@ export default function App() {
         payload: {
           titulo: 'Avance procesal',
           descripcion: nuevoAvanceTexto,
-          publicado_al_cliente: nuevoAvanceVisibilidad === 'client'
+          publicado_al_cliente: usuarioAutenticado?.rol !== 'auxiliar'
+            && nuevoAvanceVisibilidad === 'client'
         }
       });
     }
@@ -509,7 +468,7 @@ export default function App() {
             <h1>Asuntia</h1>
             <span>
               {view === 'cliente'
-                ? (casoActivo?.codigo || 'Cliente')
+                ? 'Portal del cliente'
                 : seccionFirma === 'config_almacenamiento'
                   ? 'Ajustes'
                   : seccionFirma === 'trabajo'
@@ -532,144 +491,51 @@ export default function App() {
 
       {/* VISTA CLIENTE */}
       {view === 'cliente' && (
-        <section className="main tracking-shell">
-          {casoActivo ? (
-            <>
-              <div className="tracking-header">
-                <div className="row between wrap" style={{ width: '100%' }}>
-                  <div>
-                    <span className="badge neutral">{casoActivo.codigo}</span>
-                    <h2>{casoActivo.nombre}</h2>
-                    <p className="muted">{clienteActivo?.nombre} · {casoActivo.responsable}</p>
-                  </div>
-
-                  {clienteActivo && clienteActivo.casos.length > 1 && (
-                    <div className="field" style={{ minWidth: '220px' }}>
-                      <label style={{ fontSize: '12px', fontWeight: 600 }}>Seleccionar Expediente:</label>
-                      <select 
-                        value={casoActivo.id} 
-                        onChange={(e) => setCasoIdSeleccionado(e.target.value)}
-                        style={{ height: '38px', fontSize: '14px' }}
-                      >
-                        {clienteActivo.casos.map(cs => (
-                          <option key={cs.id} value={cs.id}>{cs.codigo} ({cs.estadoBadge})</option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {casoActivo.solicitudPendiente && (
-                <section className="client-action-card">
-                  <div>
-                    <div className="row">
-                      <span className="badge warning">Documento requerido</span>
-                      <Tooltip content="Envía este documento a tu abogada para continuar la radicación." />
-                    </div>
-                    <h3 style={{ marginTop: '6px' }}>{casoActivo.solicitudPendiente}</h3>
-                    <span className="muted small">Límite: {casoActivo.fechaLimiteSolicitud || 'Próximamente'}</span>
-                  </div>
-                </section>
-              )}
-
-              <section className="tracking-grid">
-                <div className="panel tracking-main">
-                  <div>
-                    <div className="row between">
-                      <h3>
-                        Estado actual
-                        <Tooltip content="El estado procesal oficial notificado por el juzgado o Centro de Conciliación." />
-                      </h3>
-                      <span className={`badge ${casoActivo.estadoTipo}`}>{casoActivo.estadoBadge}</span>
-                    </div>
-                  </div>
-
-                  <div className="milestone-list">
-                    {casoActivo.milestones.map((m) => (
-                      <article key={m.id} className={`milestone-item milestone-${m.estadoItem}`}>
-                        <div className="milestone-rail">
-                          <div className="milestone-marker">
-                            {m.estadoItem === 'completed' ? <CircleCheck size={16} /> : m.id}
-                          </div>
-                          {m.id < casoActivo.milestones.length && <div className="milestone-line"></div>}
-                        </div>
-
-                        <div className="milestone-card">
-                          <button 
-                            className="milestone-head" 
-                            type="button"
-                            onClick={() => setMilestoneAbiertoId(milestoneAbiertoId === m.id ? null : m.id)}
-                          >
-                            <div>
-                              <span className="muted small">{m.fecha}</span>
-                              <strong>{m.titulo}</strong>
-                            </div>
-                            <div className="row">
-                              <span className={`badge ${m.tipoBadge || 'neutral'}`}>{m.estadoBadge}</span>
-                              {milestoneAbiertoId === m.id ? <ChevronDown size={17} /> : <ChevronRight size={17} />}
-                            </div>
-                          </button>
-
-                          {milestoneAbiertoId === m.id && m.detalle && (
-                            <div className="milestone-detail">
-                              <p>{m.detalle}</p>
-                            </div>
-                          )}
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-
-                  {/* Documentos Compartidos en Portal Cliente */}
-                  <DocumentosTab asuntoId={casoActivo.id} isReadOnly={true} />
-                </div>
-
-                <aside className="tracking-side">
-                  <div className="panel">
-                    <div className="section-title">
-                      <h3>Próximo paso</h3>
-                      <CalendarClock size={17} />
-                    </div>
-                    <div className="list-card">
-                      <strong>{casoActivo.proximoPaso}</strong>
-                    </div>
-                  </div>
-
-                  <div className="panel">
-                    <div className="section-title">
-                      <h3>Avances publicados</h3>
-                      <History size={17} />
-                    </div>
-                    <div className="timeline">
-                      {casoActivo.novedades.filter(n => n.visibilidad === 'Cliente').map(n => (
-                        <div key={n.id} className="timeline-item">
-                          <div className="timeline-dot">
-                            <Clock3 size={14} />
-                          </div>
-                          <div className="timeline-body">
-                            <div className="row between">
-                              <strong>{n.autor}</strong>
-                              <span className="muted small">{n.fecha}</span>
-                            </div>
-                            <p style={{ fontSize: '13px', marginTop: '4px' }}>{n.texto}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </aside>
-              </section>
-            </>
-          ) : (
-            <div className="panel" style={{ padding: '48px 24px', textAlign: 'center' }}>
-              <h3>Sin expedientes activos</h3>
-              <p className="muted small">Tu abogada aún no ha aperturado un expediente para tu documento.</p>
+        <main className="main portal-shell">
+          {portalQuery.isLoading ? (
+            <div className="panel work-empty" role="status">
+              <span className="muted">Consultando tus asuntos…</span>
             </div>
-          )}
-        </section>
+          ) : portalQuery.isError && !portalQuery.data ? (
+            <div className="panel work-empty" role="alert">
+              <div>
+                <h3>No pudimos consultar tus asuntos</h3>
+                <p className="muted small">Inténtalo de nuevo.</p>
+              </div>
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => portalQuery.refetch()}
+                disabled={portalQuery.isFetching}
+              >
+                {portalQuery.isFetching ? 'Consultando…' : 'Reintentar'}
+              </button>
+            </div>
+          ) : portalQuery.data ? (
+            <>
+              {portalQuery.isError && (
+                <div className="work-stale-notice" role="status">
+                  Mostrando la última información disponible.
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    onClick={() => portalQuery.refetch()}
+                    disabled={portalQuery.isFetching}
+                  >
+                    Reintentar
+                  </button>
+                </div>
+              )}
+              <PortalCliente
+                asuntos={portalQuery.data}
+                clienteNombre={usuarioAutenticado.nombre}
+                selectedId={casoIdSeleccionado}
+                onSelect={setCasoIdSeleccionado}
+              />
+            </>
+          ) : null}
+        </main>
       )}
-
       {/* VISTA FIRMA */}
       {view === 'firma' && (
         <div className="layout">
@@ -735,7 +601,11 @@ export default function App() {
                     </button>
                   </div>
                   <div className="stack">
-                    {clientes.length > 0 ? (
+                    {clientesQuery.isLoading ? (
+                      <span className="muted small" role="status">Consultando clientes…</span>
+                    ) : clientesQuery.isError && !clientesAPI ? (
+                      <span className="muted small">Directorio no disponible.</span>
+                    ) : clientes.length > 0 ? (
                       clientes.map(cli => (
                         <NavLink
                           key={cli.id}
@@ -774,6 +644,24 @@ export default function App() {
           </aside>
 
           <section className="main">
+            {seccionFirma === 'expedientes'
+              && (asuntosQuery.isError || clientesQuery.isError)
+              && asuntosAPI && clientesAPI && (
+                <div className="work-stale-notice" role="status">
+                  Mostrando la última información disponible.
+                  <button
+                    className="secondary-button"
+                    type="button"
+                    onClick={() => {
+                      asuntosQuery.refetch();
+                      clientesQuery.refetch();
+                    }}
+                    disabled={asuntosQuery.isFetching || clientesQuery.isFetching}
+                  >
+                    Reintentar
+                  </button>
+                </div>
+              )}
             {seccionFirma === 'config_almacenamiento' ? (
               <div className="settings-content">
                 <div className="toolbar settings-toolbar">
@@ -788,6 +676,29 @@ export default function App() {
               <MiTrabajo
                 isAdmin={usuarioAutenticado.rol === 'administrador'}
               />
+            ) : asuntosQuery.isLoading || clientesQuery.isLoading ? (
+              <div className="panel work-empty" role="status">
+                <span className="muted">Consultando expedientes…</span>
+              </div>
+            ) : (asuntosQuery.isError && !asuntosAPI)
+              || (clientesQuery.isError && !clientesAPI) ? (
+              <div className="panel work-empty" role="alert">
+                <div>
+                  <h3>No pudimos consultar los expedientes</h3>
+                  <p className="muted small">Inténtalo de nuevo.</p>
+                </div>
+                <button
+                  className="secondary-button"
+                  type="button"
+                  onClick={() => {
+                    asuntosQuery.refetch();
+                    clientesQuery.refetch();
+                  }}
+                  disabled={asuntosQuery.isFetching || clientesQuery.isFetching}
+                >
+                  Reintentar
+                </button>
+              </div>
             ) : clienteActivo ? (
               <>
                 <div className="toolbar">
@@ -983,7 +894,13 @@ export default function App() {
                       />
 
                       {/* Gestión documental del expediente */}
-                      <DocumentosTab asuntoId={casoActivo.id} isReadOnly={false} />
+                      <DocumentosTab
+                        key={casoActivo.id}
+                        asuntoId={casoActivo.id}
+                        isReadOnly={false}
+                        canManagePublication={usuarioAutenticado.rol === 'administrador'
+                          || usuarioAutenticado.rol === 'abogado'}
+                      />
 
                       <form className="panel" onSubmit={handlePublicarAvance} style={{ marginTop: '16px' }}>
                         <div className="section-title">
@@ -996,32 +913,45 @@ export default function App() {
                             <textarea 
                               id="update-body" 
                               required
+                              disabled={mutacionNovedad.isPending}
                               value={nuevoAvanceTexto}
                               onChange={(e) => setNuevoAvanceTexto(e.target.value)}
                               placeholder="Nota sobre el expediente..."
                             />
                           </div>
 
-                          <div className="field">
-                            <label htmlFor="update-visibility">Visibilidad</label>
-                            <select 
-                              id="update-visibility"
-                              value={nuevoAvanceVisibilidad}
-                              onChange={(e) => setNuevoAvanceVisibilidad(e.target.value as 'client' | 'internal')}
-                            >
-                              <option value="client">Cliente (Público)</option>
-                              <option value="internal">Interno (Solo firma)</option>
-                            </select>
-                          </div>
+                          {usuarioAutenticado.rol !== 'auxiliar' && (
+                            <div className="field">
+                              <label htmlFor="update-visibility">Visibilidad</label>
+                              <select
+                                id="update-visibility"
+                                value={nuevoAvanceVisibilidad}
+                                disabled={mutacionNovedad.isPending}
+                                onChange={(e) => setNuevoAvanceVisibilidad(e.target.value as 'client' | 'internal')}
+                              >
+                                <option value="internal">Interno (Solo firma)</option>
+                                <option value="client">Compartir con el cliente</option>
+                              </select>
+                            </div>
+                          )}
 
                           <div className="field">
                             <label>&nbsp;</label>
-                            <button className="primary-button" type="submit">
+                            <button
+                              className="primary-button"
+                              type="submit"
+                              disabled={mutacionNovedad.isPending}
+                            >
                               <Send size={16} />
-                              Registrar nota
+                              {mutacionNovedad.isPending ? 'Guardando…' : 'Registrar nota'}
                             </button>
                           </div>
                         </div>
+                        {mutacionNovedad.isError && (
+                          <p className="form-error" role="alert">
+                            No pudimos guardar la nota. Inténtalo de nuevo.
+                          </p>
+                        )}
                       </form>
 
                       <div className="panel">

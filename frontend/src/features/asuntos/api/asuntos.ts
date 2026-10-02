@@ -1,4 +1,5 @@
 import { apiClient } from '@/lib/axios';
+import type { AsuntoPortalAPI } from '@/types/portal';
 
 export interface EstadoProcesalAPI {
   id: string;
@@ -112,6 +113,11 @@ export interface AsuntoAPI {
 
 export const fetchAsuntos = async (): Promise<AsuntoAPI[]> => {
   const response = await apiClient.get<AsuntoAPI[]>('/asuntos');
+  return response.data;
+};
+
+export const fetchAsuntosPortalAPI = async (): Promise<AsuntoPortalAPI[]> => {
+  const response = await apiClient.get<AsuntoPortalAPI[]>('/portal/asuntos');
   return response.data;
 };
 

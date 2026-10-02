@@ -1,0 +1,22 @@
+/* La ayuda de cada tarea queda fuera del enlace que abre el expediente. */
+.work-item-row {
+  position: relative;
+  border-bottom: 1px solid var(--line);
+}
+
+.work-item-row:last-child,
+.work-item-row > .work-item {
+  border-bottom: 0;
+}
+
+.work-item-row.has-tooltip > .work-item {
+  padding-inline-end: calc(var(--control-min-height) + var(--space-6));
+}
+
+.work-item-row > .tooltip {
+  position: absolute;
+  top: 50%;
+  right: var(--space-3);
+  margin: 0;
+  transform: translateY(-50%);
+}

@@ -1,5 +1,18 @@
 import { apiClient } from '@/lib/axios';
 
+/** Proyección de un documento compartido, sin metadatos de almacenamiento internos. */
+export interface DocumentoPortalAPI {
+  id: string;
+  nombre_funcional: string;
+  tipo_documental: string;
+  subcarpeta: string;
+  provider: string;
+  web_view_url: string;
+  mime_type?: string | null;
+  compartido_con_cliente: boolean;
+  created_at: string;
+}
+
 export interface DocumentoAPI {
   id: string;
   firma_id: string;
@@ -20,8 +33,8 @@ export interface DocumentoAPI {
   updated_at: string;
 }
 
-export const fetchDocumentosAsunto = async (asuntoId: string, soloCompartidos: boolean = false): Promise<DocumentoAPI[]> => {
-  const response = await apiClient.get<DocumentoAPI[]>(`/asuntos/${asuntoId}/documentos`, {
+export const fetchDocumentosAsunto = async (asuntoId: string, soloCompartidos: boolean = false): Promise<Array<DocumentoAPI | DocumentoPortalAPI>> => {
+  const response = await apiClient.get<Array<DocumentoAPI | DocumentoPortalAPI>>(`/asuntos/${asuntoId}/documentos`, {
     params: { solo_compartidos: soloCompartidos }
   });
   return response.data;

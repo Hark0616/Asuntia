@@ -16,8 +16,8 @@ const formatCedulaInput = (val: string): string => {
 export function ClienteOTPLogin({ onSuccess }: ClienteOTPLoginProps) {
   const isDevelopment = import.meta.env.DEV;
   const [step, setStep] = useState<'cedula' | 'otp'>('cedula');
-  const [cedula, setCedula] = useState('1.094.852.140');
-  const [code, setCode] = useState(isDevelopment ? '12345' : '');
+  const [cedula, setCedula] = useState('');
+  const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -116,7 +116,7 @@ export function ClienteOTPLogin({ onSuccess }: ClienteOTPLoginProps) {
           <form onSubmit={handleVerificarOTP} className="stack">
             <div className="badge warning" style={{ width: '100%', justifyContent: 'center', padding: '6px' }}>
               <Mail size={13} />
-              Código enviado al correo{isDevelopment ? ' (Local: 12345)' : ''}
+              Código enviado al correo
             </div>
 
             <div className="field" style={{ marginTop: '12px' }}>
@@ -124,11 +124,13 @@ export function ClienteOTPLogin({ onSuccess }: ClienteOTPLoginProps) {
               <input
                 id="otp-code"
                 type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
                 maxLength={6}
                 required
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
-                placeholder="12345"
+                placeholder="Código recibido"
                 style={{ height: '48px', fontSize: '20px', textAlign: 'center', letterSpacing: '4px', fontWeight: 'bold' }}
               />
             </div>

@@ -11,6 +11,7 @@ import {
 
 import { Tooltip } from '@/components/ui/Tooltip';
 import { fetchMiTrabajo, type AlcanceTrabajo } from '../api/tareas';
+import './MiTrabajo.css';
 
 interface MiTrabajoProps {
   isAdmin: boolean;
@@ -125,57 +126,59 @@ export function MiTrabajo({ isAdmin }: MiTrabajoProps) {
       {!isLoading && data && data.items.length > 0 && (
         <div className="panel work-list">
           {data.items.map((tarea) => (
-            <Link
-              className="work-item"
+            <div
+              className={`work-item-row${tarea.consecuencia ? ' has-tooltip' : ''}`}
               key={tarea.id}
-              to={`/oficina/asuntos/${tarea.asunto.id}#paso-activo`}
-              aria-label={`Abrir ${tarea.asunto.radicado}: ${tarea.titulo}`}
             >
-              <span className="work-item-status" aria-hidden="true" />
-              <span className="work-item-body">
-                <span className="work-item-context">
-                  <strong>{tarea.asunto.cliente.nombre}</strong>
-                  <span>{tarea.asunto.radicado}</span>
-                </span>
-                <strong className="work-item-title">{tarea.titulo}</strong>
-                <span className="muted work-item-instruction">
-                  {tarea.instruccion}
-                  {tarea.consecuencia && (
-                    <Tooltip content={tarea.consecuencia} />
+              <Link
+                className="work-item"
+                to={`/oficina/asuntos/${tarea.asunto.id}#paso-activo`}
+                aria-label={`Abrir ${tarea.asunto.radicado}: ${tarea.titulo}`}
+              >
+                <span className="work-item-status" aria-hidden="true" />
+                <span className="work-item-body">
+                  <span className="work-item-context">
+                    <strong>{tarea.asunto.cliente.nombre}</strong>
+                    <span>{tarea.asunto.radicado}</span>
+                  </span>
+                  <strong className="work-item-title">{tarea.titulo}</strong>
+                  <span className="muted work-item-instruction">
+                    {tarea.instruccion}
+                  </span>
+                  {(tarea.prioridad === 'alta'
+                    || tarea.prioridad === 'urgente'
+                    || tarea.vence_en) && (
+                    <span className="work-item-meta">
+                      {(tarea.prioridad === 'alta' || tarea.prioridad === 'urgente') && (
+                        <span className={`badge ${tarea.prioridad === 'urgente' ? 'danger' : 'warning'}`}>
+                          Prioridad {tarea.prioridad}
+                        </span>
+                      )}
+                      {tarea.vence_en && (
+                        <span className="muted small">
+                          <CalendarClock size={14} aria-hidden="true" />
+                          Vence {new Intl.DateTimeFormat('es-CO', {
+                            timeZone: 'America/Bogota',
+                            dateStyle: 'medium',
+                            timeStyle: 'short',
+                          }).format(new Date(tarea.vence_en))}
+                        </span>
+                      )}
+                    </span>
+                  )}
+                  {alcance === 'equipo' && (
+                    <span className="muted small">
+                      Responsable · {tarea.responsable.nombre}
+                    </span>
                   )}
                 </span>
-                {(tarea.prioridad === 'alta'
-                  || tarea.prioridad === 'urgente'
-                  || tarea.vence_en) && (
-                  <span className="work-item-meta">
-                    {(tarea.prioridad === 'alta' || tarea.prioridad === 'urgente') && (
-                      <span className={`badge ${tarea.prioridad === 'urgente' ? 'danger' : 'warning'}`}>
-                        Prioridad {tarea.prioridad}
-                      </span>
-                    )}
-                    {tarea.vence_en && (
-                      <span className="muted small">
-                        <CalendarClock size={14} aria-hidden="true" />
-                        Vence {new Intl.DateTimeFormat('es-CO', {
-                          timeZone: 'America/Bogota',
-                          dateStyle: 'medium',
-                          timeStyle: 'short',
-                        }).format(new Date(tarea.vence_en))}
-                      </span>
-                    )}
-                  </span>
-                )}
-                {alcance === 'equipo' && (
-                  <span className="muted small">
-                    Responsable · {tarea.responsable.nombre}
-                  </span>
-                )}
-              </span>
-              <span className="work-item-action">
-                Abrir
-                <ArrowRight size={16} aria-hidden="true" />
-              </span>
-            </Link>
+                <span className="work-item-action">
+                  Abrir
+                  <ArrowRight size={16} aria-hidden="true" />
+                </span>
+              </Link>
+              {tarea.consecuencia && <Tooltip content={tarea.consecuencia} />}
+            </div>
           ))}
         </div>
       )}
