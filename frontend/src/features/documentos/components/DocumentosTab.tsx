@@ -54,6 +54,7 @@ export function DocumentosTab({
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [previewDoc, setPreviewDoc] = useState<{ url: string; nombre: string } | null>(null);
+  const [busqueda, setBusqueda] = useState('');
   const previewRef = useRef<HTMLDivElement>(null);
   const previewTriggerRef = useRef<HTMLButtonElement | null>(null);
   const canPublish = !isReadOnly && canManagePublication;
@@ -67,13 +68,20 @@ export function DocumentosTab({
     queryFn: () => fetchDocumentosAsunto(asuntoId, isReadOnly),
   });
   const documentos = query.data || [];
+  const normalizarBusqueda = (value: string) => value.normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es-CO');
+  const terminos = normalizarBusqueda(busqueda).trim().split(/\s+/).filter(Boolean);
+  const documentosVisibles = documentos.filter((documento) => {
+    const contenido = normalizarBusqueda(`${documento.nombre_funcional} ${TIPO_LABELS[documento.tipo_documental] || documento.tipo_documental}`);
+    return terminos.every((termino) => contenido.includes(termino));
+  });
   const gruposDocumentales = SUBCARPETAS
     .map((carpeta) => ({
       ...carpeta,
-      documentos: documentos.filter((documento) => documento.subcarpeta === carpeta.id),
+      documentos: documentosVisibles.filter((documento) => documento.subcarpeta === carpeta.id),
     }))
     .filter((carpeta) => carpeta.documentos.length > 0);
-  const sinClasificar = documentos.filter((documento) => (
+  const sinClasificar = documentosVisibles.filter((documento) => (
     !SUBCARPETAS.some((carpeta) => carpeta.id === documento.subcarpeta)
   ));
   if (sinClasificar.length) {
@@ -149,6 +157,23 @@ export function DocumentosTab({
           </button>
         )}
       </div>
+
+      {documentos.length > 0 && (
+        <div className="document-search" role="search" aria-label="Documentos del asunto">
+          <div className="field">
+            <label htmlFor={`document-search-${asuntoId}`}>Buscar documentos</label>
+            <input id={`document-search-${asuntoId}`} type="search" value={busqueda}
+              placeholder="Nombre o tipo documental"
+              onChange={(event) => setBusqueda(event.target.value)}
+            />
+          </div>
+          {terminos.length > 0 && (
+            <span className="muted small" role="status">
+              {documentosVisibles.length} de {documentos.length} documentos
+            </span>
+          )}
+        </div>
+      )}
 
       {!isReadOnly && showUploadForm && (
         <form onSubmit={handleUploadSubmit} className="document-upload">
@@ -254,7 +279,7 @@ export function DocumentosTab({
               </button>
             </div>
           )}
-          {documentos.length > 0 ? (
+          {documentosVisibles.length > 0 ? (
             <div className="document-groups">
               {gruposDocumentales.map((grupo) => (
                 <section className="document-group" key={grupo.id}>
@@ -324,7 +349,14 @@ export function DocumentosTab({
             </div>
           ) : (
             <p className="document-empty">
-              {isReadOnly ? 'Aún no hay documentos compartidos.' : 'Sin documentos en el expediente.'}
+              {documentos.length > 0
+                ? 'Sin resultados para esta búsqueda.'
+                : isReadOnly ? 'Aún no hay documentos compartidos.' : 'Sin documentos en el expediente.'}
+              {documentos.length > 0 && (
+                <button className="secondary-button" type="button" onClick={() => setBusqueda('')}>
+                  Limpiar búsqueda
+                </button>
+              )}
             </p>
           )}
         </>

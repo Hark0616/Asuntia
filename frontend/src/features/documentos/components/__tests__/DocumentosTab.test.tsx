@@ -66,6 +66,39 @@ afterEach(() => {
 });
 
 describe('DocumentosTab', () => {
+  it('busca por nombre y tipo sin distinguir acentos y conserva la clasificación', async () => {
+    const user = userEvent.setup();
+    mockedFetchDocumentos.mockResolvedValue([
+      { ...localDoc, nombre_funcional: 'Poder de María' }, cloudDoc,
+    ]);
+    renderDocumentos();
+    const search = await screen.findByRole('searchbox', { name: 'Buscar documentos' });
+    await user.type(search, 'maria poder');
+    expect(screen.getByText('Poder de María')).toBeInTheDocument();
+    expect(screen.queryByText('Solicitud final')).not.toBeInTheDocument();
+    expect(screen.getByText('1 de 2 documentos')).toBeInTheDocument();
+    await user.clear(search);
+    await user.type(search, 'escrito');
+    expect(screen.getByText('Sin resultados para esta búsqueda.')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Limpiar búsqueda' }));
+    expect(screen.getByText('Solicitud final')).toBeInTheDocument();
+    expect(screen.getByText('Poder de María')).toBeInTheDocument();
+  });
+
+  it('busca únicamente entre documentos devueltos al cliente y conserva carpetas desconocidas', async () => {
+    const user = userEvent.setup();
+    mockedFetchDocumentos.mockResolvedValue([
+      { ...cloudDoc, nombre_funcional: 'Acta reservada para consulta', subcarpeta: 'legacy' },
+    ]);
+    renderDocumentos({ isReadOnly: true });
+    const search = await screen.findByRole('searchbox', { name: 'Buscar documentos' });
+    await user.type(search, 'acta');
+    expect(screen.getByRole('heading', { name: 'Otros documentos' })).toBeInTheDocument();
+    expect(screen.getByText('Acta reservada para consulta')).toBeInTheDocument();
+    expect(mockedFetchDocumentos).toHaveBeenCalledWith('asunto-1', true);
+    expect(screen.queryByRole('button', { name: 'Subir documento' })).not.toBeInTheDocument();
+  });
+
   it('agrupa documentos por carpeta derivada y evita clasificar dos veces', async () => {
     const user = userEvent.setup();
     mockedFetchDocumentos.mockResolvedValue([
