@@ -2,6 +2,8 @@
 
 Fecha: 2 de octubre de 2026. Base revisada: `test/ux-workflow-baseline`, commit `842ac5c`.
 
+El siguiente ciclo de trabajo se rige por el [plan funcional del piloto del 4 de octubre](PLAN_PILOTO_2026-10-04.md): operación básica completa, sin versionado documental. Este documento conserva las decisiones y entregas anteriores.
+
 ## Orientación
 
 Asuntia debe consolidarse como el expediente único de trabajo de la firma: cada actuación tiene responsable, evidencia y trazabilidad; la información autorizada alimenta el portal sin volver a digitarla.
