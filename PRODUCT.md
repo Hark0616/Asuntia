@@ -24,7 +24,9 @@ Su propósito es convertir información dispersa entre WhatsApp, hojas de cálcu
 
 El producto tiene éxito cuando cada usuario sabe qué requiere atención, puede encontrar la evidencia correcta rápidamente y ninguna decisión importante depende de memoria, búsquedas en chats o datos duplicados.
 
-La promesa visible prioritaria es que el cliente pueda saber cómo avanza su asunto sin llamar o escribir repetidamente al despacho. La información que el equipo ya genera al trabajar debe convertirse, sin una segunda digitación, en una vista sencilla y actualizada para el cliente, siempre que haya sido validada y autorizada para publicación.
+La prioridad es facilitar el trabajo diario dentro de un expediente compartido: los abogados actualizan sus asuntos, la auxiliar captura información y ejecuta tareas delegadas, y la dirección consulta el conjunto, asigna responsables y ayuda a resolver pendientes. Documentos, actividad, fechas y tareas se relacionan con el mismo asunto, sin volver a capturar información para cada vista.
+
+El cliente consulta una selección autorizada de ese trabajo. Publicar un avance conserva la nota original y su autoría; la vista del cliente se actualiza sin mantener una segunda historia del expediente. La agenda se alimenta de las fechas existentes y la bandeja muestra el trabajo asignado.
 
 ## Brand Personality
 

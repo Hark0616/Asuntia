@@ -51,14 +51,15 @@ Aceptación: el cliente solo recibe información autorizada de sus asuntos; los 
 
 Aceptación: el cliente identifica su asunto y la fecha del avance registrado, entiende qué información está disponible y puede recuperarse de un fallo sin recibir mensajes engañosos. La fecha de registro no acredita cuándo se autorizó o publicó el avance.
 
-### Siguientes hitos
+### Prioridades ajustadas a la operación compartida
 
 | Prioridad | Alcance | Condición de diseño |
 | --- | --- | --- |
-| 1 | Evaluación guardable sin avanzar | Conservar información insuficiente, condiciones y observaciones; separar guardar de completar. La conclusión profesional no se reduce a marcar una casilla. |
-| 2 | Rutas procesales verificadas | Validar tipo de persona y procedimiento; no asignar la ruta de persona natural a sociedades. Distinguir aceptación, suspensiones, continuaciones, resultados y apertura judicial mediante evidencia y revisión profesional. |
-| 3 | Concurrencia de reasignaciones | Transferir asunto y trabajo abierto de forma atómica; impedir que acciones concurrentes creen responsables o tareas incoherentes. |
-| 4 | Paginación de la bandeja | Consultar y ordenar el trabajo en servidor; conservar contexto, filtros y permisos con volúmenes reales. |
+| H3 | Captura y revisión compartidas | Guardar información incompleta, revisar y publicar la misma nota; conservar la autoría y detectar ediciones simultáneas. |
+| H4 | Delegación y fechas | Tareas con responsable, prioridad y vencimiento; agenda derivada; vista de equipo para dirección. Transferir trabajo propio al reasignar el expediente y conservar delegaciones vigentes. |
+| Siguiente | Repositorio documental | Búsqueda dentro del expediente como primer paso; versiones, organización avanzada y permisos de proveedores requieren un alcance posterior. |
+| Pendiente | Rutas procesales verificadas | Validar tipo de persona y procedimiento; no asignar la ruta de persona natural a sociedades. Distinguir aceptación, suspensiones, continuaciones, resultados y apertura judicial mediante evidencia y revisión profesional. |
+| Pendiente | Paginación de la bandeja | Consultar y ordenar el trabajo en servidor; conservar contexto, filtros y permisos con volúmenes reales. |
 
 No se incorporan en estos hitos cálculos automáticos de términos, decisiones jurídicas autónomas, finanzas ni integraciones de mensajería.
 
@@ -96,4 +97,24 @@ Las lecturas de cliente de `/asuntos`, `/novedades` y `/documentos` cambian a co
 
 El navegador integrado recibió el PDF mediante la API, pero su visor embebido no mostró el contenido; se ofrece apertura alternativa. Los documentos cloud conservan el enlace de su proveedor: estos hitos no incorporan un proxy cloud ni certifican sus permisos externos.
 
-La siguiente prioridad es guardar la evaluación incompleta sin obligar a completar o avanzar el paso, antes de ampliar las rutas procesales.
+## H3 y H4 — Implementación de colaboración y operación
+
+Actualización: 4 de octubre de 2026. La prioridad acordada con el usuario es el expediente compartido y dinámico de la oficina, con una vista selectiva para el cliente.
+
+- **Captura:** auxiliar, abogado responsable y administrador guardan borradores parciales en el mismo paso. Guardar no completa el paso ni publica actividad. Completar valida los requisitos del paso y conserva lo ya capturado. Una versión desactualizada produce conflicto y permite recargar de forma explícita.
+- **Notas:** el responsable o administrador publica o retira la misma nota capturada por el equipo, conservando su identificador, autor y fecha de registro. La visibilidad de eventos derivados se gestiona desde su actuación de origen. No se añade un registro histórico de cada cambio de visibilidad en este hito.
+- **Control:** el abogado responsable puede actualizar el estado del expediente. La dirección conserva la reasignación de clientes y asuntos. La auxiliar puede capturar información y actualizar el estado de sus propias tareas manuales.
+- **Delegación:** responsable y administrador crean tareas internas, con instrucciones, responsable, prioridad y fecha opcional. Las tareas derivadas del flujo se completan desde su paso; su fecha y prioridad se pueden ajustar sin duplicar la captura.
+- **Transferencia:** asunto, pasos y tareas abiertas propias del abogado saliente se transfieren en una transacción. Las delegaciones a auxiliares y administradores se conservan. Delegar a otro abogado requiere que sea responsable del asunto; esta entrega no introduce equipos de varios abogados por expediente.
+- **Agenda:** reúne vencimientos de tareas abiertas y fechas de audiencia registradas en el paso correspondiente. La fecha se mantiene en su origen. Las fechas nuevas incluyen zona horaria; las fechas de audiencia legadas sin zona se interpretan en hora de Colombia. Una audiencia guardada como borrador aparece como fecha registrada y requiere revisión profesional.
+- **Supervisión:** dirección puede consultar pendientes y agenda del equipo; cada integrante consulta su trabajo. La API limita la agenda a un intervalo máximo de 92 días y 100 elementos, informando el total; no hay paginación todavía.
+- **Documentos:** búsqueda por nombre y tipo documental dentro del expediente, con coincidencias sin distinción de tildes. En el portal solo se buscan los documentos ya autorizados para ese cliente.
+
+Esta entrega reutiliza modelos existentes; no modifica el esquema de la base de datos ni añade dependencias. Recordatorios automáticos, cálculo de términos, versionado documental, auditoría completa de publicaciones y nuevas rutas procesales quedan fuera del alcance implementado.
+
+### Validación de H3 y H4
+
+- **Backend:** suite completa de 169 pruebas aprobada con PostgreSQL 16.15 y Python 3.12; se añadió y aprobó después una prueba adicional de aislamiento entre firmas (170 pruebas en total). Incluye edición concurrente con conflicto 409, autorización por rol y expediente, transferencia de tareas, publicación de la misma nota y proyección de fechas.
+- **Frontend:** 94 pruebas aprobadas y compilación de producción aprobada con Node 24. Se probaron borradores, recarga explícita de conflictos, permisos de tareas, agenda, errores, búsqueda documental, foco al abrir tareas y conversión de fechas con zona horaria.
+- **Navegador local con datos sintéticos:** guardado de evaluación incompleta, creación y asignación a auxiliar, edición de vencimiento y aparición del mismo dato en la agenda del equipo. Revisión de agenda en 1280 y 390 píxeles y del acceso a tareas desde la agenda móvil.
+- **Alcance de revisión:** implementación y revisión de frontend con 6.1 Sol en High; se intentó una revisión adicional con Luna en extra High, pero terminó por límite de uso. La revisión de backend continuó con inspección directa y pruebas automatizadas; ese intento de Luna no se cuenta como revisión completada.
