@@ -44,7 +44,7 @@ async def test_administrator_assigns_client_without_changing_its_cases(client):
 
 
 @pytest.mark.asyncio
-async def test_assistant_can_assign_a_client(sandra_client):
+async def test_assistant_cannot_assign_a_client(sandra_client):
     created_client = await create_client(
         sandra_client,
         prefix="Cliente de auxiliar",
@@ -56,12 +56,13 @@ async def test_assistant_can_assign_a_client(sandra_client):
         json={"responsable_id": DANIELA_ID},
     )
 
-    assert response.status_code == 200, response.text
-    assert response.json()["responsable_id"] == DANIELA_ID
+    assert response.status_code == 403, response.text
+    listed = await sandra_client.get("/api/v1/clientes")
+    assert next(item for item in listed.json() if item["id"] == created_client["id"])["responsable_id"] is None
 
 
 @pytest.mark.asyncio
-async def test_reassigning_case_moves_all_open_work_to_new_lawyer(
+async def test_reassigning_case_moves_open_workflow_to_new_lawyer(
     client,
     sandra_client,
     alejandro_client,
@@ -74,7 +75,12 @@ async def test_reassigning_case_moves_all_open_work_to_new_lawyer(
     assert created_case.status_code == 201, created_case.text
     case_id = created_case.json()["id"]
 
-    response = await sandra_client.patch(
+    denied = await sandra_client.patch(
+        f"/api/v1/asuntos/{case_id}/responsable",
+        json={"responsable_id": ALEJANDRO_ID},
+    )
+    assert denied.status_code == 403
+    response = await client.patch(
         f"/api/v1/asuntos/{case_id}/responsable",
         json={"responsable_id": ALEJANDRO_ID},
     )

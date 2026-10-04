@@ -1,5 +1,7 @@
 import uuid
+from datetime import date, datetime
 from typing import Any
+from urllib.parse import urlsplit
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -121,7 +123,86 @@ class WorkflowService:
         self.tareas = TareaRepository(session, firma_id)
 
     @staticmethod
+    def _merge_step_data(step: AsuntoPaso, supplied: dict[str, Any]) -> dict[str, Any]:
+        """Valida una captura parcial; null retira el valor previamente guardado."""
+        fields = {field["clave"]: field for field in step.campos}
+        if set(supplied) - fields.keys():
+            raise DomainException(detail="La captura contiene campos ajenos al paso", status_code=422)
+        merged = dict(step.datos)
+        for key, value in supplied.items():
+            if value is None:
+                merged.pop(key, None)
+                continue
+            field = fields[key]
+            kind = field["tipo"]
+            if kind == "boolean":
+                if not isinstance(value, bool):
+                    raise DomainException(detail=f"El campo '{field['etiqueta']}' debe ser verdadero o falso")
+            elif not isinstance(value, str):
+                raise DomainException(detail=f"El campo '{field['etiqueta']}' debe ser texto")
+            elif value.strip():
+                if kind == "select" and value not in {option["valor"] for option in field.get("opciones", [])}:
+                    raise DomainException(detail=f"Valor inválido para '{field['etiqueta']}'")
+                if kind in {"date", "datetime"}:
+                    try:
+                        if kind == "date":
+                            parsed = date.fromisoformat(value)
+                            if parsed.isoformat() != value:
+                                raise ValueError
+                        else:
+                            if "T" not in value:
+                                raise ValueError
+                            datetime.fromisoformat(value)
+                    except ValueError:
+                        raise DomainException(detail=f"Fecha inválida para '{field['etiqueta']}'")
+                if kind == "url":
+                    try:
+                        url = urlsplit(value)
+                        valid_url = url.scheme in {"http", "https"} and bool(url.hostname)
+                    except ValueError:
+                        valid_url = False
+                    if not valid_url:
+                        raise DomainException(detail=f"Enlace inválido para '{field['etiqueta']}'")
+            merged[key] = value
+        return merged
+
+    @staticmethod
+    def _check_version(step: AsuntoPaso, expected_updated_at: datetime | None) -> None:
+        if expected_updated_at is not None and step.updated_at != expected_updated_at:
+            raise DomainException(
+                detail="El paso cambió desde que lo abriste. Revisa los datos guardados antes de continuar.",
+                status_code=409,
+            )
+
+    async def _get_active_step(
+        self, asunto_id: uuid.UUID, paso_codigo: str, user_id: uuid.UUID, user_role: str,
+    ) -> tuple[Asunto, AsuntoPaso]:
+        asunto = await self.asuntos.get_by_id_for_update(asunto_id)
+        if not asunto or (user_role == "abogado" and asunto.abogado_id != user_id):
+            raise NotFoundException(detail="Asunto no encontrado")
+        if user_role not in {"administrador", "abogado", "auxiliar"}:
+            raise ForbiddenException(detail="No puedes capturar datos en este asunto")
+        if asunto.flujo_estado == "completado":
+            raise DomainException(detail="El flujo del asunto ya está completado", status_code=409)
+        current = await self.pasos.get_current_for_update(asunto_id)
+        if not current:
+            raise DomainException(detail="El asunto no tiene un paso activo", status_code=409)
+        if current.codigo != paso_codigo:
+            raise DomainException(detail=f"El paso activo es '{current.titulo}'", status_code=409)
+        return asunto, current
+
+    async def save_draft(
+        self, asunto_id: uuid.UUID, paso_codigo: str, data: dict[str, Any],
+        user_id: uuid.UUID, user_role: str, expected_updated_at: datetime,
+    ) -> Asunto:
+        _, current = await self._get_active_step(asunto_id, paso_codigo, user_id, user_role)
+        self._check_version(current, expected_updated_at)
+        return await self.pasos.save_draft(current, self._merge_step_data(current, data))
+
+    @staticmethod
     def _validate_step_data(step: AsuntoPaso, data: dict[str, Any]) -> None:
+        # También valida capturas previas antes de convertirlas en un paso completado.
+        WorkflowService._merge_step_data(step, data)
         for field in step.campos:
             key = field["clave"]
             value = data.get(key)
@@ -169,22 +250,13 @@ class WorkflowService:
         data: dict[str, Any],
         user_id: uuid.UUID,
         user_role: str,
+        expected_updated_at: datetime | None = None,
     ) -> Asunto:
-        asunto = await self.asuntos.get_by_id(asunto_id)
-        if not asunto:
-            raise NotFoundException(detail="Asunto no encontrado")
-        if asunto.flujo_estado == "completado":
-            raise DomainException(detail="El flujo del asunto ya está completado", status_code=409)
-
-        current = await self.pasos.get_current_for_update(asunto_id)
-        if not current:
-            raise DomainException(detail="El asunto no tiene un paso activo", status_code=409)
-        if current.codigo != paso_codigo:
-            raise DomainException(
-                detail=f"El paso activo es '{current.titulo}'",
-                status_code=409,
-            )
-
+        if user_role not in {"administrador", "abogado"}:
+            raise ForbiddenException(detail="Solo el abogado responsable o administrador puede completar el paso")
+        asunto, current = await self._get_active_step(asunto_id, paso_codigo, user_id, user_role)
+        self._check_version(current, expected_updated_at)
+        data = self._merge_step_data(current, data)
         self._validate_step_data(current, data)
         next_step = await self.pasos.get_by_order(asunto_id, current.orden + 1)
         current_task = await self.tareas.get_open_for_step_for_update(

@@ -9,6 +9,17 @@ class NovedadRepository(BaseRepository[Novedad]):
     def __init__(self, session, firma_id: uuid.UUID):
         super().__init__(Novedad, session, firma_id)
 
+    async def get_by_id_for_update(self, id: uuid.UUID) -> Novedad | None:
+        result = await self.session.execute(
+            select(Novedad)
+            .where(Novedad.id == id)
+            .where(Novedad.firma_id == self.firma_id)
+            .where(Novedad.is_active == True)
+            .with_for_update(of=Novedad)
+            .execution_options(populate_existing=True)
+        )
+        return result.scalars().first()
+
     def public_visibility_condition(self):
         """Un evento documental público depende del documento que lo originó."""
         documento_visible = (

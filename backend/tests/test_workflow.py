@@ -187,6 +187,15 @@ async def test_workflow_can_complete_all_steps(client):
         json={"paso_codigo": "definicion", "datos": steps[-1][1]},
     )
     assert repeated.status_code == 409
+    draft_on_completed = await client.patch(
+        f"/api/v1/asuntos/{asunto['id']}/flujo/borrador",
+        json={
+            "paso_codigo": "definicion",
+            "datos": {"observaciones": "No debe alterar la historia."},
+            "expected_updated_at": body["pasos"][-1]["updated_at"],
+        },
+    )
+    assert draft_on_completed.status_code == 409
 
 
 @pytest.mark.asyncio
@@ -211,8 +220,8 @@ async def test_lawyer_cannot_advance_another_lawyers_work(alejandro_client):
             },
         },
     )
-    assert response.status_code == 403
-    assert response.json()["detail"] == "Esta tarea está asignada a otro responsable"
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Asunto no encontrado"
 
 
 @pytest.mark.asyncio

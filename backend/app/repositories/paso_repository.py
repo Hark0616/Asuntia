@@ -19,10 +19,18 @@ class PasoRepository(BaseRepository[AsuntoPaso]):
             .where(AsuntoPaso.firma_id == self.firma_id)
             .where(AsuntoPaso.is_active == True)
             .where(AsuntoPaso.estado == "activo")
-            .with_for_update()
+            .with_for_update(of=AsuntoPaso)
+            .execution_options(populate_existing=True)
         )
         result = await self.session.execute(stmt)
         return result.scalars().first()
+
+    async def save_draft(self, current: AsuntoPaso, data: dict) -> Asunto:
+        """Conserva la captura en el mismo paso, sin cerrar tarea ni generar eventos."""
+        current.datos = data
+        self.session.add(current)
+        await self.session.commit()
+        return await self._reload_asunto(current.asunto_id)
 
     async def get_by_order(
         self, asunto_id: uuid.UUID, order: int

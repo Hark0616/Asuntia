@@ -49,16 +49,19 @@ class AsignacionService:
         asunto_id: uuid.UUID,
         responsable_id: uuid.UUID,
     ) -> Asunto:
+        """Transfiere el trabajo abierto del responsable saliente y conserva las delegaciones al equipo."""
         asunto_repo = AsuntoRepository(self.session, self.firma_id)
-        asunto = await asunto_repo.get_by_id(asunto_id)
+        asunto = await asunto_repo.get_by_id_for_update(asunto_id)
         if asunto is None:
             raise NotFoundException(detail="Asunto no encontrado")
         await self._require_responsable(responsable_id)
 
+        previous = await UserRepository(self.session, self.firma_id).get_by_id(asunto.abogado_id)
+        previous_lawyer_id = previous.id if previous and previous.rol == "abogado" else None
         asunto_repo.stage_responsible(asunto, responsable_id)
         await TareaRepository(
             self.session, self.firma_id
-        ).reassign_open_for_asunto(asunto_id, responsable_id)
+        ).reassign_open_for_asunto(asunto_id, responsable_id, previous_lawyer_id)
         await self.session.commit()
         updated = await asunto_repo.get_by_id(asunto_id)
         if updated is None:

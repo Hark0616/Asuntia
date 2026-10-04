@@ -14,7 +14,7 @@ from app.schemas.asunto import (
     AsuntoCreate,
     AsuntoUpdateEstado,
 )
-from app.schemas.flujo import AvanzarPasoRequest
+from app.schemas.flujo import AvanzarPasoRequest, GuardarPasoBorradorRequest
 from app.schemas.portal import AsuntoPortalResponse
 from app.repositories.asunto_repository import AsuntoRepository
 from app.repositories.cliente_repository import ClienteRepository
@@ -219,10 +219,10 @@ async def assign_case_responsible(
     payload: AsuntoAsignarResponsable,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(
-        require_roles("administrador", "auxiliar")
+        require_roles("administrador")
     ),
 ):
-    """Transfiere el asunto y todo su trabajo abierto a otro responsable."""
+    """Transfiere el asunto y el trabajo abierto de su responsable; conserva las delegaciones al equipo."""
     return await AsignacionService(
         db, current_user.firma_id
     ).assign_case(asunto_id, payload.responsable_id)
@@ -253,14 +253,14 @@ async def update_estado_asunto(
     asunto_id: uuid.UUID,
     payload: AsuntoUpdateEstado,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles("administrador")),
+    current_user: User = Depends(require_roles("administrador", "abogado")),
 ):
     """
     Actualiza el estado procesal de un asunto sin alterar su ruta de trabajo.
     """
     repo = AsuntoRepository(db, current_user.firma_id)
-    asunto = await repo.get_by_id(asunto_id)
-    if not asunto:
+    asunto = await repo.get_by_id_for_update(asunto_id)
+    if not asunto or not can_access_asunto(current_user, asunto):
         raise NotFoundException(detail="Asunto no encontrado")
 
     update_data = payload.model_dump(exclude_unset=True)
@@ -289,6 +289,25 @@ async def advance_asunto_workflow(
         data=payload.datos,
         user_id=current_user.id,
         user_role=current_user.rol,
+        expected_updated_at=payload.expected_updated_at,
+    )
+
+
+@router.patch("/{asunto_id}/flujo/borrador", response_model=AsuntoResponse)
+async def save_asunto_workflow_draft(
+    asunto_id: uuid.UUID,
+    payload: GuardarPasoBorradorRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_office_user),
+):
+    """Guarda la captura parcial del paso activo sin completar ni publicar."""
+    return await WorkflowService(db, current_user.firma_id).save_draft(
+        asunto_id=asunto_id,
+        paso_codigo=payload.paso_codigo,
+        data=payload.datos,
+        user_id=current_user.id,
+        user_role=current_user.rol,
+        expected_updated_at=payload.expected_updated_at,
     )
 
 @router.delete("/{asunto_id}", status_code=status.HTTP_204_NO_CONTENT)

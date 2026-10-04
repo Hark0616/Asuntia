@@ -50,6 +50,16 @@ class UserRepository(BaseRepository[User]):
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
 
+    async def list_office_members(self) -> list[User]:
+        result = await self.session.execute(
+            select(User)
+            .where(User.firma_id == self.firma_id)
+            .where(User.is_active == True)
+            .where(User.rol.in_(("administrador", "abogado", "auxiliar")))
+            .order_by(User.nombre.asc(), User.id.asc())
+        )
+        return list(result.scalars().all())
+
     async def get_case_responsible(
         self, user_id: uuid.UUID
     ) -> Optional[User]:

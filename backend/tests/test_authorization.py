@@ -34,14 +34,15 @@ async def test_client_cannot_list_customers_or_mutate_asunto(elena_client):
 
 
 @pytest.mark.asyncio
-async def test_lawyer_cannot_apply_administrative_case_corrections(
+async def test_responsible_lawyer_can_update_case_state(
     alejandro_client,
 ):
     response = await alejandro_client.patch(
         "/api/v1/asuntos/00000000-0000-0000-0000-000000000202/estado",
         json={"estado_id": "00000000-0000-0000-0000-000000000102"},
     )
-    assert response.status_code == 403
+    assert response.status_code == 200
+    assert response.json()["estado"]["id"] == "00000000-0000-0000-0000-000000000102"
 
 
 @pytest.mark.asyncio

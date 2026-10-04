@@ -40,6 +40,20 @@ class AsuntoRepository(BaseRepository[Asunto]):
         result = await self.session.execute(stmt)
         return result.scalars().unique().first()
 
+    async def get_by_id_for_update(self, id: uuid.UUID) -> Optional[Asunto]:
+        """Serializa cambios del expediente antes de bloquear pasos o tareas."""
+        result = await self.session.execute(
+            select(Asunto)
+            .where(Asunto.id == id)
+            .where(Asunto.firma_id == self.firma_id)
+            .where(Asunto.is_active == True)
+            .with_for_update(of=Asunto)
+            .execution_options(populate_existing=True)
+        )
+        if result.scalars().first() is None:
+            return None
+        return await self.get_by_id(id)
+
     async def list(self, skip: int = 0, limit: int = 100) -> List[Asunto]:
         stmt = (
             select(Asunto)

@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, time, timedelta, timezone
 from typing import Optional
 
-from sqlalchemy import case, func, select, update
+from sqlalchemy import case, func, or_, select, update
 from sqlalchemy.orm import joinedload
 
 from app.models.asunto import Asunto
@@ -34,6 +34,7 @@ class TareaRepository(BaseRepository[Tarea]):
         *,
         include_team: bool = False,
         limit: int = 50,
+        restrict_cases_to_responsable: bool = False,
     ) -> list[Tarea]:
         now = datetime.now(timezone.utc)
         tomorrow = datetime.combine(
@@ -73,6 +74,8 @@ class TareaRepository(BaseRepository[Tarea]):
         )
         if not include_team:
             stmt = stmt.where(Tarea.responsable_id == responsable_id)
+        if restrict_cases_to_responsable:
+            stmt = stmt.where(Asunto.abogado_id == responsable_id)
 
         result = await self.session.execute(stmt)
         return list(result.scalars().unique().all())
@@ -82,6 +85,7 @@ class TareaRepository(BaseRepository[Tarea]):
         responsable_id: Optional[uuid.UUID],
         *,
         include_team: bool = False,
+        restrict_cases_to_responsable: bool = False,
     ) -> int:
         stmt = (
             select(func.count(Tarea.id))
@@ -96,9 +100,73 @@ class TareaRepository(BaseRepository[Tarea]):
         )
         if not include_team:
             stmt = stmt.where(Tarea.responsable_id == responsable_id)
+        if restrict_cases_to_responsable:
+            stmt = stmt.where(Asunto.abogado_id == responsable_id)
 
         result = await self.session.execute(stmt)
         return int(result.scalar_one())
+
+    async def get_detail(self, tarea_id: uuid.UUID, *, lock: bool = False) -> Tarea | None:
+        stmt = (select(Tarea).options(*self._load_options())
+                .join(Tarea.asunto)
+                .where(Tarea.id == tarea_id)
+                .where(Tarea.firma_id == self.firma_id)
+                .where(Tarea.is_active == True)
+                .where(Asunto.firma_id == self.firma_id)
+                .where(Asunto.is_active == True)
+                .execution_options(populate_existing=True))
+        if lock:
+            stmt = stmt.with_for_update(of=Tarea)
+        result = await self.session.execute(stmt)
+        return result.scalars().unique().first()
+
+    async def list_by_asunto(self, asunto_id: uuid.UUID) -> list[Tarea]:
+        result = await self.session.execute(
+            select(Tarea).options(*self._load_options())
+            .where(Tarea.asunto_id == asunto_id)
+            .where(Tarea.firma_id == self.firma_id)
+            .where(Tarea.is_active == True)
+            .order_by(Tarea.created_at.desc(), Tarea.id.asc())
+        )
+        return list(result.scalars().unique().all())
+
+    async def scheduled_tasks(self, user_id: uuid.UUID, desde: datetime, hasta: datetime,
+                              *, include_team: bool = False,
+                              restrict_cases_to_responsable: bool = False) -> list[Tarea]:
+        stmt = (select(Tarea).options(*self._load_options()).join(Tarea.asunto)
+                .where(Tarea.firma_id == self.firma_id)
+                .where(Tarea.is_active == True)
+                .where(Asunto.firma_id == self.firma_id)
+                .where(Asunto.is_active == True)
+                .where(Tarea.estado.in_(["pendiente", "en_progreso"]))
+                .where(Tarea.vence_en >= desde).where(Tarea.vence_en < hasta))
+        if not include_team:
+            stmt = stmt.where(Tarea.responsable_id == user_id)
+        if restrict_cases_to_responsable:
+            stmt = stmt.where(Asunto.abogado_id == user_id)
+        result = await self.session.execute(stmt)
+        return list(result.scalars().unique().all())
+
+    def stage_manual(self, data: dict, actor_id: uuid.UUID) -> Tarea:
+        tarea = Tarea(**data, firma_id=self.firma_id,
+                      codigo=f"manual:{uuid.uuid4()}", tipo=TareaTipo.TAREA_INTERNA.value,
+                      estado=TareaEstado.PENDIENTE.value, solicitante_id=actor_id,
+                      created_by_id=actor_id)
+        self.session.add(tarea)
+        return tarea
+
+    def stage_update(self, tarea: Tarea, data: dict, actor_id: uuid.UUID) -> None:
+        for field, value in data.items():
+            setattr(tarea, field, value)
+        if data.get("estado") == TareaEstado.COMPLETADA.value:
+            tarea.completed_at = datetime.now(timezone.utc)
+            tarea.completed_by_id = actor_id
+        elif data.get("estado") in {TareaEstado.PENDIENTE.value, TareaEstado.EN_PROGRESO.value}:
+            tarea.completed_at = None
+            tarea.completed_by_id = None
+        if data.get("estado") == TareaEstado.EN_PROGRESO.value and not tarea.started_at:
+            tarea.started_at = datetime.now(timezone.utc)
+        self.session.add(tarea)
 
     async def get_open_for_step_for_update(
         self, asunto_id: uuid.UUID, asunto_paso_id: uuid.UUID
@@ -157,12 +225,16 @@ class TareaRepository(BaseRepository[Tarea]):
         self,
         asunto_id: uuid.UUID,
         responsable_id: uuid.UUID,
+        previous_lawyer_id: uuid.UUID | None = None,
     ) -> int:
         result = await self.session.execute(
             update(Tarea)
             .where(Tarea.asunto_id == asunto_id)
             .where(Tarea.firma_id == self.firma_id)
             .where(Tarea.is_active == True)
+            .where(or_(Tarea.tipo == TareaTipo.COMPLETAR_PASO.value,
+                       Tarea.responsable_id == previous_lawyer_id) if previous_lawyer_id
+                   else Tarea.tipo == TareaTipo.COMPLETAR_PASO.value)
             .where(
                 Tarea.estado.in_(
                     [

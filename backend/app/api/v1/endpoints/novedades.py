@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.deps import get_current_user, require_office_user, require_roles
 from app.core.access import can_access_asunto, require_publication_permission
 from app.core.db import get_db
-from app.schemas.novedad import NovedadCreate, NovedadResponse
+from app.schemas.novedad import NovedadCreate, NovedadResponse, NovedadVisibilidadUpdate
 from app.schemas.portal import NovedadPortalResponse
 from app.repositories.novedad_repository import NovedadRepository
 from app.repositories.asunto_repository import AsuntoRepository
@@ -59,6 +59,29 @@ async def create_novedad(
 
     nueva_novedad = await repo.create(data, created_by_id=current_user.id)
     return nueva_novedad
+
+@router.patch("/{novedad_id}/visibilidad", response_model=NovedadResponse)
+async def update_novedad_visibility(
+    novedad_id: uuid.UUID,
+    payload: NovedadVisibilidadUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles("administrador", "abogado")),
+):
+    """Autoriza o retira la misma nota conservando su identidad y autoría."""
+    repo = NovedadRepository(db, current_user.firma_id)
+    novedad = await repo.get_by_id(novedad_id)
+    if not novedad:
+        raise NotFoundException(detail="Novedad no encontrada")
+    asunto = await AsuntoRepository(db, current_user.firma_id).get_by_id_for_update(novedad.asunto_id)
+    if not asunto or not can_access_asunto(current_user, asunto):
+        raise NotFoundException(detail="Novedad no encontrada")
+    novedad = await repo.get_by_id_for_update(novedad_id)
+    if not novedad:
+        raise NotFoundException(detail="Novedad no encontrada")
+    if novedad.tipo != "nota":
+        raise HTTPException(status_code=409, detail="Este avance se gestiona desde su actuación de origen.")
+    return await repo.update(novedad, payload.model_dump())
+
 
 @router.delete("/{novedad_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_novedad(
