@@ -9,12 +9,8 @@ import {
 } from 'react-router';
 import { 
   BriefcaseBusiness,
-  History, 
   Plus, 
   Save, 
-  Eye, 
-  Send, 
-  Clock3,
   HardDrive,
   UsersRound,
 } from 'lucide-react';
@@ -26,7 +22,7 @@ import {
   fetchResponsablesAPI,
   abrirAsuntoAPI,
   avanzarPasoAPI,
-  crearNovedadAPI, 
+  guardarBorradorPasoAPI,
   actualizarEstadoAPI, 
   asignarResponsableClienteAPI,
   asignarResponsableAsuntoAPI,
@@ -38,28 +34,20 @@ import {
 import { ClienteOTPLogin } from '@/features/auth/components/ClienteOTPLogin';
 import { OficinaLogin } from '@/features/auth/components/OficinaLogin';
 import { fetchCurrentUserAPI, logoutAPI } from '@/features/auth/api/auth';
-import type { User } from '@/types/api';
+import type { Novedad, User } from '@/types/api';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { AperturaAsuntoModal } from '@/components/ui/AperturaAsuntoModal';
 import { DocumentosTab } from '@/features/documentos/components/DocumentosTab';
 import { ConfiguracionAlmacenamiento } from '@/features/firma/components/ConfiguracionAlmacenamiento';
 import { FlujoAsunto } from '@/features/asuntos/components/FlujoAsunto';
+import { ActividadExpediente } from '@/features/asuntos/components/ActividadExpediente';
 import { ResponsableAsignacion } from '@/features/asuntos/components/ResponsableAsignacion';
 import type { AsuntoPasoAPI } from '@/features/asuntos/api/asuntos';
 import { UserMenu } from '@/components/layout/UserMenu';
 import { MiTrabajo } from '@/features/tareas/components/MiTrabajo';
+import { TareasAsunto } from '@/features/tareas/components/TareasAsunto';
 import { PortalCliente } from '@/features/portal-cliente/components/PortalCliente';
 import { formatAsuntosCount } from '@/lib/formatAsuntos';
-
-interface NovedadItem {
-  id: string;
-  autor: string;
-  titulo: string;
-  tipo: 'nota' | 'paso_completado' | 'documento_incorporado';
-  fecha: string;
-  texto: string;
-  visibilidad: 'Cliente' | 'Interno';
-}
 
 interface CasoData {
   id: string;
@@ -73,7 +61,7 @@ interface CasoData {
   accionActual: string;
   abogadoId?: string;
   prioridad: 'alta' | 'normal';
-  novedades: NovedadItem[];
+  novedades: Novedad[];
   pasos: AsuntoPasoAPI[];
   flujoEstado: 'activo' | 'completado';
 }
@@ -170,10 +158,7 @@ export default function App() {
     retry: 1,
     enabled: officeUser,
   });
-  const puedeGestionarAsignaciones = (
-    usuarioAutenticado?.rol === 'administrador'
-    || usuarioAutenticado?.rol === 'auxiliar'
-  );
+  const puedeGestionarAsignaciones = usuarioAutenticado?.rol === 'administrador';
 
   // Mutaciones
   const mutacionApertura = useMutation({
@@ -191,23 +176,24 @@ export default function App() {
   });
 
   const mutacionAvanzarPaso = useMutation({
-    mutationFn: ({ asuntoId, pasoCodigo, datos }: { asuntoId: string; pasoCodigo: string; datos: Record<string, unknown> }) =>
-      avanzarPasoAPI(asuntoId, { paso_codigo: pasoCodigo, datos }),
-    onSuccess: () => {
+    mutationFn: ({ asuntoId, pasoCodigo, datos, expectedUpdatedAt }: { asuntoId: string; pasoCodigo: string; datos: Record<string, unknown>; expectedUpdatedAt?: string }) =>
+      avanzarPasoAPI(asuntoId, { paso_codigo: pasoCodigo, datos, expected_updated_at: expectedUpdatedAt }),
+    onSuccess: (asunto) => {
+      queryClient.setQueryData<AsuntoAPI[]>(['asuntos'], (current) => current?.map((item) => item.id === asunto.id ? asunto : item));
       queryClient.invalidateQueries({ queryKey: ['asuntos'] });
       queryClient.invalidateQueries({ queryKey: ['tareas'] });
     },
   });
 
-  const mutacionNovedad = useMutation({
-    mutationFn: ({ asuntoId, payload }: { asuntoId: string; payload: { titulo: string; descripcion: string; publicado_al_cliente: boolean } }) =>
-      crearNovedadAPI(asuntoId, payload),
-    onSuccess: () => {
+  const mutacionBorrador = useMutation({
+    mutationFn: ({ asuntoId, pasoCodigo, datos, expectedUpdatedAt }: { asuntoId: string; pasoCodigo: string; datos: Record<string, unknown>; expectedUpdatedAt: string }) =>
+      guardarBorradorPasoAPI(asuntoId, { paso_codigo: pasoCodigo, datos, expected_updated_at: expectedUpdatedAt }),
+    onSuccess: (asunto) => {
+      queryClient.setQueryData<AsuntoAPI[]>(['asuntos'], (current) => current?.map((item) => item.id === asunto.id ? asunto : item));
       queryClient.invalidateQueries({ queryKey: ['asuntos'] });
-      setNuevoAvanceTexto('');
-      setNuevoAvanceVisibilidad('internal');
     },
   });
+
 
   const mutacionEstado = useMutation({
     mutationFn: ({ asuntoId, payload }: { asuntoId: string; payload: { estado_id?: string } }) =>
@@ -278,19 +264,7 @@ export default function App() {
           prioridad: 'normal' as const,
           pasos: as.pasos,
           flujoEstado: as.flujo_estado,
-          novedades: as.novedades.map(nov => ({
-            id: nov.id,
-            autor: nov.tipo === 'nota' ? 'Nota de la firma' : 'Actividad del sistema',
-            titulo: nov.titulo,
-            tipo: nov.tipo,
-            fecha: new Intl.DateTimeFormat('es-CO', {
-              timeZone: 'America/Bogota',
-              dateStyle: 'medium',
-              timeStyle: 'short',
-            }).format(new Date(nov.created_at)),
-            texto: nov.descripcion,
-            visibilidad: nov.publicado_al_cliente ? 'Cliente' : 'Interno'
-          }))
+          novedades: as.novedades
           };
         })
       };
@@ -299,10 +273,10 @@ export default function App() {
   // Selección activa
   const clienteActivo = clientes.find(c => c.id === clienteIdSeleccionado) || null;
   const casoActivo = clienteActivo && clienteActivo.casos ? (clienteActivo.casos.find(c => c.id === casoIdSeleccionado) || clienteActivo.casos[0] || null) : null;
+  const puedeDecidirCaso = usuarioAutenticado?.rol === 'administrador'
+    || (usuarioAutenticado?.rol === 'abogado' && casoActivo?.abogadoId === usuarioAutenticado.id);
 
   const [estadoSeleccionadoId, setEstadoSeleccionadoId] = useState<string>('');
-  const [nuevoAvanceTexto, setNuevoAvanceTexto] = useState('');
-  const [nuevoAvanceVisibilidad, setNuevoAvanceVisibilidad] = useState<'client' | 'internal'>('internal');
 
   React.useEffect(() => {
     setEstadoSeleccionadoId(casoActivo?.estadoId || '');
@@ -319,9 +293,9 @@ export default function App() {
   }, [asuntoRouteMatch?.params.asuntoId, asuntosAPI]);
 
   React.useEffect(() => {
-    if (!casoActivo || location.hash !== '#paso-activo') return;
+    if (!casoActivo || !['#paso-activo', '#tareas-expediente'].includes(location.hash)) return;
     const frame = window.requestAnimationFrame(() => {
-      const activeStep = document.getElementById('paso-activo');
+      const activeStep = document.getElementById(location.hash.slice(1));
       activeStep?.scrollIntoView({ block: 'start' });
       activeStep?.focus({ preventScroll: true });
     });
@@ -340,23 +314,6 @@ export default function App() {
     }
   };
 
-  const handlePublicarAvance = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!nuevoAvanceTexto.trim()) return;
-
-    if (casoActivo) {
-      mutacionNovedad.mutate({
-        asuntoId: casoActivo.id,
-        payload: {
-          titulo: 'Avance procesal',
-          descripcion: nuevoAvanceTexto,
-          publicado_al_cliente: usuarioAutenticado?.rol !== 'auxiliar'
-            && nuevoAvanceVisibilidad === 'client'
-        }
-      });
-    }
-
-  };
 
   const handleAuthenticated = (user: User) => {
     queryClient.setQueryData(['auth', 'me'], user);
@@ -635,11 +592,7 @@ export default function App() {
                     )}
                   </div>
                 </>
-              ) : (
-                <div className="office-nav-note">
-                  <span className="muted small">Tu bandeja reúne los pasos abiertos de los asuntos asignados.</span>
-                </div>
-              )}
+              ) : null}
             </div>
           </aside>
 
@@ -820,26 +773,22 @@ export default function App() {
                               }}
                             />
                             <span className="row case-public-status">
-                              <span className="muted small">Estado comunicado</span>
+                              <span className="muted small">Estado del expediente</span>
                               <span className={`badge ${casoActivo.estadoTipo}`}>{casoActivo.estadoBadge}</span>
                               <Tooltip
                                 content={casoActivo.estadoDescripcion
-                                  || 'Estado procesal que se muestra al cliente.'}
+                                  || 'Estado registrado por la firma para este expediente.'}
                               />
                             </span>
                           </div>
                         </div>
 
-                        {usuarioAutenticado.rol === 'administrador' && (
-                          <details className="administrative-correction">
-                            <summary>
-                              Corrección administrativa
-                              <Tooltip content="Ajusta el estado público sin modificar la ruta del expediente." />
-                            </summary>
+                        {puedeDecidirCaso && (
+                          <div className="expediente-status-editor">
                             <form onSubmit={handleGuardarEstado}>
                               <div className="form-grid">
                                 <div className="field">
-                                  <label htmlFor="estado-procesal-select">Estado público</label>
+                                  <div className="row"><label htmlFor="estado-procesal-select">Actualizar estado</label><Tooltip content="Registra el estado del expediente sin completar los pasos de trabajo." /></div>
                                   <select
                                     id="estado-procesal-select"
                                     value={estadoSeleccionadoId || casoActivo.estadoId || ''}
@@ -859,134 +808,66 @@ export default function App() {
 
                                 <div className="field">
                                   <label>&nbsp;</label>
-                                  <button className="secondary-button" type="submit">
+                                  <button className="secondary-button" type="submit" disabled={mutacionEstado.isPending}>
                                     <Save size={16} />
-                                    Guardar corrección
+                                    {mutacionEstado.isPending ? 'Guardando…' : 'Guardar estado'}
                                   </button>
                                 </div>
                               </div>
                             </form>
-                          </details>
+                            {mutacionEstado.isError && mutacionEstado.variables?.asuntoId === casoActivo.id && <p className="form-error" role="alert">No se pudo actualizar el estado. Inténtalo de nuevo.</p>}
+                            {mutacionEstado.isSuccess && mutacionEstado.variables?.asuntoId === casoActivo.id && <p className="muted small" role="status">Estado actualizado</p>}
+                          </div>
                         )}
                       </section>
 
                       <FlujoAsunto
+                        key={`flujo-${casoActivo.id}`}
                         pasos={casoActivo.pasos}
                         flujoEstado={casoActivo.flujoEstado}
-                        isLoading={mutacionAvanzarPaso.isPending}
-                        canAdvance={
-                          usuarioAutenticado.rol === 'administrador'
-                          || (
-                            usuarioAutenticado.rol === 'abogado'
-                            && casoActivo.abogadoId === usuarioAutenticado.id
-                          )
-                        }
+                        canAdvance={puedeDecidirCaso}
+                        canSave={puedeDecidirCaso || usuarioAutenticado.rol === 'auxiliar'}
                         readOnlyReason={
-                          usuarioAutenticado.rol === 'auxiliar'
-                            ? 'Tu perfil puede consultar esta ruta.'
-                            : 'Este paso está asignado a otro abogado.'
+                          'Este paso está asignado a otro abogado.'
                         }
-                        onAdvance={(pasoCodigo, datos) => mutacionAvanzarPaso.mutateAsync({
+                        onAdvance={(pasoCodigo, datos, expectedUpdatedAt) => mutacionAvanzarPaso.mutateAsync({
                           asuntoId: casoActivo.id,
                           pasoCodigo,
                           datos,
+                          expectedUpdatedAt,
                         })}
+                        onSave={(pasoCodigo, datos, expectedUpdatedAt) => mutacionBorrador.mutateAsync({
+                          asuntoId: casoActivo.id, pasoCodigo, datos, expectedUpdatedAt,
+                        })}
+                        onReload={async () => {
+                          const result = await asuntosQuery.refetch();
+                          const asunto = result.data?.find((item) => item.id === casoActivo.id);
+                          if (result.isError || !asunto) throw new Error('No disponible');
+                          return asunto;
+                        }}
                       />
 
                       {/* Gestión documental del expediente */}
+                      <TareasAsunto
+                        key={`tareas-${casoActivo.id}`}
+                        asuntoId={casoActivo.id}
+                        abogadoId={casoActivo.abogadoId}
+                        userId={usuarioAutenticado.id}
+                        canManage={puedeDecidirCaso}
+                      />
                       <DocumentosTab
-                        key={casoActivo.id}
+                        key={`documentos-${casoActivo.id}`}
                         asuntoId={casoActivo.id}
                         isReadOnly={false}
-                        canManagePublication={usuarioAutenticado.rol === 'administrador'
-                          || usuarioAutenticado.rol === 'abogado'}
+                        canManagePublication={puedeDecidirCaso}
                       />
 
-                      <form className="panel" onSubmit={handlePublicarAvance} style={{ marginTop: '16px' }}>
-                        <div className="section-title">
-                          <h3>Registrar nota</h3>
-                          <Eye size={17} />
-                        </div>
-                        <div className="form-grid">
-                          <div className="field full">
-                            <label htmlFor="update-body">Contenido</label>
-                            <textarea 
-                              id="update-body" 
-                              required
-                              disabled={mutacionNovedad.isPending}
-                              value={nuevoAvanceTexto}
-                              onChange={(e) => setNuevoAvanceTexto(e.target.value)}
-                              placeholder="Nota sobre el expediente..."
-                            />
-                          </div>
-
-                          {usuarioAutenticado.rol !== 'auxiliar' && (
-                            <div className="field">
-                              <label htmlFor="update-visibility">Visibilidad</label>
-                              <select
-                                id="update-visibility"
-                                value={nuevoAvanceVisibilidad}
-                                disabled={mutacionNovedad.isPending}
-                                onChange={(e) => setNuevoAvanceVisibilidad(e.target.value as 'client' | 'internal')}
-                              >
-                                <option value="internal">Interno (Solo firma)</option>
-                                <option value="client">Compartir con el cliente</option>
-                              </select>
-                            </div>
-                          )}
-
-                          <div className="field">
-                            <label>&nbsp;</label>
-                            <button
-                              className="primary-button"
-                              type="submit"
-                              disabled={mutacionNovedad.isPending}
-                            >
-                              <Send size={16} />
-                              {mutacionNovedad.isPending ? 'Guardando…' : 'Registrar nota'}
-                            </button>
-                          </div>
-                        </div>
-                        {mutacionNovedad.isError && (
-                          <p className="form-error" role="alert">
-                            No pudimos guardar la nota. Inténtalo de nuevo.
-                          </p>
-                        )}
-                      </form>
-
-                      <div className="panel">
-                        <div className="section-title">
-                          <h3>Actividad del expediente</h3>
-                          <History size={17} />
-                        </div>
-
-                        <div className="timeline">
-                          {casoActivo.novedades && casoActivo.novedades.length > 0 ? (
-                            casoActivo.novedades.map((n) => (
-                              <div key={n.id} className="timeline-item">
-                                <div className="timeline-dot">
-                                  <Clock3 size={14} />
-                                </div>
-                                <div className="timeline-body">
-                                  <div className="row between">
-                                    <strong>{n.titulo}</strong>
-                                    <span className="muted small">{n.fecha}</span>
-                                  </div>
-                                  <span className="muted small">{n.autor}</span>
-                                  <p style={{ margin: '4px 0' }}>{n.texto}</p>
-                                  <span className={`badge ${n.visibilidad === 'Cliente' ? 'neutral' : 'warning'}`}>
-                                    {n.visibilidad}
-                                  </span>
-                                </div>
-                              </div>
-                            ))
-                          ) : (
-                            <div className="muted small" style={{ padding: '12px' }}>
-                              Sin actividad registrada.
-                            </div>
-                          )}
-                        </div>
-                      </div>
+                      <ActividadExpediente
+                        key={`actividad-${casoActivo.id}`}
+                        asuntoId={casoActivo.id}
+                        novedades={casoActivo.novedades}
+                        canPublish={puedeDecidirCaso}
+                      />
                     </section>
                   ) : (
                     <div className="panel" style={{ padding: '32px 24px', textAlign: 'center' }}>

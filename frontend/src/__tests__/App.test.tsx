@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../App';
 import {
   crearNovedadAPI,
+  actualizarEstadoAPI,
   fetchAsuntos,
   fetchAsuntosPortalAPI,
   fetchClientesAPI,
@@ -25,6 +26,8 @@ vi.mock('@/features/asuntos/api/asuntos', () => ({
   fetchResponsablesAPI: vi.fn(),
   abrirAsuntoAPI: vi.fn(),
   avanzarPasoAPI: vi.fn(),
+  guardarBorradorPasoAPI: vi.fn(),
+  actualizarVisibilidadNovedadAPI: vi.fn(),
   crearNovedadAPI: vi.fn(),
   actualizarEstadoAPI: vi.fn(),
   asignarResponsableClienteAPI: vi.fn(),
@@ -36,6 +39,9 @@ vi.mock('@/features/auth/api/auth', () => ({
 }));
 vi.mock('@/features/documentos/components/DocumentosTab', () => ({
   DocumentosTab: () => <div>Documentos del expediente</div>,
+}));
+vi.mock('@/features/tareas/components/TareasAsunto', () => ({
+  TareasAsunto: () => <section id="tareas-expediente" tabIndex={-1} aria-label="Tareas del expediente">Tareas del expediente</section>,
 }));
 vi.mock('@/features/portal-cliente/components/PortalCliente', () => ({
   PortalCliente: ({ asuntos }: { asuntos: AsuntoPortalAPI[] }) => (
@@ -75,7 +81,7 @@ function renderApp(path = '/cliente', queryClient = new QueryClient({
   return queryClient;
 }
 
-function prepareOffice(role: 'administrador' | 'auxiliar' = 'administrador') {
+function prepareOffice(role: 'administrador' | 'auxiliar' | 'abogado' = 'administrador') {
   vi.mocked(fetchCurrentUserAPI).mockResolvedValue({ ...clientUser, rol: role });
   vi.mocked(fetchClientesAPI).mockResolvedValue([{
     id: 'cliente-1', tipo_persona: 'natural', tipo_documento: 'CC',
@@ -103,6 +109,22 @@ beforeEach(() => {
 });
 
 describe('App: proyección autorizada y recuperación', () => {
+  it('el enlace de agenda desplaza y enfoca las tareas del expediente', async () => {
+    const previous = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollIntoView');
+    const scroll = vi.fn();
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: scroll });
+    try {
+      prepareOffice();
+      renderApp('/oficina/asuntos/asunto-1#tareas-expediente');
+      const target = await screen.findByRole('region', { name: 'Tareas del expediente' });
+      await waitFor(() => expect(target).toHaveFocus());
+      expect(scroll).toHaveBeenCalledWith({ block: 'start' });
+    } finally {
+      if (previous) Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', previous);
+      else Reflect.deleteProperty(HTMLElement.prototype, 'scrollIntoView');
+    }
+  });
+
   it('consulta el contrato público sin descargar datos de oficina para clientes', async () => {
     renderApp();
 
@@ -165,6 +187,8 @@ describe('App: proyección autorizada y recuperación', () => {
 
     const note = await screen.findByLabelText('Contenido');
     expect(screen.queryByLabelText('Visibilidad')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Actualizar estado')).not.toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: /Responsable del cliente|Abogado del asunto/ })).not.toBeInTheDocument();
     await user.type(note, 'Se revisaron los soportes.');
     await user.click(screen.getByRole('button', { name: 'Registrar nota' }));
 
@@ -173,6 +197,29 @@ describe('App: proyección autorizada y recuperación', () => {
       descripcion: 'Se revisaron los soportes.',
       publicado_al_cliente: false,
     }));
+  });
+
+  it('el abogado responsable actualiza el estado del expediente sin corrección administrativa', async () => {
+    const user = userEvent.setup();
+    prepareOffice('abogado');
+    vi.mocked(fetchCurrentUserAPI).mockResolvedValue({ ...clientUser, id: 'abogada-1', rol: 'abogado' });
+    vi.mocked(fetchEstadosAPI).mockResolvedValue([{ id: 'estado-1', nombre: 'En negociación', color_tipo: 'mint' }]);
+    vi.mocked(actualizarEstadoAPI).mockResolvedValue({});
+    renderApp('/oficina/asuntos/asunto-1');
+    expect(await screen.findByText('Estado del expediente')).toBeInTheDocument();
+    expect(screen.queryByText('Corrección administrativa')).not.toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText('Actualizar estado'), 'estado-1');
+    await user.click(screen.getByRole('button', { name: 'Guardar estado' }));
+    await waitFor(() => expect(actualizarEstadoAPI).toHaveBeenCalledWith('asunto-1', { estado_id: 'estado-1' }));
+    expect(await screen.findByText('Estado actualizado')).toBeInTheDocument();
+  });
+
+  it('un abogado diferente no recibe controles de estado ni publicación', async () => {
+    prepareOffice('abogado');
+    renderApp('/oficina/asuntos/asunto-1');
+    await screen.findByLabelText('Contenido');
+    expect(screen.queryByLabelText('Actualizar estado')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Visibilidad')).not.toBeInTheDocument();
   });
 
   it('las notas comienzan privadas y un fallo conserva el texto para reintentar', async () => {

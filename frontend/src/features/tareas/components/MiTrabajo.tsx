@@ -11,6 +11,8 @@ import {
 
 import { Tooltip } from '@/components/ui/Tooltip';
 import { fetchMiTrabajo, type AlcanceTrabajo } from '../api/tareas';
+import { AgendaTrabajo } from './AgendaTrabajo';
+import { fechaTrabajo } from '../fechas';
 import './MiTrabajo.css';
 
 interface MiTrabajoProps {
@@ -19,6 +21,7 @@ interface MiTrabajoProps {
 
 export function MiTrabajo({ isAdmin }: MiTrabajoProps) {
   const [alcance, setAlcance] = useState<AlcanceTrabajo>('mio');
+  const [vista, setVista] = useState<'pendientes' | 'agenda'>('pendientes');
   const {
     data,
     error,
@@ -30,6 +33,7 @@ export function MiTrabajo({ isAdmin }: MiTrabajoProps) {
     queryFn: () => fetchMiTrabajo(alcance),
     staleTime: 30_000,
     refetchOnWindowFocus: true,
+    enabled: vista === 'pendientes',
   });
   const total = data?.total || 0;
   const totalLabel = alcance === 'equipo'
@@ -44,13 +48,10 @@ export function MiTrabajo({ isAdmin }: MiTrabajoProps) {
     <div className="workbench">
       <div className="toolbar workbench-toolbar">
         <div>
-          <span className="page-eyebrow">Bandeja de trabajo</span>
           <h2>Mi trabajo</h2>
-          <p className="muted">
-            {isLoading ? 'Consultando trabajo…' : totalLabel}
-          </p>
+          {vista === 'pendientes' && <p className="muted">{isLoading ? 'Consultando trabajo…' : error && !data ? 'Bandeja no disponible.' : totalLabel}</p>}
         </div>
-        <button
+        {vista === 'pendientes' && <button
           className="secondary-button"
           type="button"
           onClick={() => refetch()}
@@ -58,7 +59,12 @@ export function MiTrabajo({ isAdmin }: MiTrabajoProps) {
         >
           <RefreshCw size={16} aria-hidden="true" />
           {isFetching ? 'Actualizando…' : 'Actualizar'}
-        </button>
+        </button>}
+      </div>
+
+      <div className="scope-tabs" role="group" aria-label="Vista de trabajo">
+        <button className={vista === 'pendientes' ? 'active' : ''} type="button" aria-pressed={vista === 'pendientes'} onClick={() => setVista('pendientes')}>Pendientes</button>
+        <button className={vista === 'agenda' ? 'active' : ''} type="button" aria-pressed={vista === 'agenda'} onClick={() => setVista('agenda')}>Agenda</button>
       </div>
 
       {isAdmin && (
@@ -77,10 +83,12 @@ export function MiTrabajo({ isAdmin }: MiTrabajoProps) {
             aria-pressed={alcance === 'equipo'}
             onClick={() => setAlcance('equipo')}
           >
-            Pendientes del equipo
+            Equipo
           </button>
         </div>
       )}
+
+      {vista === 'agenda' ? <AgendaTrabajo alcance={alcance} /> : <>
 
       {isLoading && (
         <div className="panel work-list" aria-label="Cargando trabajo">
@@ -118,7 +126,6 @@ export function MiTrabajo({ isAdmin }: MiTrabajoProps) {
           <BriefcaseBusiness size={24} aria-hidden="true" />
           <div>
             <h3>Sin tareas pendientes</h3>
-            <p className="muted small">No hay pasos abiertos en este momento.</p>
           </div>
         </div>
       )}
@@ -132,7 +139,7 @@ export function MiTrabajo({ isAdmin }: MiTrabajoProps) {
             >
               <Link
                 className="work-item"
-                to={`/oficina/asuntos/${tarea.asunto.id}#paso-activo`}
+                to={`/oficina/asuntos/${tarea.asunto.id}${tarea.tipo === 'completar_paso' ? '#paso-activo' : '#tareas-expediente'}`}
                 aria-label={`Abrir ${tarea.asunto.radicado}: ${tarea.titulo}`}
               >
                 <span className="work-item-status" aria-hidden="true" />
@@ -157,11 +164,7 @@ export function MiTrabajo({ isAdmin }: MiTrabajoProps) {
                       {tarea.vence_en && (
                         <span className="muted small">
                           <CalendarClock size={14} aria-hidden="true" />
-                          Vence {new Intl.DateTimeFormat('es-CO', {
-                            timeZone: 'America/Bogota',
-                            dateStyle: 'medium',
-                            timeStyle: 'short',
-                          }).format(new Date(tarea.vence_en))}
+                          Vence {fechaTrabajo(tarea.vence_en)}
                         </span>
                       )}
                     </span>
@@ -182,6 +185,7 @@ export function MiTrabajo({ isAdmin }: MiTrabajoProps) {
           ))}
         </div>
       )}
+      </>}
     </div>
   );
 }

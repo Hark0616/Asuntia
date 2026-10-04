@@ -1,4 +1,8 @@
 /* La ayuda de cada tarea queda fuera del enlace que abre el expediente. */
+.agenda-window { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-3); margin-block: var(--space-4); }
+.agenda-work > p { margin-block: var(--space-3); }
+.work-item-body { overflow-wrap: anywhere; }
+.work-item-context { flex-wrap: wrap; }
 .work-item-row {
   position: relative;
   border-bottom: 1px solid var(--line);

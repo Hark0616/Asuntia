@@ -1,5 +1,6 @@
 import { apiClient } from '@/lib/axios';
 import type { AsuntoPortalAPI } from '@/types/portal';
+import type { Novedad } from '@/types/api';
 
 export interface EstadoProcesalAPI {
   id: string;
@@ -79,6 +80,7 @@ export interface AsuntoPasoAPI {
   estado: 'bloqueado' | 'activo' | 'completado';
   campos: PasoCampoAPI[];
   datos: Record<string, unknown>;
+  updated_at?: string;
   completed_at?: string | null;
   completed_by_id?: string | null;
 }
@@ -95,17 +97,7 @@ export interface AsuntoAPI {
   cliente_id: string;
   abogado_id?: string;
   estado?: EstadoProcesalAPI;
-  novedades: Array<{
-    id: string;
-    asunto_id: string;
-    asunto_paso_id?: string;
-    documento_id?: string;
-    tipo: 'nota' | 'paso_completado' | 'documento_incorporado';
-    titulo: string;
-    descripcion: string;
-    publicado_al_cliente: boolean;
-    created_at: string;
-  }>;
+  novedades: Novedad[];
   pasos: AsuntoPasoAPI[];
   created_at: string;
   updated_at: string;
@@ -155,7 +147,7 @@ export const abrirAsuntoAPI = async (payload: AperturaAsuntoPayload) => {
 
 export const avanzarPasoAPI = async (
   asuntoId: string,
-  payload: { paso_codigo: string; datos: Record<string, unknown> },
+  payload: { paso_codigo: string; datos: Record<string, unknown>; expected_updated_at?: string },
 ) => {
   const response = await apiClient.post<AsuntoAPI>(`/asuntos/${asuntoId}/flujo/avanzar`, payload);
   return response.data;
@@ -163,6 +155,22 @@ export const avanzarPasoAPI = async (
 
 export const crearNovedadAPI = async (asuntoId: string, payload: { titulo: string; descripcion: string; publicado_al_cliente: boolean }) => {
   const response = await apiClient.post(`/novedades/asunto/${asuntoId}`, payload);
+  return response.data;
+};
+
+export const guardarBorradorPasoAPI = async (
+  asuntoId: string,
+  payload: { paso_codigo: string; datos: Record<string, unknown>; expected_updated_at: string },
+) => {
+  const response = await apiClient.patch<AsuntoAPI>(`/asuntos/${asuntoId}/flujo/borrador`, payload);
+  return response.data;
+};
+
+export const actualizarVisibilidadNovedadAPI = async (
+  novedadId: string,
+  payload: { publicado_al_cliente: boolean },
+) => {
+  const response = await apiClient.patch<Novedad>(`/novedades/${novedadId}/visibilidad`, payload);
   return response.data;
 };
 
