@@ -7,18 +7,25 @@ from app.models.cliente import Cliente
 from app.models.novedad import Novedad
 from app.models.tarea import Tarea, TareaEstado, TareaPrioridad, TareaTipo
 from app.repositories.base import BaseRepository
+from app.repositories.novedad_repository import NovedadRepository
 
 class AsuntoRepository(BaseRepository[Asunto]):
     def __init__(self, session, firma_id: uuid.UUID):
         super().__init__(Asunto, session, firma_id)
 
-    @staticmethod
-    def _load_options():
+    def _load_options(self, solo_publicas: bool = False):
+        criteria = (Novedad.firma_id == self.firma_id) & (Novedad.is_active == True)
+        if solo_publicas:
+            criteria &= NovedadRepository(
+                self.session, self.firma_id
+            ).public_visibility_condition()
         return (
             joinedload(Asunto.cliente),
+            joinedload(Asunto.abogado),
             joinedload(Asunto.estado),
             selectinload(Asunto.novedades),
             selectinload(Asunto.pasos),
+            with_loader_criteria(Novedad, criteria, include_aliases=True),
         )
 
     async def get_by_id(self, id: uuid.UUID) -> Optional[Asunto]:
@@ -28,9 +35,24 @@ class AsuntoRepository(BaseRepository[Asunto]):
             .where(Asunto.id == id)
             .where(Asunto.firma_id == self.firma_id)
             .where(Asunto.is_active == True)
+            .execution_options(populate_existing=True)
         )
         result = await self.session.execute(stmt)
         return result.scalars().unique().first()
+
+    async def get_by_id_for_update(self, id: uuid.UUID) -> Optional[Asunto]:
+        """Serializa cambios del expediente antes de bloquear pasos o tareas."""
+        result = await self.session.execute(
+            select(Asunto)
+            .where(Asunto.id == id)
+            .where(Asunto.firma_id == self.firma_id)
+            .where(Asunto.is_active == True)
+            .with_for_update(of=Asunto)
+            .execution_options(populate_existing=True)
+        )
+        if result.scalars().first() is None:
+            return None
+        return await self.get_by_id(id)
 
     async def list(self, skip: int = 0, limit: int = 100) -> List[Asunto]:
         stmt = (
@@ -40,6 +62,7 @@ class AsuntoRepository(BaseRepository[Asunto]):
             .where(Asunto.is_active == True)
             .offset(skip)
             .limit(limit)
+            .execution_options(populate_existing=True)
         )
         result = await self.session.execute(stmt)
         return list(result.scalars().unique().all())
@@ -58,31 +81,19 @@ class AsuntoRepository(BaseRepository[Asunto]):
             .where(Asunto.is_active == True)
             .offset(skip)
             .limit(limit)
+            .execution_options(populate_existing=True)
         )
         result = await self.session.execute(stmt)
         return list(result.scalars().unique().all())
 
     async def get_by_radicado(self, radicado: str, solo_publicas: bool = False) -> Optional[Asunto]:
-        options = [
-            joinedload(Asunto.cliente),
-            joinedload(Asunto.estado),
-            selectinload(Asunto.novedades),
-            selectinload(Asunto.pasos),
-        ]
-        if solo_publicas:
-            options.append(
-                with_loader_criteria(
-                    Novedad,
-                    Novedad.publicado_al_cliente == True,
-                    include_aliases=True,
-                )
-            )
         stmt = (
             select(Asunto)
-            .options(*options)
+            .options(*self._load_options(solo_publicas))
             .where(Asunto.radicado == radicado)
             .where(Asunto.firma_id == self.firma_id)
             .where(Asunto.is_active == True)
+            .execution_options(populate_existing=True)
         )
         result = await self.session.execute(stmt)
         return result.scalars().first()
@@ -90,26 +101,13 @@ class AsuntoRepository(BaseRepository[Asunto]):
     async def get_by_cliente_id(
         self, cliente_id: uuid.UUID, solo_publicas: bool = False
     ) -> List[Asunto]:
-        options = [
-            joinedload(Asunto.cliente),
-            joinedload(Asunto.estado),
-            selectinload(Asunto.novedades),
-            selectinload(Asunto.pasos),
-        ]
-        if solo_publicas:
-            options.append(
-                with_loader_criteria(
-                    Novedad,
-                    Novedad.publicado_al_cliente == True,
-                    include_aliases=True,
-                )
-            )
         stmt = (
             select(Asunto)
-            .options(*options)
+            .options(*self._load_options(solo_publicas))
             .where(Asunto.cliente_id == cliente_id)
             .where(Asunto.firma_id == self.firma_id)
             .where(Asunto.is_active == True)
+            .execution_options(populate_existing=True)
         )
         result = await self.session.execute(stmt)
         return list(result.scalars().unique().all())
@@ -117,28 +115,16 @@ class AsuntoRepository(BaseRepository[Asunto]):
     async def get_by_portal_user_id(
         self, portal_user_id: uuid.UUID, solo_publicas: bool = False
     ) -> List[Asunto]:
-        options = [
-            joinedload(Asunto.cliente),
-            joinedload(Asunto.estado),
-            selectinload(Asunto.novedades),
-            selectinload(Asunto.pasos),
-        ]
-        if solo_publicas:
-            options.append(
-                with_loader_criteria(
-                    Novedad,
-                    Novedad.publicado_al_cliente == True,
-                    include_aliases=True,
-                )
-            )
         stmt = (
             select(Asunto)
             .join(Cliente, Cliente.id == Asunto.cliente_id)
-            .options(*options)
+            .options(*self._load_options(solo_publicas))
             .where(Cliente.portal_user_id == portal_user_id)
+            .where(Cliente.firma_id == self.firma_id)
             .where(Cliente.is_active == True)
             .where(Asunto.firma_id == self.firma_id)
             .where(Asunto.is_active == True)
+            .execution_options(populate_existing=True)
         )
         result = await self.session.execute(stmt)
         return list(result.scalars().unique().all())

@@ -34,14 +34,15 @@ async def test_client_cannot_list_customers_or_mutate_asunto(elena_client):
 
 
 @pytest.mark.asyncio
-async def test_lawyer_cannot_apply_administrative_case_corrections(
+async def test_responsible_lawyer_can_update_case_state(
     alejandro_client,
 ):
     response = await alejandro_client.patch(
         "/api/v1/asuntos/00000000-0000-0000-0000-000000000202/estado",
         json={"estado_id": "00000000-0000-0000-0000-000000000102"},
     )
-    assert response.status_code == 403
+    assert response.status_code == 200
+    assert response.json()["estado"]["id"] == "00000000-0000-0000-0000-000000000102"
 
 
 @pytest.mark.asyncio
@@ -90,13 +91,20 @@ async def test_lawyer_cannot_open_or_modify_another_lawyers_case(alejandro_clien
 
 
 @pytest.mark.asyncio
-async def test_client_only_receives_public_novedades(carlos_client):
+async def test_client_only_receives_public_novedades(carlos_client, client):
     response = await carlos_client.get("/api/v1/asuntos")
     assert response.status_code == 200
     asuntos = response.json()
     asunto = next(item for item in asuntos if item["radicado"] == "AS-2026-001")
+    internal = await client.get("/api/v1/asuntos/AS-2026-001")
+    public_ids = {
+        novedad["id"]
+        for novedad in internal.json()["novedades"]
+        if novedad["publicado_al_cliente"]
+    }
+    assert all(novedad["id"] in public_ids for novedad in asunto["novedades"])
     assert all(
-        novedad["publicado_al_cliente"]
+        set(novedad) == {"id", "titulo", "descripcion", "tipo", "created_at"}
         for novedad in asunto["novedades"]
     )
 

@@ -43,7 +43,7 @@ Ejemplos:
 
 Cada cambio visual debe mantener el flujo principal claro:
 
-> El cliente entra con un codigo, ve el tracking de su asunto, entiende el estado actual y consulta lo que se ha hecho.
+> El equipo encuentra el expediente, actualiza información una vez y sabe quién debe hacer qué y para cuándo. La dirección supervisa y asigna; el cliente consulta los avances y documentos autorizados de ese mismo expediente.
 
 Si una seccion ocupa mucho espacio sin acelerar ese flujo, debe simplificarse.
 

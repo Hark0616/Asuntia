@@ -1,0 +1,14 @@
+.expediente-tasks {
+  margin-top: var(--space-4);
+  scroll-margin-top: calc(var(--control-min-height) + var(--space-8) + var(--space-4));
+}
+.expediente-task-list { list-style: none; padding: 0; margin: var(--space-4) 0 0; }
+.expediente-task { border-top: 1px solid var(--line); padding-block: var(--space-4); }
+.task-heading { gap: var(--space-3); flex-wrap: wrap; }
+.task-heading > strong, .task-metadata > span { min-width: 0; overflow-wrap: anywhere; }
+.task-metadata, .task-actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-3); margin-top: var(--space-3); }
+.task-metadata > span { display: inline-flex; align-items: center; gap: var(--space-1); }
+.task-fields { border: 0; margin: var(--space-3) 0 0; padding: 0; min-width: 0; }
+.task-editor, .task-create { margin-top: var(--space-3); }
+.task-editor > summary, .task-create > summary { cursor: pointer; color: var(--brand-dark); font-weight: 600; }
+.task-create > summary { display: flex; align-items: center; gap: var(--space-2); }

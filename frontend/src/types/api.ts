@@ -81,6 +81,7 @@ export interface AsuntoPaso {
     opciones: Array<{ valor: string; etiqueta: string }>;
   }>;
   datos: Record<string, unknown>;
+  updated_at?: string;
   completed_at?: string | null;
   completed_by_id?: string | null;
 }

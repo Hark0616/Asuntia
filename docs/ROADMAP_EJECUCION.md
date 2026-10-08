@@ -1,5 +1,7 @@
 # ROADMAP DE EJECUCIÓN — Asuntia
 
+> **Prioridad vigente para el siguiente ciclo (2026-10-04):** [Plan funcional del piloto](PLAN_PILOTO_2026-10-04.md). Completar apertura, asignación, expediente, documentos, portal y agenda/calendario; el versionado documental queda fuera del piloto. Las subfases siguientes se conservan como referencia de alcance mayor.
+
 > **Documento derivado de:** [SCOPE_FINAL.md](file:///c:/Users/H/Documents/Code/Asuntia/docs/SCOPE_FINAL.md)
 > **Fecha:** 2026-07-26
 > **Propósito:** Descomponer el alcance monolítico en subfases estrictas, financieramente viables y técnicamente ejecutables. Cada subfase debe poder facturarse, entregarse y operar de forma independiente.

@@ -57,7 +57,7 @@ async def assign_client_responsible(
     payload: ClienteAsignarResponsable,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(
-        require_roles("administrador", "auxiliar")
+        require_roles("administrador")
     ),
 ):
     """Asigna la relación principal de un cliente dentro de la firma."""

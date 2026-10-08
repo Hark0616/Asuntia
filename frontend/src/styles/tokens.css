@@ -37,4 +37,17 @@
   --radius-md: 8px;
   --radius-lg: 12px;
   --radius-full: 999px;
+
+  /* Lectura del portal y documentos */
+  --font-size-small: 0.875rem;
+  --font-size-body: 1rem;
+  --font-size-subheading: 1.25rem;
+  --font-size-heading: 1.75rem;
+  --portal-max-width: 68rem;
+  --portal-context-width: 15rem;
+  --portal-selector-width: 16rem;
+  --portal-date-width: 11rem;
+  --document-preview-height: 28rem;
+  --control-min-height: 2.75rem;
+  --color-danger-subtle: #fbf0f0;
 }

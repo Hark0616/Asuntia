@@ -11,6 +11,15 @@ from app.schemas.equipo import ResponsableAsuntoResponse
 router = APIRouter()
 
 
+@router.get("/miembros", response_model=list[ResponsableAsuntoResponse])
+async def list_office_members(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_office_user),
+):
+    """Equipo activo de la firma para delegar trabajo interno."""
+    return await UserRepository(db, current_user.firma_id).list_office_members()
+
+
 @router.get("/responsables", response_model=list[ResponsableAsuntoResponse])
 async def list_case_responsibles(
     db: AsyncSession = Depends(get_db),
