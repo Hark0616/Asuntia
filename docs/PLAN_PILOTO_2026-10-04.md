@@ -4,6 +4,8 @@ Fecha: 4 de octubre de 2026. Base examinada: `3801961`, rama `codex/mejoras-oper
 
 Este documento propone trabajo futuro. Las funciones descritas como pendientes todavía no están implementadas. Sustituye, para el siguiente ciclo, la prioridad de ampliar el repositorio con versionado documental.
 
+Antes de implementarlo, revisar la [propuesta UX/UI del 8 de octubre](PROPUESTA_UX_PILOTO_2026-10-08.md), que concreta navegación, pantallas y recorridos por rol. Su estado es propuesta; incluye ajustes de interacción y alcance de agenda para la secretaria que deben resolverse junto con este plan.
+
 ## 1. Resultado que debe permitir el piloto
 
 Una secretaria abre o asigna un expediente; su abogado encuentra el trabajo, registra lo ocurrido, incorpora documentos y programa reuniones o audiencias. El jefe consulta y ayuda a repartir la carga. El cliente entra y ve únicamente los avances y documentos autorizados de su expediente.
