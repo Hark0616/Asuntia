@@ -4,6 +4,8 @@
 
 **Estado:** propuesta para revisión, anterior a la implementación. Complementa el [plan funcional del piloto](PLAN_PILOTO_2026-10-04.md); no describe funciones ya entregadas ni cambia todavía la interfaz. Los ejemplos de pantalla usan datos ficticios.
 
+La [evaluación de seis especialistas y filosofía UX](FILOSOFIA_UX_EVALUACIONES_2026-10-08.md) fundamenta los refinamientos incorporados aquí: continuidad dentro del expediente, herramientas visibles, instrucciones operativas, foco y recuperación. Este documento sigue siendo la especificación de pantallas; el informe conserva el razonamiento y las diferencias entre evaluadores.
+
 ## 1. Decisión de producto
 
 Asuntia debe sentirse como un lugar de trabajo compartido: encontrar un expediente, entenderlo y actuar desde ahí. El abogado conserva el control profesional; la secretaria puede organizar y capturar; el jefe puede consultar y distribuir; el cliente recibe una vista sencilla de lo autorizado.
@@ -61,7 +63,7 @@ En escritorio, barra lateral estrecha con icono y texto. La lista de clientes de
 
 Cada destino, pestaña de expediente, filtro de alcance y detalle importante tiene un enlace estable. Volver conserva búsqueda, filtros y posición. Una actualización de datos conserva el contexto. El filtro «Expediente: …» debe verse cuando Trabajo o Agenda están acotados a un caso, con acción para quitarlo.
 
-En Trabajo, llegar desde un expediente activa el alcance **Tareas del expediente**, distinto de Mis tareas y Equipo. Muestra todas las tareas que el usuario puede consultar en ese caso, incluidas las delegadas a otra persona; no aplica por debajo un filtro invisible de «asignadas a mí». Quitar el contexto devuelve al alcance personal o de equipo permitido, sin ampliar acceso a otros casos.
+Las listas completas **Tareas del expediente** y **Citas del expediente** se abren como vistas locales bajo la cabecera del caso, con enlace de regreso a Resumen. Muestran todos los registros autorizados de ese expediente, incluidas tareas delegadas; no aplican un filtro invisible de «asignadas a mí». Reutilizan los datos y componentes de Trabajo y Agenda, sin duplicar captura. Los destinos globales sirven para comparar varios casos; no es necesario salir a ellos para ampliar una lista local.
 
 **Por qué:** tres destinos cubren las preguntas diarias. Un módulo independiente por cada tabla del sistema multiplicaría decisiones. El directorio sigue disponible para gestionar personas, pero deja de ser un peaje para llegar al caso.
 
@@ -76,7 +78,9 @@ En Trabajo, llegar desde un expediente activa el alcance **Tareas del expediente
 5. «Otros pendientes»: trabajo abierto sin fecha o posterior, con acceso a todos.
 6. Acceso visible a «Mis expedientes» o «Expedientes de la firma». No tener tareas no significa no tener casos asignados.
 
-Una fila de tarea muestra título, asunto/cliente, vencimiento y responsable cuando aporta contexto. La prioridad se resalta solo si es relevante. Al abrirla, el panel de detalle conserva visible el expediente y ofrece la acción permitida: comenzar, completar o abrir el paso de la guía. No se completa un paso jurídico desde un checkbox genérico.
+Una fila de tarea muestra título, asunto/cliente, vencimiento y **Asignada a** cuando aporta contexto. La prioridad se resalta solo si es relevante. Al abrirla, el panel de detalle conserva visible el expediente y ofrece la acción permitida: comenzar, completar o abrir el paso de la guía. No se completa un paso jurídico desde un checkbox genérico.
+
+La instrucción de trabajo se consulta como contenido en **Ver tarea**, con una síntesis en la fila cuando sea útil. No se esconde exclusivamente en `(i)`. Iniciar y Completar tienen acceso directo para todo rol que pueda ejecutar esa transición; tener permisos de gestión no obliga a abrir Editar y cambiar un selector. Editar conserva campos administrativos como responsable, prioridad y fecha.
 
 ### Adaptación por rol
 
@@ -84,7 +88,7 @@ Una fila de tarea muestra título, asunto/cliente, vencimiento y responsable cua
 - **Secretaria:** sus tareas delegadas y acceso a la agenda de coordinación de la firma. No se presenta la cartera del abogado como si fuera su carga personal.
 - **Jefe:** puede elegir Mi trabajo o Equipo, filtrar responsable y abrir el mismo expediente que usa el equipo. Los vencimientos y pendientes ayudan a distribuir trabajo; el número bruto de expedientes no se presenta como medida de productividad.
 
-Estos son los alcances de entrada habituales. En el alcance contextual Tareas del expediente se ve también trabajo delegado, se identifica a cada responsable y se conservan los permisos de acción de cada tarea. Esa consulta reutiliza el listado autorizado del asunto, no el endpoint personal ni el alcance Equipo reservado a administración.
+Estos son los alcances de entrada habituales. En la vista local Tareas del expediente se ve también trabajo delegado, se identifica **Asignada a** y se conservan los permisos de acción de cada tarea. Esa consulta reutiliza el listado autorizado del asunto, no el endpoint personal ni el alcance Equipo reservado a administración.
 
 **Por qué:** el inicio debe permitir actuar. Gráficos de volumen, indicadores de éxito y tarjetas por cada cifra no resuelven el trabajo del piloto.
 
@@ -133,7 +137,7 @@ Cambiar estado o responsable requiere abrir la acción correspondiente y guardar
 | **Documentos** | ¿Dónde está el soporte? | Archivos, búsqueda, tipo, visibilidad y acciones. |
 | **Actividad** | ¿Qué ocurrió y qué recorrido ha seguido? | Historia fechada, autoría, soportes y eventos operativos. |
 
-**Resumen** muestra el último avance con un fragmento y acceso al registro completo; hasta tres tareas prioritarias y dos próximas citas, con total y «Ver todas». Los límites son de presentación, no de acceso: las listas completas se abren en Trabajo o Agenda filtrados por ese expediente, con enlace claro de regreso. Si hay vencidos, se ordenan antes y se muestra el total para no ocultarlos.
+**Resumen** muestra el último avance con un fragmento y acceso al registro completo; hasta tres tareas prioritarias y dos próximas citas, con total y «Ver todas». Los límites son de presentación, no de acceso: las listas completas se abren dentro del expediente conservando su cabecera, alcance y regreso a Resumen. Si hay vencidos, se ordenan antes y se muestra el total para no ocultarlos.
 
 «Último avance» prioriza el registro escrito por una persona, incluido un resumen de cita. Un evento automático como documento incorporado no sustituye ese relato. Los eventos operativos siguen en Actividad; si no hay avance escrito, se indica esa ausencia sin inventar un resumen.
 
@@ -158,7 +162,9 @@ Agenda     |  AS-2026-024                       Datos del expediente
            |                                  Ver 4 tareas
 ```
 
-El ejemplo es un esquema de jerarquía, no una maqueta visual aprobada. La acción principal de Resumen y Actividad es **Registrar avance**. En Documentos es **Subir documento**. Programar cita y Nueva tarea viven junto a sus listas; no se agrupan todas las acciones como botones del mismo peso en la cabecera.
+El ejemplo es un esquema de jerarquía, no una maqueta visual aprobada. En la entrada habitual a Resumen y Actividad se destaca **Registrar avance**; en Documentos, **Subir documento**. **Programar cita** y **Nueva tarea** permanecen visibles junto a sus secciones, incluso sin registros, si el rol tiene permiso. Una acción predominante no significa una única herramienta disponible.
+
+Si la persona abre una tarea, cita o paso concreto desde Trabajo o Agenda, se enfoca ese objeto y su acción correspondiente dentro del expediente. No se le devuelve primero a una portada genérica ni se le obliga a buscarlo de nuevo. Las herramientas mantienen ubicación estable; el sistema no cambia el orden de botones automáticamente por la hora, la carga o una supuesta prioridad. Cambia el foco de la vista por la selección explícita del usuario.
 
 ### Guía jurídica, cuando existe
 
@@ -176,6 +182,8 @@ Si hay varias audiencias, el paso muestra **Audiencia vinculada** y permite sele
 
 **Registrar avance** abre un panel con título, contenido, fecha del hecho opcional y documentos relacionados. La fecha y persona del registro se generan automáticamente. Los archivos se seleccionan de los ya cargados; no se vuelven a subir para vincularlos.
 
+Si falta un soporte, **Subir documento** dentro del selector lleva al mismo formulario de carga, conservando el avance en memoria. Al terminar, vuelve y vincula el ID del único documento creado. Se cambia de panel con retorno; no se apilan modales ni se crea otro cargador. Cancelar la carga devuelve al avance intacto. El formulario actual todavía fija el título «Avance procesal» en código: el título editable pertenece a esta propuesta, no a la funcionalidad ya existente.
+
 El botón es **Guardar avance**. El registro nace **Interno** para todos los roles. Queda visible en Actividad y alimenta el Resumen. Se protege el texto ante errores y cierre accidental.
 
 La secretaria puede registrar. El abogado responsable o jefe revisa y decide **Compartir con el cliente** desde el registro guardado. No se crea un segundo informe ni se obliga a mantener un campo separado llamado «Resumen actual».
@@ -183,6 +191,8 @@ La secretaria puede registrar. El abogado responsable o jefe revisa y decide **C
 ### Compartir de forma deliberada
 
 Una revisión breve muestra el asunto, el cliente destinatario y el contenido exacto. Lista los soportes vinculados y su visibilidad. El botón **Compartir avance** afecta únicamente a la nota. Los documentos internos permanecen internos; compartirlos es una acción explícita por documento. No hay casillas de adjuntos activadas automáticamente.
+
+El botón final de esa revisión ejecuta la publicación; no abre otra confirmación idéntica. Guardar internamente o iniciar una tarea usa acción directa y resultado localizado. Archivar sin restauración y descartar una captura requieren decisión explícita; reasignar usa Seleccionar y Guardar asignación sin otro paso redundante. Retirar visibilidad impide consultas futuras conforme a permisos, pero no deshace lo que el cliente ya pudo leer o descargar.
 
 Después se muestra **Compartido con el cliente** con texto y señal visual discreta. «Vista del cliente» permite revisar la proyección pública real sin simular una sesión ni cambiar permisos. Retirar visibilidad conserva el registro interno. Una aclaración de un hecho ya compartido se vincula al original; no se sobrescribe silenciosamente lo que el cliente leyó.
 
@@ -206,7 +216,7 @@ En escritorio los metadatos se alinean por columnas. En móvil el nombre puede o
 
 Seleccionar archivo —o arrastrarlo como alternativa en escritorio—, revisar nombre y tipo, y **Subir documento**. Se propone conservar el nombre del archivo como valor inicial editable. Tipos admitidos y límite se indican de forma breve junto al selector, sincronizados con el servidor; el plan propone hasta 20 MB. No fingir un porcentaje de progreso si no se mide.
 
-Durante la carga el botón muestra «Subiendo…» y evita doble envío. Solo se incorpora la fila al confirmar archivo y metadatos. El documento nace interno. Una falla permite reintentar sin rehacer datos, mientras la selección siga disponible en la sesión.
+Durante la carga el botón muestra «Subiendo…» y evita doble envío. Solo se incorpora la fila al confirmar archivo y metadatos. El documento nace interno. Un rechazo confirmado permite corregir y reintentar sin rehacer datos, mientras la selección siga disponible en la sesión. Si se pierde la respuesta, se conserva la captura y se comprueba el resultado antes de reenviar, conforme a la sección 13.
 
 ### Lectura y visibilidad
 
@@ -309,7 +319,7 @@ Direcciones de entrada claras para Cliente y Oficina, con identidad de la firma 
 
 En OTP: un campo que permita pegar y autocompletar el código, acción Volver para corregir la identificación, reenvío conforme al límite real del servidor y mensajes de código inválido/caducado junto al campo. Las respuestas públicas no revelan si una identificación está registrada. El estado de envío debe corresponder a lo que el servicio puede acreditar: no prometer entrega al buzón por recibir un 200 genérico. La indisponibilidad del correo necesita una salida de error recuperable y registro operativo, con respuestas externas que sigan protegiendo esa privacidad.
 
-En ambos accesos, errores anunciados para lectores de pantalla y foco bien ubicado. Al vencer la sesión se preserva la ruta de retorno y se evita afirmar que un formulario se guardó sin confirmación. No se promete persistencia del texto tras recargar/cerrar el navegador; no se guardan expedientes sensibles en almacenamiento persistente del navegador para simular modo sin conexión.
+En ambos accesos, errores anunciados para lectores de pantalla y foco bien ubicado. Al vencer la sesión se preserva la ruta de retorno autorizada y la captura únicamente en memoria, mientras se reautentica la misma identidad en la aplicación. Una salida explícita o cambio de usuario limpia las capturas; nunca se recuperan para otra identidad. Un fallo de conexión no se interpreta automáticamente como sesión vencida, ni un cierre de sesión fallido se presenta como confirmado. No se promete persistencia tras recargar/cerrar el navegador ni se guardan expedientes sensibles en almacenamiento persistente del navegador para simular modo sin conexión.
 
 ### Clientes
 
@@ -338,6 +348,12 @@ Estas medidas son criterios iniciales de diseño, no CSS aprobado. La implementa
 
 Etiquetas, permisos, visibilidad y errores esenciales siempre están a la vista. Las explicaciones complementarias usan el Tooltip `(i)` del proyecto, accesible con teclado y toque; nunca son requisito oculto para operar. La pantalla no contiene párrafos de onboarding o justificaciones de arquitectura.
 
+Un avance escrito, una instrucción de tarea o el contexto de una cita son contenido de trabajo, no sobre-explicación de la interfaz. Se leen en su detalle rotulado. Se conserva el Tooltip actual, que ya dispone de interacción con teclado y toque; el cambio está en qué información se le asigna.
+
+El contrato de un diálogo incluye foco inicial, recorrido Tab/Shift+Tab dentro de él, fondo inerte y restauración del foco al disparador al cerrar. Pestañas y grupos de selección admiten las teclas de su patrón o usan controles nativos. La página móvil conserva retorno y foco en el elemento de origen. La navegación inferior deja espacio para contenido, área segura y acciones durante el uso del teclado; se comprueba renderizada, no se asume por definir un token.
+
+Vocabulario de interfaz propuesto: **Expedientes / Abrir expediente** en la oficina; **Tu asunto** en el portal para el mismo caso autorizado; **Avance** para el registro escrito y **Actividad** para la historia completa. Los nombres técnicos Nota/Novedad no alternan en botones. Se distingue **Responsable del cliente**, **Abogado del expediente** y **Asignada a** en una tarea. El ensayo con usuarios comprobará la comprensión de Expedientes frente a Asuntos sin introducir dos módulos para el mismo objeto.
+
 Se comprobarán contraste, aumento de texto, foco y lectura con tecnologías de asistencia. La inspiración minimalista no justifica texto gris ilegible ni interacción exclusiva por hover. Apple también recomienda tamaños adaptables y contraste suficiente en su [guía de accesibilidad](https://developer.apple.com/design/human-interface-guidelines/accessibility).
 
 ## 13. Estados que hacen que la experiencia sea fiable
@@ -349,10 +365,10 @@ Se comprobarán contraste, aumento de texto, foco y lectura con tecnologías de 
 | Cargando | Estructura estable y estado anunciado; no mostrar «Sin datos» antes de terminar. |
 | Consulta fallida | Mensaje localizado y Reintentar. Si hay datos anteriores, indicar que no se actualizaron. |
 | Guardando | Bloquear doble envío de esa acción y mostrar Guardando… sin bloquear toda la aplicación. |
-| Guardado exitoso | Confirmación junto al elemento y actualización de vistas derivadas; sin modal de felicitación. |
+| Guardado exitoso | Confirmación junto al elemento y actualización de vistas derivadas; sin modal de felicitación. Una nueva edición sustituye el éxito anterior por Cambios sin guardar. Recargar usa Recargando…, nunca Guardando…. |
 | Validación | Error junto al campo, foco al primero y valores conservados. |
-| Cierre con cambios | Ofrecer seguir editando o descartar. Escape o clic fuera no borra trabajo silenciosamente. |
-| Edición simultánea | Mantener captura local, avisar del cambio remoto y permitir revisar antes de recargar. Sin sobrescritura silenciosa. |
+| Cierre con cambios | Mantener la captura al cambiar pestaña del mismo expediente. Antes de abandonar/reemplazar el editor, ofrecer seguir editando o descartar. Escape, clic fuera o navegación no borran trabajo silenciosamente. Refrescar responsables no reinicia Apertura. |
+| Edición simultánea | Mantener captura local y consultar la última versión guardada en un detalle de solo lectura sin sustituir el formulario. Mostrar campos relevantes y fecha/autor solo si existen. El descarte para recargar es explícito; sin fusión automática ni historial de versiones. |
 | Cambio de responsable | Guardado explícito, resultado visible; si el usuario pierde acceso, retorno claro a su listado. |
 | Documento inválido/fallido | Explicar formato/tamaño/problema real, sin fila que aparente una carga exitosa. |
 | Acción no permitida | No ofrecer un control inoperante como invitación a usarlo. Un acceso directo debe responder correctamente desde API. |
@@ -362,7 +378,7 @@ Se comprobarán contraste, aumento de texto, foco y lectura con tecnologías de 
 
 La interfaz espera confirmación del servidor para compartir, transferir, completar decisiones o archivar. Las operaciones fallidas no dejan visibles estados que nunca se guardaron.
 
-Las creaciones deben poder reconciliar un envío de resultado incierto sin duplicar cliente, expediente, avance o cita. Esto exige soporte técnico de identificación/idempotencia de la operación cuando corresponda; deshabilitar el botón por sí solo no resuelve una respuesta perdida. El diseño no ofrece un reintento ciego como si siempre fuera seguro.
+Ante una respuesta perdida, el mínimo de experiencia es conservar la captura, informar incertidumbre y no repetir automáticamente la creación. La apertura conserva la prevención de duplicados exigida por P1. Para avances, citas, tareas y documentos, se definirá la recuperación por operación: consultar lo ya registrado cuando permita verificar el resultado y añadir identificación/idempotencia cuando resulte necesaria. Esta es una decisión técnica a resolver en cada hito, no una obligación de construir ahora una infraestructura general nueva. Si todavía no se puede determinar el resultado, se ofrece consultar el expediente y se mantiene el estado incierto; no se promete reconciliación automática ni un reintento seguro sin soporte.
 
 ## 14. Una captura y permisos comprensibles
 
@@ -383,6 +399,7 @@ Las creaciones deben poder reconciliar un envío de resultado incierto sin dupli
 | Capturar avance/documento | En sus casos | En casos autorizados | En la firma | No |
 | Publicar/retirar visibilidad | En sus casos | No | En la firma | No |
 | Crear/delegar tareas | En sus casos | Sin ampliar el permiso existente | En la firma | No |
+| Leer tareas del expediente, incluidas delegadas | Todas las activas de sus casos autorizados | Todas las activas de casos autorizados | Todas las activas de la firma | No |
 | Ejecutar tareas asignadas | Sí | Sí | Sí | No |
 | Programar citas | En sus casos | En casos autorizados | En la firma | No |
 | Consultar agenda | Sus casos | Coordinación autorizada propuesta | Equipo | No |
@@ -390,6 +407,8 @@ Las creaciones deben poder reconciliar un envío de resultado incierto sin dupli
 | Consultar contenido compartido | Vista autorizada del cliente | Sin suplantar al cliente | Vista autorizada del cliente | Solo el propio |
 
 Son reglas de producto para implementar y comprobar en servidor; ocultar un botón no constituye autorización. El piloto mantiene el aislamiento por firma y evita duplicar interfaces completas por rol.
+
+La lectura de tareas conserva el contrato actual de `GET /tareas/asunto/{id}`: usuario de oficina con acceso al asunto puede consultar sus tareas activas, aunque las ejecute otra persona. La autorización para ejecutar, editar o delegar se comprueba por separado; esa lectura no amplía el alcance global Equipo de Mi trabajo ni expone tareas al cliente.
 
 ## 15. Recorridos completos que debe sostener el diseño
 
@@ -418,6 +437,10 @@ Propuesta de ensayo con una secretaria, dos abogados, el jefe y dos clientes con
 | Reprogramar y volver al expediente | Encontrar una sola cita actualizada y conservar orientación. |
 | Cliente encuentra último avance y archivo | Completarlo sin ayuda de la oficina. |
 | Recuperarse de error/conflicto | No perder captura ni confundir error con éxito. |
+| Incorporar un soporte mientras se escribe un avance | Volver al texto intacto y vincular un único archivo creado. |
+| Guardar y volver a editar | Mostrar Cambios sin guardar; el éxito anterior no acredita la nueva edición. |
+| Perder respuesta de una creación | No reenviar automáticamente; conservar captura y verificar el resultado según el soporte de esa operación. Si no es verificable, comunicar incertidumbre y permitir consultar sin prometer éxito. Mantener la prevención de duplicados exigida para apertura. |
+| Recuperar sesión durante edición | Volver a la ruta autorizada y recuperar memoria solo para la misma identidad. |
 
 Los tiempos son objetivos iniciales de usabilidad, no promesas de rendimiento ni datos observados. Una tarea crítica fallida o una publicación accidental exige corregir el diseño antes del piloto. No se infiere validación estadística de una muestra pequeña.
 
@@ -431,6 +454,7 @@ Además: revisar escritorio de 1280 px, móvil de 390 px y tamaño estrecho de 3
 - Guardar avances es siempre interno y compartir es una acción posterior explícita. Ajusta el formulario actual, que permite elegir visibilidad durante la creación.
 - Se requiere agenda de coordinación para secretaria sobre sus expedientes autorizados.
 - Se añaden como requisitos de experiencia enlaces estables, preservación de contexto, revisión de publicación y estados recuperables.
+- La revisión de seis especialistas precisa vistas locales completas de tareas/citas, ejecución directa por permisos, acceso visible a instrucciones, carga de soportes con retorno, contrato de foco y vida del borrador. No crea otra fuente de datos ni altera las funciones acordadas del piloto.
 - No se añade un estado público automático, una bandeja nueva de aprobación, chat, IA, notificaciones externas ni integraciones de calendario.
 
 Una vez elegido el diseño, el plan técnico puede distribuir estas decisiones entre P1–P6. El cascarón de navegación y componentes comunes se prepara primero; cada hito entrega un recorrido completo con permisos, estados y comprobación en escritorio/móvil. La aprobación de esta propuesta no equivale a desplegar el piloto.
