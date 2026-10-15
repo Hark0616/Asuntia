@@ -278,3 +278,53 @@ conservar nombre original e integridad como metadatos y falta reconciliar fallos
 entre almacenamiento y commit, con reintentos idempotentes. D04 sigue abierto por
 las vías cloud heredadas; sus enlaces no tienen todavía el contrato de acceso
 privado que exige el núcleo. Este bloque no amplía la integración de proveedores.
+
+## Decisión de almacenamiento por firma (2026-10-15)
+
+**Requisito del usuario, pendiente de implementación y aceptación:** la primera
+firma ya trabaja en **OneDrive personal**, confirmado por el usuario. Local y
+OneDrive deben resolver el recorrido documental de esta entrega; Google Drive podrá incorporarse mediante otro
+adaptador. La presencia de `BaseStorageService` y código Google no demuestra que
+OneDrive esté disponible: la factoría y los DTO actuales todavía no lo admiten.
+
+- Local significa almacenamiento privado persistente del servidor de Asuntia,
+  independiente de la carpeta sincronizada de un PC del equipo.
+- La conexión se configura y autoriza por firma. Debe permitir elegir una carpeta
+  existente y vincular sus archivos sin copiar ni reorganizar el archivo histórico.
+  Las nuevas cargas usan el destino configurado, con límites y controles comunes.
+- Cada documento conserva su UUID propio en Asuntia y la referencia a la conexión,
+  cuenta y proveedor donde vive. Para OneDrive, la referencia comprende unidad y elemento
+  (`drive_id` e `item_id`); la ruta y el nombre son metadatos. Un cambio de destino
+  predeterminado no cambia la referencia de documentos ya incorporados. Reconectar
+  otra cuenta no debe reinterpretar referencias previas como archivos de esa cuenta.
+- El contrato común debe contemplar guardar, vincular, consultar metadatos y leer
+  contenido autorizado, además de errores, integridad y estados recuperables. Un
+  adaptador no debe inventar metadatos ni éxito cuando el proveedor está ausente.
+- Asuntia conserva las relaciones con asunto/tarea/novedad y sus reglas de acceso.
+  El proveedor conserva el archivo. Vincularlo no lo publica ni reproduce por
+  defecto sus enlaces compartidos o sus permisos dentro del portal del cliente.
+- Las credenciales quedan cifradas y accesibles solo al backend. Lecturas pesadas,
+  exploración masiva y transferencias remotas se ejecutan mediante workers; la
+  API expone estados y resultados, no bloquea el request esperando toda la operación.
+- El acceso del portal se valida en Asuntia; no se entregan URLs preautorizadas del
+  proveedor como sustituto de ese control. Desconectar o vencer la autorización
+  debe mostrar un estado recuperable y permitir reconexión, sin desviar archivos
+  a local en silencio ni publicar archivos pendientes de revisión.
+
+La incorporación debe definir el comportamiento ante cambios externos, archivos
+ausentes, permisos retirados y cambios de unidad/cuenta, sin prometer sincronización
+en tiempo real. La sincronización completa de carpetas, migraciones automáticas
+entre proveedores, edición colaborativa y versionado no se incorporan por esta
+decisión. La primera conexión debe usar autorización delegada de la cuenta personal
+existente, con renovación y revocación de credenciales. Elegir una carpeta delimita
+el alcance operativo de Asuntia; no debe presentarse como un permiso de Microsoft
+limitado a esa carpeta sin verificar que la autorización concedida lo sea.
+Falta verificar las autorizaciones reales, titularidad de la carpeta y política
+ante ediciones externas; ninguna cuenta ha sido conectada por documentar este requisito.
+
+Referencias técnicas: Microsoft Graph distingue unidad y elemento y soporta
+[OneDrive, OneDrive for Business y bibliotecas SharePoint](https://learn.microsoft.com/en-us/graph/api/resources/onedrive?view=graph-rest-1.0).
+El [acceso por ID](https://learn.microsoft.com/en-us/graph/onedrive-addressing-driveitems)
+conserva la referencia ante renombres y movimientos dentro de la unidad; las rutas
+no ofrecen esa estabilidad. Las [descargas de contenido](https://learn.microsoft.com/en-us/graph/api/driveitem-get-content?view=graph-rest-1.0)
+se resuelven en el adaptador y no definen la identidad ni los permisos de Asuntia.

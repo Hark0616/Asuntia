@@ -4,6 +4,8 @@
 
 > **Lectura de las subfases históricas:** se conservan como referencia de alcance y decisiones anteriores. No autorizan por sí solas todas las funciones del documento legado ni postergan controles que el checklist vigente exige desde el núcleo. Las afirmaciones de estado y garantías deben contrastarse con código y evidencia actuales.
 
+> **Almacenamiento confirmado por el usuario (2026-10-15):** la primera firma ya trabaja en OneDrive personal. La entrega documental vigente incluye local y OneDrive, con vinculación del archivo existente y carga/lectura autorizadas; Google Drive queda ampliable mediante el mismo contrato. La sincronización completa y el versionado no se incorporan por esta aclaración. Véase la decisión en [Contratos del núcleo](CONTRATOS_NUCLEO.md#decisión-de-almacenamiento-por-firma-2026-10-15).
+
 > **Documento derivado de:** [SCOPE_FINAL.md](file:///c:/Users/H/Documents/Code/Asuntia/docs/SCOPE_FINAL.md)
 > **Fecha:** 2026-07-26
 > **Propósito:** Descomponer el alcance monolítico en subfases estrictas, financieramente viables y técnicamente ejecutables. Cada subfase debe poder facturarse, entregarse y operar de forma independiente.

@@ -112,6 +112,23 @@ P0 no significa que todos los hallazgos sean vulnerabilidades demostradas. Inclu
 - [ ] **D04 · P0 · Cerrar permisos de lectura, descarga y publicación.** Por qué: conocer una URL o publicar una novedad no concede acceso a un archivo. Terminado con autorización actual en todas las vías, recursos privados por defecto, retiro de acceso efectivo y respuestas seguras para contenido; pruebas desde otro cliente, otra firma y sesión retirada. Evitar enlaces permanentes que eludan el backend.
 - [ ] **D05 · P1 · Completar la biblioteca útil.** Por qué: subir archivos sin encontrarlos o relacionarlos no resuelve el trabajo. Terminado con carga, búsqueda, filtro, vista/descarga y asociación a tarea o novedad desde el expediente; un único cargador reutilizable conserva el avance que se estaba escribiendo. Mostrar progreso, cancelación y recuperación acordes con el contrato real de carga.
 
+**Aclaración de alcance del usuario (2026-10-15):** la primera firma conserva sus
+archivos en **OneDrive personal**, confirmado por el usuario. La entrega documental
+debe funcionar con almacenamiento local del servidor o conexión a OneDrive por firma; Google Drive queda como
+extensión posterior del mismo contrato. OneDrive deja de ser una integración
+hipotética para esta entrega. D01–D04 no se aceptan solo con el proveedor local.
+La conexión debe permitir seleccionar una carpeta existente, consultar y vincular
+archivos al expediente sin duplicarlos ni reorganizarlos automáticamente, y cargar
+nuevos archivos en el destino elegido. El UUID del documento en Asuntia conserva
+su identidad, separado de la ubicación y los identificadores del proveedor;
+también conserva la conexión/cuenta concreta a la que pertenece el archivo.
+Cambiar el destino de nuevas cargas no migra documentos anteriores; desconectar
+OneDrive no debe desviar cargas silenciosamente al almacenamiento local.
+La publicación al cliente continúa siendo explícita y autorizada por Asuntia.
+La sincronización completa, la edición colaborativa y el versionado no quedan
+incorporados por esta aclaración. Las ediciones externas y referencias ausentes
+deben tener un comportamiento definido antes de aceptar lectura/publicación.
+
 ### E. Recorridos completos del equipo y del cliente
 
 - [ ] **E01 · P1 · Abrir y encontrar cualquier expediente.** Por qué: es el inicio del trabajo real. Terminado cuando abogado y secretaria puedan abrir según permisos, reutilizar o crear un cliente sin duplicarlo y llegar al resumen guardado; validaciones concisas y recuperación ante error. Depende de B01–B05 y C01.
@@ -167,7 +184,7 @@ Cada entrega incluye la migración necesaria, API, permisos, interfaz y pruebas 
 
 El núcleo estará listo cuando los recorridos de crear, asignar, actualizar, subir, compartir, consultar y agendar funcionen con los cuatro perfiles, sobrevivan errores y reingresos, y cumplan los criterios P0/P1 aplicables. Las verificaciones deben incluir datos controlados en staging y prueba de recuperación, no solo capturas de pantalla o tests unitarios.
 
-Mejorar la calidad no amplía automáticamente el alcance: versionado documental continúa fuera por instrucción del usuario. IA, finanzas, sincronización Google/Microsoft, mensajería, acceso offline y cómputo automático de términos requieren una decisión de producto propia. Los límites del núcleo deben permitir futuras extensiones sin implementar hoy funciones especulativas.
+Mejorar la calidad no amplía automáticamente el alcance: versionado documental continúa fuera por instrucción del usuario. La conexión documental a OneDrive sí forma parte de la entrega por la aclaración del 2026-10-15. IA, finanzas, sincronización completa Google/Microsoft, mensajería, acceso offline y cómputo automático de términos requieren una decisión de producto propia. Los límites del núcleo deben permitir futuras extensiones sin implementar hoy funciones especulativas.
 
 ## 6. Evidencia, límites y referencias
 
