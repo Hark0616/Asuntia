@@ -502,3 +502,24 @@ D01/D03 siguen abiertos por la migración del archivo histórico, reconciliació
 de pendientes abandonados y aceptación real de OneDrive. No se eliminan archivos
 jurídicos automáticamente ni se consume la promoción gratuita de Azure para este
 avance. Las comprobaciones de proxy/despliegue y respaldos continúan pendientes.
+
+## 14. Revisión funcional por roles (2026-10-15)
+
+Se incorporan 15 recorridos de integración sobre API/PostgreSQL: administración
+(1), abogado (4), auxiliar (6) y cliente (4). Se prueban apertura, búsqueda,
+asignación, tareas, borradores y guía, publicación/retiro de notas y archivos
+locales, archivo, acceso denegado y sesión revocada. Los datos y archivos son
+sintéticos y temporales; los asuntos creados se archivan al finalizar.
+
+El recorrido de administración encontró y corrigió una transferencia incompleta:
+si el titular saliente era administrador, sus tareas manuales abiertas no pasaban
+al nuevo titular. Ahora se transfieren igual que las del abogado, conservando
+delegaciones a otros miembros y tareas ya terminadas. Cambio y regresiones en
+[b32e512](https://github.com/Hark0616/Asuntia/commit/b32e512).
+
+El dictamen, las evidencias y los pendientes por impacto están en
+[Pruebas por roles](PRUEBAS_ROLES_2026-10-15.md). Falta edición de datos existentes,
+citas independientes, auditoría y aceptación de producción/recuperación. La
+revisión de navegador cubre administración; los agentes verifican los demás
+perfiles mediante integración de API e inspección de UI. No sustituye aceptación
+con personas ni cierra G06, H03, A03 o los criterios de operación pendientes.
