@@ -12,6 +12,7 @@ from app.repositories.asunto_repository import AsuntoRepository
 from app.repositories.novedad_repository import NovedadRepository
 from app.repositories.paso_repository import PasoRepository
 from app.repositories.tarea_repository import TareaRepository
+from app.services.office_lock import lock_office_actor
 
 
 RUTA_INSOLVENCIA_PERSONA_NATURAL: list[dict[str, Any]] = [
@@ -117,6 +118,8 @@ def initial_workflow_steps() -> list[dict[str, Any]]:
 
 class WorkflowService:
     def __init__(self, session: AsyncSession, firma_id: uuid.UUID):
+        self.session = session
+        self.firma_id = firma_id
         self.asuntos = AsuntoRepository(session, firma_id)
         self.novedades = NovedadRepository(session, firma_id)
         self.pasos = PasoRepository(session, firma_id)
@@ -177,6 +180,7 @@ class WorkflowService:
     async def _get_active_step(
         self, asunto_id: uuid.UUID, paso_codigo: str, user_id: uuid.UUID, user_role: str,
     ) -> tuple[Asunto, AsuntoPaso]:
+        await lock_office_actor(self.session, self.firma_id, user_id, user_role)
         asunto = await self.asuntos.get_by_id_for_update(asunto_id)
         if not asunto or (user_role == "abogado" and asunto.abogado_id != user_id):
             raise NotFoundException(detail="Asunto no encontrado")

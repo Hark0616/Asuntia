@@ -14,6 +14,7 @@ from app.schemas.cliente import (
 )
 from app.services.asignacion_service import AsignacionService
 from app.services.cliente_service import ClienteService
+from app.services.office_lock import lock_office_actor
 
 router = APIRouter()
 
@@ -38,6 +39,7 @@ async def create_cliente(
     """
     Registra un nuevo cliente en la firma.
     """
+    await lock_office_actor(db, current_user.firma_id, current_user.id, current_user.rol)
     return await ClienteService(db, current_user.firma_id).create(
         payload,
         created_by_id=current_user.id,
@@ -65,4 +67,4 @@ async def assign_client_responsible(
     """Asigna la relación principal de un cliente dentro de la firma."""
     return await AsignacionService(
         db, current_user.firma_id
-    ).assign_client(cliente_id, payload.responsable_id)
+    ).assign_client(cliente_id, payload.responsable_id, current_user)

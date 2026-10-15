@@ -15,6 +15,7 @@ from app.repositories.user_repository import UserRepository
 from app.schemas.asunto import AperturaAsuntoCreate, AsuntoCreate, AsuntoResponse
 from app.services.cliente_service import ClienteService
 from app.services.workflow_service import initial_workflow_steps
+from app.services.office_lock import lock_office_actor
 
 
 class AsuntoService:
@@ -51,6 +52,7 @@ class AsuntoService:
 
     async def open(self, payload: AsuntoCreate | AperturaAsuntoCreate, actor: User) -> Asunto:
         try:
+            await lock_office_actor(self.session, self.firma_id, actor.id, actor.rol)
             responsible_id = await self.resolve_responsible(actor, payload.abogado_id)
             cliente_id = payload.cliente_id
             if isinstance(payload, AperturaAsuntoCreate) and payload.cliente_nuevo:
@@ -102,6 +104,7 @@ class AsuntoService:
             raise
 
     async def attach_workflow(self, asunto_id: uuid.UUID, ruta_codigo: str, actor: User) -> Asunto:
+        await lock_office_actor(self.session, self.firma_id, actor.id, actor.rol)
         try:
             asunto = await self.asuntos.get_by_id_for_update(asunto_id)
             if asunto is None or (actor.rol == "abogado" and asunto.abogado_id != actor.id):

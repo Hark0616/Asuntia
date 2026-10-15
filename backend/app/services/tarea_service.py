@@ -9,6 +9,7 @@ from app.repositories.asunto_repository import AsuntoRepository
 from app.repositories.tarea_repository import TareaRepository
 from app.repositories.user_repository import UserRepository
 from app.schemas.tarea import TareaCreate, TareaUpdate
+from app.services.office_lock import lock_office_actor
 
 
 class TareaService:
@@ -16,6 +17,7 @@ class TareaService:
 
     def __init__(self, session: AsyncSession, firma_id: uuid.UUID):
         self.session = session
+        self.firma_id = firma_id
         self.asuntos = AsuntoRepository(session, firma_id)
         self.tareas = TareaRepository(session, firma_id)
         self.users = UserRepository(session, firma_id)
@@ -29,6 +31,7 @@ class TareaService:
         return user
 
     async def create(self, payload: TareaCreate, actor: User):
+        await lock_office_actor(self.session, self.firma_id, actor.id, actor.rol)
         asunto = await self.asuntos.get_by_id_for_update(payload.asunto_id)
         if not asunto or not can_access_asunto(actor, asunto):
             raise NotFoundException(detail="Asunto no encontrado")
@@ -40,6 +43,7 @@ class TareaService:
         return await self.tareas.get_detail(tarea.id)
 
     async def update(self, tarea_id: uuid.UUID, payload: TareaUpdate, actor: User):
+        await lock_office_actor(self.session, self.firma_id, actor.id, actor.rol)
         original = await self.tareas.get_detail(tarea_id)
         if original is None:
             raise NotFoundException(detail="Tarea no encontrada")

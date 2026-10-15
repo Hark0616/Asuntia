@@ -5,6 +5,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import NotFoundException
 from app.models.asunto import Asunto
 from app.models.cliente import Cliente
+from app.models.user import User
+from app.services.office_lock import lock_office_actor
 from app.repositories.asunto_repository import AsuntoRepository
 from app.repositories.cliente_repository import ClienteRepository
 from app.repositories.tarea_repository import TareaRepository
@@ -30,7 +32,9 @@ class AsignacionService:
         self,
         cliente_id: uuid.UUID,
         responsable_id: uuid.UUID,
+        actor: User,
     ) -> Cliente:
+        await lock_office_actor(self.session, self.firma_id, actor.id, "administrador")
         cliente_repo = ClienteRepository(self.session, self.firma_id)
         cliente = await cliente_repo.get_by_id(cliente_id)
         if cliente is None:
@@ -48,8 +52,10 @@ class AsignacionService:
         self,
         asunto_id: uuid.UUID,
         responsable_id: uuid.UUID,
+        actor: User,
     ) -> Asunto:
         """Transfiere el trabajo abierto del responsable saliente y conserva las delegaciones al equipo."""
+        await lock_office_actor(self.session, self.firma_id, actor.id, "administrador")
         asunto_repo = AsuntoRepository(self.session, self.firma_id)
         asunto = await asunto_repo.get_by_id_for_update(asunto_id)
         if asunto is None:

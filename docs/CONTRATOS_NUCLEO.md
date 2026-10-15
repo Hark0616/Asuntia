@@ -97,8 +97,47 @@ OTP. La captura es compartida por ambos formularios; puede iniciarse desde
 `?firma=identificador` o `VITE_FIRMA_SLUG`, sin valor implícito de demostración.
 La configuración no concede permisos: el backend valida firma activa, usuario y
 credenciales. Cada petición autenticada vuelve a validar la firma; una baja de la
-firma invalida también sus sesiones existentes. La revocación individual de tokens,
-la recuperación de contraseña y la gestión del equipo continúan en C02–C04.
+firma invalida también sus sesiones existentes. La recuperación de contraseña y
+la recuperación global de la interfaz ante 401 continúan en C03–C04.
+
+## Ciclo de vida del equipo
+
+Solo administración consulta `/equipo/gestion`, crea invitaciones y cambia el
+acceso. Los selectores de trabajo siguen consultando únicamente miembros activos.
+El alta crea una identidad inactiva; email y documento normalizados no pueden
+duplicar otra identidad de oficina de la firma, incluidas las bajas. Para una
+reincorporación se invita al miembro existente y se conserva su UUID e historia.
+
+La invitación devuelve una única vez un secreto aleatorio de 256 bits, conserva
+su HMAC y vence en 24 horas. Administración copia y comparte el enlace; no se
+afirma que se haya enviado correo. El secreto viaja en el fragmento del enlace,
+se retira del historial al abrir la vista y solo se envía al comando de activación.
+La activación exige contraseña de 12–128 caracteres, consume el enlace una sola
+vez y no abre ni sustituye una sesión. Renovar, cancelar o cambiar el rol invalida
+las invitaciones anteriores. Las respuestas con secretos llevan `no-store`.
+
+La baja transfiere, dentro de la misma transacción, clientes y asuntos activos,
+tareas abiertas del saliente y el trabajo de guía de sus asuntos. Conserva
+delegaciones manuales a otros miembros, tareas completadas/canceladas, archivos
+y autores históricos. Si hay trabajo, se exige un reemplazo activo de la misma
+firma, administrador o abogado. Un abogado solo recibe tareas de asuntos que ya
+gestiona o recibe en esa transferencia; para trabajo disperso se elige un
+administrador. La baja no borra registros ni elimina el historial del saliente.
+
+Al pasar a auxiliar se transfiere el trabajo profesional. Al pasar a abogado se
+transfieren solo tareas de asuntos ajenos, conservando sus clientes y asuntos.
+Promover a administrador mantiene las asignaciones. Se impide quitar el último
+administrador activo y modificar el propio acceso: otro administrador debe hacerlo.
+Los cambios exigen `expected_updated_at` para rechazar pantallas obsoletas con 409.
+
+Los comandos de equipo y los que asignan trabajo toman primero un bloqueo de
+la fila de firma, revalidan al actor y luego bloquean expediente/tarea. Así una
+baja no compite con una nueva asignación y dos administradores no pueden retirar
+simultáneamente el último control. El bloqueo solo dura la transacción SQL.
+El JWT incluye la revisión `User.updated_at`; cada petición exige que coincida
+con la revisión actual. Cambiar rol, retirar acceso o reincorporar invalida los
+tokens anteriores incluso si el rol vuelve a ser el mismo. Este sello revoca
+sesiones; no sustituye el historial de auditoría pendiente en B08.
 
 La evidencia adicional está en `backend/tests/test_busqueda_asuntos.py`,
 `backend/tests/test_firma_acceso.py` y las pruebas de `ListaExpedientes`, acceso y

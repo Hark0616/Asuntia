@@ -111,7 +111,7 @@ async def assign_case_responsible(
     """Transfiere el asunto y el trabajo abierto de su responsable; conserva las delegaciones al equipo."""
     return await AsignacionService(
         db, current_user.firma_id
-    ).assign_case(asunto_id, payload.responsable_id)
+    ).assign_case(asunto_id, payload.responsable_id, current_user)
 
 @router.get("/id/{asunto_id}", response_model=AsuntoResponse | AsuntoPortalResponse)
 async def get_asunto_by_id(

@@ -9,8 +9,22 @@ from app.core.mail import send_otp_email
 from app.core.security import create_access_token
 from app.models.user import User
 from app.services.auth_service import AuthService
+from app.services.equipo_service import EquipoService
+from app.schemas.equipo import ActivarEquipoRequest
+from app.repositories.firma_repository import FirmaRepository
+from app.core.exceptions import DomainException
 
 router = APIRouter()
+
+
+@router.post("/equipo/activar", status_code=204)
+async def activate_team_member(payload: ActivarEquipoRequest, response: Response,
+                               db: AsyncSession = Depends(get_db)):
+    response.headers["Cache-Control"] = "no-store"
+    firma = await FirmaRepository(db).get_by_subdominio(payload.firma_slug)
+    if not firma:
+        raise DomainException(detail="Invitación inválida o vencida")
+    await EquipoService(db, firma.id).activate(payload)
 
 
 def _set_session_cookie(response: Response, access_token: str) -> None:
@@ -31,6 +45,7 @@ def _session_response(user: User, response: Response) -> SessionResponse:
         "cedula": user.cedula,
         "rol": user.rol,
         "firma_id": str(user.firma_id),
+        "user_revision": user.updated_at.isoformat(),
     }
     access_token = create_access_token(data=token_data)
     _set_session_cookie(response, access_token)
