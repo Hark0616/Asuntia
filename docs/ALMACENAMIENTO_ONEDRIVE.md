@@ -24,6 +24,17 @@ primero el alta de Azure/Entra del operador o usar otro directorio autorizado.
 Un alta que solicite términos, tarjeta o datos de facturación debe completarla
 el titular; no crear recursos facturables para resolver este paso.
 
+**Promoción de Azure:** el usuario quiere reservar la oferta de cliente nuevo para
+más adelante. No completar el alta de Azure Free Trial para esta prueba. Los US$200
+caducan a los 30 días desde el alta y la oferta está limitada a una por cliente
+nuevo, aunque no se consuman los créditos. Microsoft distingue esta promoción del
+registro gratuito de propiedad del directorio, Microsoft Entra ID Free. Crear una
+cuenta de pago por uso tampoco ofrece una garantía verificada de conservar la
+elegibilidad de cliente nuevo. Mantener pendiente la aceptación real de Graph
+hasta disponer del directorio de Asuntia; las pruebas locales no requieren activar
+la promoción. Véanse las [condiciones de la oferta](https://azure.microsoft.com/en-us/pricing/purchase-options/azure-account#FAQ)
+y [Microsoft Entra ID Free](https://learn.microsoft.com/en-us/azure/cost-management-billing/manage/microsoft-entra-id-free).
+
 1. Registrar una aplicación para **cuentas Microsoft personales** en Microsoft
    Entra. Usar plataforma **Web**: el backend intercambia el código y conserva
    el secreto. No registrar este callback como SPA ni habilitar flujo implícito.
