@@ -467,3 +467,38 @@ migración/verificación del archivo local histórico, reconciliación de tempor
 sin trabajo persistido y revisión de vías Google legadas. El soporte de OneDrive
 se incorpora a la entrega sin declarar cerrados esos pendientes. Dependencias
 nuevas de ejecución: ARQ y HTTPX, registradas también en requisitos de producción.
+
+## 13. Cargas locales recuperables (2026-10-15)
+
+Avance de D01/D03/B07 sin depender de Azure. El formulario existente conserva el
+UUID al reintentar; la API local ahora lo respeta. Repetir una solicitud recupera
+un único archivo, documento y evento, incluso si se pierde la confirmación del
+commit o dos peticiones llegan juntas. Otro contenido o campos bajo el mismo UUID
+producen 409.
+
+La intención se confirma antes de escribir. Una incorporación incompleta no
+aparece en Documentos ni Actividad; el original identificado se conserva para
+recuperarlo sin sobrescribirlo ni borrarlo por un resultado de BD incierto. Los
+pendientes duran 24 horas y no se envían a Redis ni al worker cloud. Los resultados
+completados conservan la deduplicación. La recuperación revalida sesión, firma,
+acceso y publicación; un documento archivado o un archivo ausente/modificado no
+se recrea por reintentar.
+
+Las nuevas claves son relativas y separadas por firma/asunto/operación. Se verifica
+la lectura tras trasladar la raíz privada y la compatibilidad con referencias
+absolutas anteriores. La clasificación sigue derivándose del tipo documental;
+no se añaden campos ni pasos al formulario. El contrato está en
+[Contratos del núcleo](CONTRATOS_NUCLEO.md#recuperación-de-cargas-locales-2026-10-15).
+
+| Verificación | Resultado y límite |
+| --- | --- |
+| Backend completo, PostgreSQL 16 | 393 pruebas correctas en 253,66 s; una omitida por Redis nativo ausente. Tras ajustar el contador de intentos y ampliar dos casos finales: 69 pruebas afectadas correctas. |
+| Recuperación local | 24 casos nuevos: concurrencia, solicitud diferente, fallo antes de la intención, antes/después del commit, proceso interrumpido, renombre fallido, original ausente/alterado, archivo lógico, sesión retirada, otra firma, cambio de destino, vencimiento y traslado de raíz. |
+| Compatibilidad | Lectura de la referencia absoluta histórica y conservación de los permisos de descarga. Validaciones 401/403/404/422 y contenido inválido mantienen la política previa. |
+| Frontend | 148 pruebas correctas y `npm run build` correcto. Se reutiliza la prueba existente que demuestra conservación de UUID, archivo y datos al fallar; no se cambió la interfaz. |
+| Esquema | Se reutiliza `StorageOperation`; no hay tablas ni dependencias nuevas. `alembic check` sin diferencias. |
+
+D01/D03 siguen abiertos por la migración del archivo histórico, reconciliación
+de pendientes abandonados y aceptación real de OneDrive. No se eliminan archivos
+jurídicos automáticamente ni se consume la promoción gratuita de Azure para este
+avance. Las comprobaciones de proxy/despliegue y respaldos continúan pendientes.

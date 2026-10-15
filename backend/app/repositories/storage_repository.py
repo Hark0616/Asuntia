@@ -41,6 +41,12 @@ class StorageOperationRepository(BaseRepository[StorageOperation]):
     def __init__(self, session, firma_id: uuid.UUID):
         super().__init__(StorageOperation, session, firma_id)
 
+    async def stage_create(self, data: dict, *, created_by_id: uuid.UUID):
+        operation = StorageOperation(**data, firma_id=self.firma_id, created_by_id=created_by_id)
+        self.session.add(operation)
+        await self.session.flush()
+        return operation
+
     async def pending_counts(self, user_id, now):
         result = await self.session.execute(select(func.count(StorageOperation.id),
             func.count(StorageOperation.id).filter(StorageOperation.user_id == user_id)).where(
@@ -58,6 +64,7 @@ class StorageOperationRepository(BaseRepository[StorageOperation]):
     async def ready(self, now: datetime):
         result = await self.session.execute(select(StorageOperation).where(
             StorageOperation.firma_id == self.firma_id, StorageOperation.is_active.is_(True),
+            StorageOperation.kind != "upload_local",
             or_((StorageOperation.status == "queued") & or_(StorageOperation.lease_until.is_(None), StorageOperation.lease_until < now),
                 (StorageOperation.status == "running") & (StorageOperation.lease_until < now),
                 (StorageOperation.status == "awaiting_authorization") & (StorageOperation.expires_at < now)))
@@ -67,6 +74,7 @@ class StorageOperationRepository(BaseRepository[StorageOperation]):
     async def expired_transfers(self, now: datetime):
         result = await self.session.execute(select(StorageOperation).where(
             StorageOperation.firma_id == self.firma_id, StorageOperation.is_active.is_(True),
+            StorageOperation.kind != "upload_local",
             StorageOperation.expires_at < now,
             StorageOperation.status.in_(("completed", "failed")),
             StorageOperation.payload["_transfers_cleared"].as_boolean().is_not(True)).limit(100))

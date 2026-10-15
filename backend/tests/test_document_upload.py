@@ -72,7 +72,8 @@ async def test_upload_canonicalizes_mime_uses_opaque_filename_and_private_downlo
     assert document["mime_type"] == "application/pdf"
     assert document["compartido_con_cliente"] is False
     path = Path(document["external_file_id"])
-    assert path.is_relative_to(Path(settings.LOCAL_STORAGE_PATH))
+    assert not path.is_absolute()
+    assert LocalStorageService().contained_path(path).is_relative_to(Path(settings.LOCAL_STORAGE_PATH))
     assert "nombre-identificable" not in str(path)
     assert len(path.stem) == 32
     assert document["web_view_url"] == f"/api/v1/documentos/{document['id']}/preview"

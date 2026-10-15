@@ -22,3 +22,18 @@ DOCUMENT_MIME_BY_EXTENSION = {
 INLINE_DOCUMENT_TYPES = {
     "image/png", "image/jpeg", "image/gif", "image/webp", "text/plain",
 }
+
+DOCUMENT_FOLDER_BY_TYPE = {
+    "anexo": "anexo",
+    "poder": "anexo",
+    "escrito_solicitud": "solicitud",
+    "auto_admisorio": "audiencia",
+    "acta_audiencia": "audiencia",
+    "acta_acuerdo": "audiencia",
+    "comunicacion_juzgado": "liquidacion",
+    "otro": "anexo",
+}
+
+
+def folder_for_document_type(tipo_documental: str) -> str:
+    return DOCUMENT_FOLDER_BY_TYPE.get(tipo_documental, "anexo")

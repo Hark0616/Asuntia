@@ -9,7 +9,7 @@ from app.core.deps import get_current_user, require_office_user, require_roles
 from app.core.access import can_access_asunto, require_publication_permission
 from app.core.db import get_db
 from app.config import settings
-from app.core.document_policy import INLINE_DOCUMENT_TYPES
+from app.core.document_policy import INLINE_DOCUMENT_TYPES, folder_for_document_type
 from app.models.documento import TipoDocumental
 from app.models.user import User
 from app.repositories.asunto_repository import AsuntoRepository
@@ -20,27 +20,13 @@ from app.services.storage.factory import StorageFactory
 from app.services.publicacion_service import PublicacionService
 from app.services.document_upload import read_validated_upload
 from app.services.storage.local_storage import LocalStorageService
+from app.services.local_document_upload import LocalDocumentUpload
 from app.services.office_lock import lock_office_actor
 from app.repositories.firma_storage_repository import FirmaStorageRepository
 from app.repositories.storage_repository import StorageOperationRepository
 from app.schemas.storage import StorageOperationResponse
 
 router = APIRouter()
-
-DOCUMENT_FOLDER_BY_TYPE = {
-    "anexo": "anexo",
-    "poder": "anexo",
-    "escrito_solicitud": "solicitud",
-    "auto_admisorio": "audiencia",
-    "acta_audiencia": "audiencia",
-    "acta_acuerdo": "audiencia",
-    "comunicacion_juzgado": "liquidacion",
-    "otro": "anexo",
-}
-
-def folder_for_document_type(tipo_documental: str) -> str:
-    return DOCUMENT_FOLDER_BY_TYPE.get(tipo_documental, "anexo")
-
 
 @router.get("/asuntos/{asunto_id}/documentos", response_model=List[DocumentoResponse | DocumentoPortalResponse])
 async def list_documentos_asunto(
@@ -79,7 +65,7 @@ async def upload_documento_asunto(
 ):
     """
     Sube contenido acotado y validado al proveedor activo de la firma.
-    Garantiza aprovisionamiento dinámico de carpetas por proveedor (JSONB).
+    Recupera cargas locales por UUID y delega OneDrive al worker documental.
     """
     nombre_funcional = nombre_funcional.strip()
     if not nombre_funcional:
@@ -94,7 +80,11 @@ async def upload_documento_asunto(
 
     config = await FirmaStorageRepository(db, current_user.firma_id).get_config()
     previous = await StorageOperationRepository(db, current_user.firma_id).get_by_id(operation_id) if operation_id else None
-    if previous or (config and config.provider == "onedrive"):
+    if previous and previous.user_id != current_user.id:
+        raise HTTPException(404, "Operación no encontrada")
+    if previous and previous.kind not in {"upload", "upload_local"}:
+        raise HTTPException(409, "La operación ya se utilizó para otra solicitud.")
+    if (previous and previous.kind == "upload") or (not previous and config and config.provider == "onedrive"):
         if not operation_id:
             raise HTTPException(422, "Indica el identificador de la operación de carga.")
         from app.api.v1.endpoints.storage import remote_upload
@@ -105,6 +95,9 @@ async def upload_documento_asunto(
 
     # No aprovisionar carpetas ni modificar la BD antes de validar el archivo.
     file_bytes, filename, mime_type = await read_validated_upload(file)
+    if (previous and previous.kind == "upload_local") or not config or config.provider == "local":
+        return await LocalDocumentUpload(db, current_user).upload(asunto_id, operation_id,
+            file_bytes, filename, mime_type, nombre_funcional, tipo_documental, compartido_con_cliente)
     await lock_office_actor(db, current_user.firma_id, current_user.id, current_user.rol)
     asunto = await asunto_repo.get_by_id_for_update(asunto_id)
     if not asunto or not can_access_asunto(current_user, asunto):
@@ -121,9 +114,7 @@ async def upload_documento_asunto(
 
     if not provider_folders:
         # Aprovisionamiento bajo demanda de las 4 carpetas en la nube activa
-        identity = (f"{current_user.firma_id.hex}_{asunto.id.hex}"
-                    if provider_name == "local" else asunto.radicado)
-        folder_struct = await provider.create_case_folder_structure(identity)
+        folder_struct = await provider.create_case_folder_structure(asunto.radicado)
         storage_folders[provider_name] = folder_struct
         asunto.storage_folders = storage_folders
         provider_folders = folder_struct
@@ -167,9 +158,6 @@ async def upload_documento_asunto(
     }
 
     documento = await repo.stage_create(doc_data, created_by_id=current_user.id)
-    if provider_name == "local":
-        documento.web_view_url = f"/api/v1/documentos/{documento.id}/preview"
-        documento.web_download_url = documento.web_view_url
     await NovedadRepository(db, current_user.firma_id).stage_create(
         {
             "asunto_id": asunto_id,

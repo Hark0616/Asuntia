@@ -273,11 +273,49 @@ terminar, y retira el temporal si falla. Los metadatos de un archivo ausente gen
 error en vez de un documento ficticio. La carpeta del expediente, el documento y
 su evento se confirman juntos en BD, sin commit intermedio al crear carpetas.
 
-D01 y D03 siguen pendientes: aún existen referencias absolutas históricas, falta
-conservar nombre original e integridad como metadatos y falta reconciliar fallos
-entre almacenamiento y commit, con reintentos idempotentes. D04 sigue abierto por
+D01 y D03 siguen pendientes de aceptación integral. Las cargas actuales conservan
+nombre original y SHA-256; las locales usan claves relativas por firma/asunto y
+una intención durable para recuperar reintentos, como se detalla a continuación.
+Quedan las referencias absolutas históricas y la reconciliación de pendientes
+abandonados. D04 sigue abierto por
 las vías cloud heredadas; sus enlaces no tienen todavía el contrato de acceso
 privado que exige el núcleo. Este bloque no amplía la integración de proveedores.
+
+### Recuperación de cargas locales (2026-10-15)
+
+El cargador envía `operation_id` UUID junto al archivo validado. PostgreSQL guarda
+primero la intención, ligada a firma, asunto y usuario, con huella de contenido y
+campos. Solo entonces se escribe en `documentos/<firma>/<asunto>/<operación>.<ext>`
+dentro de la raíz privada. Esta clave nueva es relativa y puede conservarse al
+trasladar la raíz; las referencias absolutas anteriores siguen siendo legibles
+en su ubicación existente y no se migran implícitamente.
+
+Repetir UUID y solicitud recupera el mismo documento; otro contenido, nombre,
+tipo, visibilidad o asunto produce 409. La firma se bloquea y la sesión y el
+acceso al asunto se revalidan antes de escribir. El documento, su evento y la
+confirmación de la operación se guardan juntos. La pérdida de confirmación del
+commit se resuelve consultando el resultado real. Una operación iniciada conserva
+el destino local aunque luego cambie el predeterminado.
+
+La escritura y la comprobación SHA-256 se ejecutan en threads con lecturas
+acotadas. Un archivo ya escrito se verifica y reutiliza sin sobrescribirlo; un
+temporal interrumpido se puede rehacer. No se borra el original para compensar
+un error de BD cuyo resultado sea incierto. Si falla la incorporación, el archivo
+no aparece en la lista ni en actividad hasta completar ambos registros. Si el
+documento ya fue archivado, o su archivo falta o cambió, repetir la carga no lo
+recrea ni inventa un éxito.
+
+La carga local devuelve 201 con el documento y no necesita Redis. Los trabajos
+locales no se despachan al worker cloud. Un fallo recuperable devuelve 503 y el
+formulario conserva datos y UUID para repetir explícitamente la solicitud. Los
+pendientes se pueden recuperar durante 24 horas; los resultados confirmados
+conservan su deduplicación. Los clientes anteriores que no envían UUID siguen
+admitidos, pero no pueden recuperar una respuesta perdida sin ese identificador.
+La consulta autenticada de la operación devuelve solo estado y UUID del documento.
+
+No hay eliminación automática de originales ni de pendientes abandonados: esa
+reconciliación y las referencias históricas siguen abiertas en D01/D03. El contrato
+no sustituye respaldos ni verifica por sí solo la persistencia ante un fallo del disco.
 
 ## Decisión de almacenamiento por firma (2026-10-15)
 

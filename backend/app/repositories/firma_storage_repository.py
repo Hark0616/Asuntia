@@ -11,10 +11,11 @@ class FirmaStorageRepository(BaseRepository[FirmaStorageConfig]):
     def __init__(self, session: AsyncSession, firma_id: uuid.UUID):
         super().__init__(model=FirmaStorageConfig, session=session, firma_id=firma_id)
 
-    async def get_config(self) -> Optional[FirmaStorageConfig]:
-        res = await self.session.execute(
-            select(FirmaStorageConfig).where(FirmaStorageConfig.firma_id == self.firma_id)
-        )
+    async def get_config(self, *, fresh: bool = False) -> Optional[FirmaStorageConfig]:
+        stmt = select(FirmaStorageConfig).where(FirmaStorageConfig.firma_id == self.firma_id)
+        if fresh:
+            stmt = stmt.execution_options(populate_existing=True)
+        res = await self.session.execute(stmt)
         return res.scalars().first()
 
     async def stage_destination(self, provider: str, connection_id: uuid.UUID | None = None):

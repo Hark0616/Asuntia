@@ -16,7 +16,7 @@ from starlette.datastructures import Headers
 
 from app.config import settings
 from app.core.db import AsyncSessionLocal
-from app.core.document_policy import MAX_DOCUMENT_BYTES
+from app.core.document_policy import MAX_DOCUMENT_BYTES, folder_for_document_type
 from app.models.storage import StorageConnection
 from app.repositories.documento_repository import DocumentoRepository
 from app.repositories.firma_repository import FirmaRepository
@@ -235,7 +235,6 @@ async def apply_result(session, operation, result, case, document, connection):
             if previous:
                 raise StorageError("duplicate", "El archivo ya está vinculado a este expediente.")
             step = next((step for step in case.pasos if step.estado == "activo" and step.is_active), None)
-            from app.api.v1.endpoints.documentos import folder_for_document_type
             document = await repo.stage_create({"asunto_id": case.id, "asunto_paso_id": step.id if step else None,
                 "nombre_funcional": operation.payload["nombre_funcional"], "tipo_documental": operation.payload["tipo_documental"],
                 "subcarpeta": folder_for_document_type(operation.payload["tipo_documental"]),
@@ -266,6 +265,8 @@ async def run_storage_operation(ctx, firma_id: str, operation_id: str):
         try:
             await FirmaRepository(session).lock_active(firma_id)
             operation = await repo.get_locked(operation_id)
+            if operation and operation.kind == "upload_local":
+                return  # La carga local se recupera por la petición, sin lecturas cloud.
             if not operation or operation.status not in {"queued", "running", "awaiting_authorization"}:
                 return
             if operation.status in {"queued", "running"} and operation.lease_until and operation.lease_until > now():
