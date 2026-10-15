@@ -5,6 +5,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import NotFoundException
 from app.models.asunto import Asunto
 from app.models.cliente import Cliente
+from app.models.user import User
+from app.services.office_lock import lock_office_actor
+from app.services.cita_service import CitaService
 from app.repositories.asunto_repository import AsuntoRepository
 from app.repositories.cliente_repository import ClienteRepository
 from app.repositories.tarea_repository import TareaRepository
@@ -30,7 +33,9 @@ class AsignacionService:
         self,
         cliente_id: uuid.UUID,
         responsable_id: uuid.UUID,
+        actor: User,
     ) -> Cliente:
+        await lock_office_actor(self.session, self.firma_id, actor.id, "administrador")
         cliente_repo = ClienteRepository(self.session, self.firma_id)
         cliente = await cliente_repo.get_by_id(cliente_id)
         if cliente is None:
@@ -48,17 +53,28 @@ class AsignacionService:
         self,
         asunto_id: uuid.UUID,
         responsable_id: uuid.UUID,
+        actor: User,
     ) -> Asunto:
+        """Transfiere el trabajo abierto del responsable saliente y conserva las delegaciones al equipo."""
+        await lock_office_actor(self.session, self.firma_id, actor.id, "administrador")
         asunto_repo = AsuntoRepository(self.session, self.firma_id)
-        asunto = await asunto_repo.get_by_id(asunto_id)
+        asunto = await asunto_repo.get_by_id_for_update(asunto_id)
         if asunto is None:
             raise NotFoundException(detail="Asunto no encontrado")
         await self._require_responsable(responsable_id)
 
+        previous = await UserRepository(self.session, self.firma_id).get_by_id(asunto.abogado_id)
+        previous_responsable_id = (
+            previous.id if previous and previous.rol in {"administrador", "abogado"} else None
+        )
+        citas = CitaService(self.session, self.firma_id)
+        for cita in await citas.citas.pending_for_user(previous_responsable_id) if previous_responsable_id else []:
+            if cita.asunto_id == asunto_id:
+                citas.stage_transfer(cita, previous_responsable_id, responsable_id, actor.id)
         asunto_repo.stage_responsible(asunto, responsable_id)
         await TareaRepository(
             self.session, self.firma_id
-        ).reassign_open_for_asunto(asunto_id, responsable_id)
+        ).reassign_open_for_asunto(asunto_id, responsable_id, previous_responsable_id)
         await self.session.commit()
         updated = await asunto_repo.get_by_id(asunto_id)
         if updated is None:

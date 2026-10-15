@@ -1,4 +1,18 @@
 import { apiClient } from '@/lib/axios';
+import type { StorageOperation } from '@/types/storage';
+
+/** Proyección de un documento compartido, sin metadatos de almacenamiento internos. */
+export interface DocumentoPortalAPI {
+  id: string;
+  nombre_funcional: string;
+  tipo_documental: string;
+  subcarpeta: string;
+  provider: string;
+  web_view_url: string;
+  mime_type?: string | null;
+  compartido_con_cliente: boolean;
+  created_at: string;
+}
 
 export interface DocumentoAPI {
   id: string;
@@ -10,6 +24,10 @@ export interface DocumentoAPI {
   subcarpeta: string;
   provider: string;
   external_file_id: string;
+  storage_connection_id?: string | null;
+  nombre_original?: string | null;
+  content_sha256?: string | null;
+  remote_etag?: string | null;
   web_view_url: string;
   web_download_url?: string;
   mime_type?: string;
@@ -20,8 +38,8 @@ export interface DocumentoAPI {
   updated_at: string;
 }
 
-export const fetchDocumentosAsunto = async (asuntoId: string, soloCompartidos: boolean = false): Promise<DocumentoAPI[]> => {
-  const response = await apiClient.get<DocumentoAPI[]>(`/asuntos/${asuntoId}/documentos`, {
+export const fetchDocumentosAsunto = async (asuntoId: string, soloCompartidos: boolean = false): Promise<Array<DocumentoAPI | DocumentoPortalAPI>> => {
+  const response = await apiClient.get<Array<DocumentoAPI | DocumentoPortalAPI>>(`/asuntos/${asuntoId}/documentos`, {
     params: { solo_compartidos: soloCompartidos }
   });
   return response.data;
@@ -30,8 +48,8 @@ export const fetchDocumentosAsunto = async (asuntoId: string, soloCompartidos: b
 export const uploadDocumentoAPI = async (
   asuntoId: string,
   formData: FormData
-): Promise<DocumentoAPI> => {
-  const response = await apiClient.post<DocumentoAPI>(`/asuntos/${asuntoId}/documentos/upload`, formData, {
+): Promise<DocumentoAPI | StorageOperation> => {
+  const response = await apiClient.post<DocumentoAPI | StorageOperation>(`/asuntos/${asuntoId}/documentos/upload`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   });
   return response.data;

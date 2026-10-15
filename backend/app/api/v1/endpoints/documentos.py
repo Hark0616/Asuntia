@@ -1,39 +1,34 @@
 import uuid
-from pathlib import Path
+import hashlib
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Response, status
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.deps import get_current_user, require_office_user
-from app.core.access import can_access_asunto
+from app.core.deps import get_current_user, require_office_user, require_roles
+from app.core.access import can_access_asunto, require_publication_permission
 from app.core.db import get_db
+from app.config import settings
+from app.core.document_policy import INLINE_DOCUMENT_TYPES, folder_for_document_type
+from app.models.documento import TipoDocumental
 from app.models.user import User
 from app.repositories.asunto_repository import AsuntoRepository
 from app.repositories.documento_repository import DocumentoRepository
 from app.repositories.novedad_repository import NovedadRepository
-from app.schemas.documento import DocumentoResponse, DocumentoLinkCreate
+from app.schemas.documento import DocumentoResponse, DocumentoPortalResponse, DocumentoLinkCreate
 from app.services.storage.factory import StorageFactory
+from app.services.publicacion_service import PublicacionService
+from app.services.document_upload import read_validated_upload
+from app.services.storage.local_storage import LocalStorageService
+from app.services.local_document_upload import LocalDocumentUpload
+from app.services.office_lock import lock_office_actor
+from app.repositories.firma_storage_repository import FirmaStorageRepository
+from app.repositories.storage_repository import StorageOperationRepository
+from app.schemas.storage import StorageOperationResponse
 
 router = APIRouter()
 
-DOCUMENT_FOLDER_BY_TYPE = {
-    "anexo": "anexo",
-    "poder": "anexo",
-    "escrito_solicitud": "solicitud",
-    "auto_admisorio": "audiencia",
-    "acta_audiencia": "audiencia",
-    "acta_acuerdo": "audiencia",
-    "comunicacion_juzgado": "liquidacion",
-    "otro": "anexo",
-}
-
-
-def folder_for_document_type(tipo_documental: str) -> str:
-    return DOCUMENT_FOLDER_BY_TYPE.get(tipo_documental, "anexo")
-
-
-@router.get("/asuntos/{asunto_id}/documentos", response_model=List[DocumentoResponse])
+@router.get("/asuntos/{asunto_id}/documentos", response_model=List[DocumentoResponse | DocumentoPortalResponse])
 async def list_documentos_asunto(
     asunto_id: uuid.UUID,
     solo_compartidos: bool = False,
@@ -50,25 +45,61 @@ async def list_documentos_asunto(
     if current_user.rol == "cliente":
         solo_compartidos = True
     repo = DocumentoRepository(db, current_user.firma_id)
-    return await repo.list_by_asunto(asunto_id, solo_compartidos=solo_compartidos)
+    documentos = await repo.list_by_asunto(asunto_id, solo_compartidos=solo_compartidos)
+    if current_user.rol == "cliente":
+        return [DocumentoPortalResponse.from_documento(doc) for doc in documentos]
+    return documentos
 
-@router.post("/asuntos/{asunto_id}/documentos/upload", response_model=DocumentoResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/asuntos/{asunto_id}/documentos/upload", response_model=DocumentoResponse | StorageOperationResponse, status_code=status.HTTP_201_CREATED)
 async def upload_documento_asunto(
     asunto_id: uuid.UUID,
-    nombre_funcional: str = Form(...),
-    tipo_documental: str = Form("otro"),
+    response: Response,
+    nombre_funcional: str = Form(..., min_length=1, max_length=255),
+    tipo_documental: TipoDocumental = Form(TipoDocumental.OTRO),
     subcarpeta: Optional[str] = Form(None),
     compartido_con_cliente: bool = Form(False),
     file: UploadFile = File(...),
+    operation_id: uuid.UUID | None = Form(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_office_user),
 ):
     """
-    Sube un archivo usando el proveedor de almacenamiento activo de la firma (Google Drive, OneDrive, Local).
-    Garantiza aprovisionamiento dinámico de carpetas por proveedor (JSONB).
+    Sube contenido acotado y validado al proveedor activo de la firma.
+    Recupera cargas locales por UUID y delega OneDrive al worker documental.
     """
+    nombre_funcional = nombre_funcional.strip()
+    if not nombre_funcional:
+        raise HTTPException(422, "Indica el nombre del documento.")
     asunto_repo = AsuntoRepository(db, current_user.firma_id)
     asunto = await asunto_repo.get_by_id(asunto_id)
+    if not asunto or not can_access_asunto(current_user, asunto):
+        raise HTTPException(status_code=404, detail="Asunto no encontrado")
+
+    if compartido_con_cliente:
+        require_publication_permission(current_user)
+
+    config = await FirmaStorageRepository(db, current_user.firma_id).get_config()
+    previous = await StorageOperationRepository(db, current_user.firma_id).get_by_id(operation_id) if operation_id else None
+    if previous and previous.user_id != current_user.id:
+        raise HTTPException(404, "Operación no encontrada")
+    if previous and previous.kind not in {"upload", "upload_local"}:
+        raise HTTPException(409, "La operación ya se utilizó para otra solicitud.")
+    if (previous and previous.kind == "upload") or (not previous and config and config.provider == "onedrive"):
+        if not operation_id:
+            raise HTTPException(422, "Indica el identificador de la operación de carga.")
+        from app.api.v1.endpoints.storage import remote_upload
+        response.status_code = 202
+        return await remote_upload(asunto_id, operation_id, nombre_funcional, tipo_documental,
+                                   compartido_con_cliente, file, db, current_user)
+    tipo_documental = tipo_documental.value
+
+    # No aprovisionar carpetas ni modificar la BD antes de validar el archivo.
+    file_bytes, filename, mime_type = await read_validated_upload(file)
+    if (previous and previous.kind == "upload_local") or not config or config.provider == "local":
+        return await LocalDocumentUpload(db, current_user).upload(asunto_id, operation_id,
+            file_bytes, filename, mime_type, nombre_funcional, tipo_documental, compartido_con_cliente)
+    await lock_office_actor(db, current_user.firma_id, current_user.id, current_user.rol)
+    asunto = await asunto_repo.get_by_id_for_update(asunto_id)
     if not asunto or not can_access_asunto(current_user, asunto):
         raise HTTPException(status_code=404, detail="Asunto no encontrado")
 
@@ -85,7 +116,7 @@ async def upload_documento_asunto(
         # Aprovisionamiento bajo demanda de las 4 carpetas en la nube activa
         folder_struct = await provider.create_case_folder_structure(asunto.radicado)
         storage_folders[provider_name] = folder_struct
-        await asunto_repo.update(asunto, {"storage_folders": storage_folders})
+        asunto.storage_folders = storage_folders
         provider_folders = folder_struct
 
     # La carpeta se deriva del tipo documental para conservar una sola
@@ -95,12 +126,11 @@ async def upload_documento_asunto(
     if provider_folders and "subfolders" in provider_folders:
         target_subfolder_id = provider_folders["subfolders"].get(target_folder) or provider_folders.get("root_folder_id")
 
-    # Streaming de bytes hacia el proveedor
-    file_bytes = await file.read()
+    # Contenido ya acotado y validado; el proveedor no recibe nombres con rutas.
     file_id, web_view, web_download, size_bytes = await provider.upload_file(
         file_bytes=file_bytes,
-        filename=file.filename or nombre_funcional,
-        mime_type=file.content_type or "application/pdf",
+        filename=filename,
+        mime_type=mime_type,
         parent_folder_id=target_subfolder_id
     )
 
@@ -119,7 +149,9 @@ async def upload_documento_asunto(
         "external_file_id": file_id,
         "web_view_url": web_view,
         "web_download_url": web_download,
-        "mime_type": file.content_type or "application/pdf",
+        "mime_type": mime_type,
+        "nombre_original": filename,
+        "content_sha256": hashlib.sha256(file_bytes).hexdigest(),
         "tamano_bytes": size_bytes,
         "compartido_con_cliente": compartido_con_cliente,
         "estado_revision": "recibido"
@@ -155,6 +187,9 @@ async def vincular_documento_drive(
     asunto = await AsuntoRepository(db, current_user.firma_id).get_by_id(asunto_id)
     if not asunto or not can_access_asunto(current_user, asunto):
         raise HTTPException(status_code=404, detail="Asunto no encontrado")
+
+    if payload.compartido_con_cliente:
+        require_publication_permission(current_user)
 
     repo = DocumentoRepository(db, current_user.firma_id)
     active_step = next(
@@ -202,7 +237,7 @@ async def preview_documento_proxy(
     current_user: User = Depends(get_current_user),
 ):
     """
-    Proxy de previsualización para clientes. Retorna los bytes directamente para previsualizar sin requerir login en Google/OneDrive.
+    Entrega local autorizada: imágenes/texto en línea y otros formatos como adjuntos.
     """
     repo = DocumentoRepository(db, current_user.firma_id)
     doc = await repo.get_by_id(documento_id)
@@ -216,25 +251,35 @@ async def preview_documento_proxy(
     if current_user.rol == "cliente" and not doc.compartido_con_cliente:
         raise HTTPException(status_code=404, detail="Documento no encontrado")
 
+    if doc.provider == "onedrive":
+        raise HTTPException(409, "Prepara este documento desde Asuntia para consultarlo.")
     if doc.provider != "local":
         raise HTTPException(
             status_code=status.HTTP_501_NOT_IMPLEMENTED,
             detail="El proveedor cloud de este documento todavía no está conectado.",
         )
 
-    storage_root = (Path.cwd() / "storage").resolve()
-    file_path = Path(doc.external_file_id).resolve()
-    if (
-        not file_path.is_relative_to(storage_root)
-        or not file_path.is_file()
-    ):
+    try:
+        file_path = LocalStorageService().contained_path(doc.external_file_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Archivo no encontrado")
+    if not file_path.is_file():
         raise HTTPException(status_code=404, detail="Archivo no encontrado")
 
+    media_type = (doc.mime_type or "application/octet-stream").lower()
     return FileResponse(
         path=file_path,
-        media_type=doc.mime_type or "application/octet-stream",
+        media_type=media_type,
+        filename=f"{doc.nombre_funcional}{file_path.suffix}",
+        content_disposition_type="inline" if media_type in INLINE_DOCUMENT_TYPES else "attachment",
         headers={
-            "Content-Disposition": f'inline; filename="{doc.nombre_funcional}.pdf"'
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "private, no-store",
+            "Content-Security-Policy": (
+                "sandbox; default-src 'none'; frame-ancestors 'self' "
+                + " ".join(settings.allow_origins_list)
+            ),
+            "Referrer-Policy": "no-referrer",
         },
     )
 
@@ -243,38 +288,37 @@ async def toggle_visibilidad_documento(
     documento_id: uuid.UUID,
     compartido: bool,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_office_user),
+    current_user: User = Depends(require_roles("administrador", "abogado")),
 ):
     """
     Alterna si el documento es visible para el cliente (compartido_con_cliente = true/false).
     """
     repo = DocumentoRepository(db, current_user.firma_id)
-    doc = await repo.get_by_id(documento_id)
+    doc = await repo.get_by_id_for_update(documento_id)
     if not doc:
         raise HTTPException(status_code=404, detail="Documento no encontrado")
     asunto = await AsuntoRepository(db, current_user.firma_id).get_by_id(doc.asunto_id)
     if not asunto or not can_access_asunto(current_user, asunto):
         raise HTTPException(status_code=404, detail="Documento no encontrado")
-    updated = await repo.toggle_visibilidad(documento_id, compartido)
-    return updated
+    return await PublicacionService(db, current_user.firma_id).set_document_visibility(
+        doc, compartido
+    )
 
 @router.delete("/documentos/{documento_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_documento(
     documento_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_office_user),
+    current_user: User = Depends(require_roles("administrador", "abogado")),
 ):
     """
     Borrado lógico de documento (Soft Delete).
     """
     repo = DocumentoRepository(db, current_user.firma_id)
-    doc = await repo.get_by_id(documento_id)
+    doc = await repo.get_by_id_for_update(documento_id)
     if not doc:
         raise HTTPException(status_code=404, detail="Documento no encontrado")
     asunto = await AsuntoRepository(db, current_user.firma_id).get_by_id(doc.asunto_id)
     if not asunto or not can_access_asunto(current_user, asunto):
         raise HTTPException(status_code=404, detail="Documento no encontrado")
-    success = await repo.soft_delete(documento_id)
-    if not success:
-        raise HTTPException(status_code=404, detail="Documento no encontrado")
+    await PublicacionService(db, current_user.firma_id).archive_document(doc)
     return None

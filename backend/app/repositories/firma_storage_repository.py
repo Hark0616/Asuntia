@@ -11,11 +11,23 @@ class FirmaStorageRepository(BaseRepository[FirmaStorageConfig]):
     def __init__(self, session: AsyncSession, firma_id: uuid.UUID):
         super().__init__(model=FirmaStorageConfig, session=session, firma_id=firma_id)
 
-    async def get_config(self) -> Optional[FirmaStorageConfig]:
-        res = await self.session.execute(
-            select(FirmaStorageConfig).where(FirmaStorageConfig.firma_id == self.firma_id)
-        )
+    async def get_config(self, *, fresh: bool = False) -> Optional[FirmaStorageConfig]:
+        stmt = select(FirmaStorageConfig).where(FirmaStorageConfig.firma_id == self.firma_id)
+        if fresh:
+            stmt = stmt.execution_options(populate_existing=True)
+        res = await self.session.execute(stmt)
         return res.scalars().first()
+
+    async def stage_destination(self, provider: str, connection_id: uuid.UUID | None = None):
+        config = await self.get_config()
+        if config is None:
+            config = FirmaStorageConfig(firma_id=self.firma_id)
+        config.provider = provider
+        config.auth_type = "local" if provider == "local" else "oauth2"
+        config.connection_id = connection_id
+        config.is_active = True
+        self.session.add(config)
+        return config
 
     async def create_or_update_config(self, data: FirmaStorageConfigCreate) -> FirmaStorageConfig:
         config = await self.get_config()
@@ -28,6 +40,8 @@ class FirmaStorageRepository(BaseRepository[FirmaStorageConfig]):
         else:
             for field, val in data.model_dump(exclude_unset=True).items():
                 setattr(config, field, val)
+        if config.provider == "local":
+            config.connection_id = None
         await self.session.commit()
         await self.session.refresh(config)
         return config

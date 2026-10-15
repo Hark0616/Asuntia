@@ -1,7 +1,8 @@
 import uuid
+from datetime import datetime, timezone
 from typing import Any, Optional
 
-from sqlalchemy import select
+from sqlalchemy import func, select, update
 
 from app.models.user import User
 from app.repositories.base import BaseRepository
@@ -10,6 +11,25 @@ from app.repositories.base import BaseRepository
 class UserRepository(BaseRepository[User]):
     def __init__(self, session, firma_id: uuid.UUID):
         super().__init__(User, session, firma_id)
+
+    async def get_portal_identity_for_update(self, user_id: uuid.UUID) -> User | None:
+        """Incluye identidades retiradas para sincronizar el perfil sin reactivarlas."""
+        result = await self.session.execute(select(User).where(
+            User.id == user_id, User.firma_id == self.firma_id, User.rol == "cliente",
+        ).with_for_update(of=User).execution_options(populate_existing=True))
+        return result.scalars().first()
+
+    async def stage_sync_portal(self, user: User, changes: dict[str, Any], *, revoke: bool) -> None:
+        # Una corrección de contacto no invalida la sesión; correo/documento sí.
+        await self.session.execute(update(User).where(
+            User.id == user.id, User.firma_id == self.firma_id, User.rol == "cliente",
+        ).values(**changes, updated_at=datetime.now(timezone.utc) if revoke else User.updated_at))
+
+    async def get_active_identity(self, user_id: uuid.UUID) -> User | None:
+        result = await self.session.execute(select(User).where(
+            User.id == user_id, User.firma_id == self.firma_id, User.is_active.is_(True))
+            .execution_options(populate_existing=True))
+        return result.scalars().first()
 
     async def get_office_by_email(self, email: str) -> Optional[User]:
         stmt = (
@@ -21,6 +41,41 @@ class UserRepository(BaseRepository[User]):
         )
         result = await self.session.execute(stmt)
         return result.scalars().first()
+
+    async def get_office_member(self, user_id: uuid.UUID) -> User | None:
+        """Incluye bajas exclusivamente para la gestión del ciclo de vida."""
+        result = await self.session.execute(
+            select(User).where(User.id == user_id, User.firma_id == self.firma_id,
+                               User.rol.in_(("administrador", "abogado", "auxiliar")))
+            .execution_options(populate_existing=True)
+        )
+        return result.scalars().first()
+
+    async def find_office_identity(self, email: str, cedula: str) -> list[User]:
+        # Incluye inactivos: una reincorporación conserva la identidad histórica.
+        result = await self.session.execute(
+            select(User).where(User.firma_id == self.firma_id,
+                               User.rol.in_(("administrador", "abogado", "auxiliar")))
+        )
+        normalized = self.normalize_cedula(cedula)
+        return [user for user in result.scalars().all()
+                if user.email.strip().lower() == email.strip().lower()
+                or self.normalize_cedula(user.cedula) == normalized]
+
+    async def list_managed_members(self) -> list[User]:
+        result = await self.session.execute(
+            select(User).where(User.firma_id == self.firma_id,
+                               User.rol.in_(("administrador", "abogado", "auxiliar")))
+            .order_by(User.is_active.desc(), User.nombre, User.id)
+        )
+        return list(result.scalars().all())
+
+    async def count_administrators(self) -> int:
+        return int(await self.session.scalar(
+            select(func.count(User.id)).where(User.firma_id == self.firma_id,
+                                             User.is_active.is_(True),
+                                             User.rol == "administrador")
+        ))
 
     async def get_by_cedula(self, cedula: str) -> Optional[User]:
         normalized = self.normalize_cedula(cedula)
@@ -48,6 +103,16 @@ class UserRepository(BaseRepository[User]):
             .order_by(User.nombre.asc())
         )
         result = await self.session.execute(stmt)
+        return list(result.scalars().all())
+
+    async def list_office_members(self) -> list[User]:
+        result = await self.session.execute(
+            select(User)
+            .where(User.firma_id == self.firma_id)
+            .where(User.is_active == True)
+            .where(User.rol.in_(("administrador", "abogado", "auxiliar")))
+            .order_by(User.nombre.asc(), User.id.asc())
+        )
         return list(result.scalars().all())
 
     async def get_case_responsible(

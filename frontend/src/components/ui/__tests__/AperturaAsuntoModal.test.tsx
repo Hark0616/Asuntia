@@ -21,6 +21,7 @@ const clientes = [
     asuntos_count: 1,
     rol: 'cliente',
     created_at: '2026-07-29T12:00:00Z',
+    updated_at: '2026-07-29T12:00:00Z',
   },
   {
     id: 'cliente-2',
@@ -35,6 +36,7 @@ const clientes = [
     asuntos_count: 2,
     rol: 'cliente',
     created_at: '2026-07-29T12:00:00Z',
+    updated_at: '2026-07-29T12:00:00Z',
   },
 ];
 
@@ -61,6 +63,24 @@ const currentUser = {
 };
 
 describe('apertura de asuntos', () => {
+  it('exige título y permite elegir una guía y una referencia oficial sin pedir código interno', async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    render(<AperturaAsuntoModal isOpen clientes={clientes} responsables={responsables}
+      usuarioActual={currentUser} clienteInicialId="cliente-1" onClose={vi.fn()} onSubmit={onSubmit} />);
+    const submit = screen.getByRole('button', { name: 'Abrir asunto' });
+    expect(submit).toBeDisabled();
+    expect(screen.getByLabelText('Guía de trabajo')).toHaveValue('');
+    await user.type(screen.getByLabelText(/Título del asunto/i), 'Negociación de deudas');
+    await user.type(screen.getByLabelText('Radicado oficial'), 'RAD-2026-88');
+    await user.selectOptions(screen.getByLabelText('Guía de trabajo'), 'insolvencia_persona_natural:v2');
+    await user.click(submit);
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+      titulo: 'Negociación de deudas', radicado_oficial: 'RAD-2026-88', ruta_codigo: 'insolvencia_persona_natural:v2',
+    }));
+    expect(screen.queryByLabelText(/Código interno/i)).not.toBeInTheDocument();
+  });
+
   it('muestra primero el directorio y abre el asunto para el cliente seleccionado', async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();
@@ -87,12 +107,16 @@ describe('apertura de asuntos', () => {
     await user.click(
       screen.getByRole('radio', { name: /María Elena Pérez/i }),
     );
+    await user.type(screen.getByLabelText(/Título del asunto/i), 'Revisión de contrato');
     fireEvent.change(screen.getByLabelText(/Fecha de apertura/i), {
       target: { value: '2026-07-15' },
     });
     await user.click(screen.getByRole('button', { name: 'Abrir asunto' }));
 
     expect(onSubmit).toHaveBeenCalledWith({
+      titulo: 'Revisión de contrato',
+      radicado_oficial: undefined,
+      ruta_codigo: undefined,
       cliente_id: 'cliente-1',
       abogado_id: 'admin-1',
       fecha_apertura: '2026-07-15',
@@ -142,6 +166,7 @@ describe('apertura de asuntos', () => {
     );
 
     await user.click(screen.getByRole('tab', { name: /Cliente nuevo/i }));
+    await user.type(screen.getByLabelText(/Título del asunto/i), 'Asesoría comercial');
     await user.selectOptions(
       screen.getByLabelText(/Tipo de persona/i),
       'juridica',
@@ -181,6 +206,9 @@ describe('apertura de asuntos', () => {
     await user.click(screen.getByRole('button', { name: 'Abrir asunto' }));
 
     expect(onSubmit).toHaveBeenCalledWith({
+      titulo: 'Asesoría comercial',
+      radicado_oficial: undefined,
+      ruta_codigo: undefined,
       cliente_nuevo: expect.objectContaining({
         tipo_persona: 'juridica',
         tipo_documento: 'NIT',

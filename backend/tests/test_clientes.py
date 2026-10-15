@@ -165,7 +165,7 @@ async def test_client_remains_in_directory_after_case_is_archived(client):
 
     created_case = await client.post(
         "/api/v1/asuntos",
-        json={"cliente_id": client_id},
+        json={"titulo": "Expediente de prueba", "ruta_codigo": "insolvencia_persona_natural:v2", "cliente_id": client_id},
     )
     assert created_case.status_code == 201
     archived = await client.delete(

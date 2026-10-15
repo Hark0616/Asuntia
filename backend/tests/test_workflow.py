@@ -13,7 +13,7 @@ CLIENTE_CARLOS_ID = "00000000-0000-0000-0000-000000000020"
 async def create_case(client, suffix: str):
     response = await client.post(
         "/api/v1/asuntos",
-        json={
+        json={"titulo": "Expediente de prueba", "ruta_codigo": "insolvencia_persona_natural:v2",
             "radicado": f"TEST-FLUJO-{suffix}",
             "cliente_id": CLIENTE_CARLOS_ID,
         },
@@ -51,7 +51,7 @@ async def test_create_case_starts_with_seven_sequential_steps(client):
 async def test_create_case_assigns_an_internal_code_when_not_provided(client):
     response = await client.post(
         "/api/v1/asuntos",
-        json={"cliente_id": CLIENTE_CARLOS_ID},
+        json={"titulo": "Expediente de prueba", "ruta_codigo": "insolvencia_persona_natural:v2", "cliente_id": CLIENTE_CARLOS_ID},
     )
 
     assert response.status_code == 201, response.text
@@ -62,7 +62,7 @@ async def test_create_case_assigns_an_internal_code_when_not_provided(client):
 async def test_create_case_derives_the_initial_next_action_from_the_route(client):
     response = await client.post(
         "/api/v1/asuntos",
-        json={
+        json={"titulo": "Expediente de prueba", "ruta_codigo": "insolvencia_persona_natural:v2",
             "cliente_id": CLIENTE_CARLOS_ID,
             "fecha_apertura": "2026-07-15",
         },
@@ -125,6 +125,12 @@ async def test_workflow_validates_data_and_prevents_skipping(client):
 @pytest.mark.asyncio
 async def test_workflow_can_complete_all_steps(client):
     asunto = await create_case(client, uuid.uuid4().hex[:8])
+    cita = await client.post('/api/v1/citas', json={
+        'asunto_id': asunto['id'], 'operacion_id': str(uuid.uuid4()), 'tipo': 'audiencia',
+        'titulo': 'Audiencia inicial', 'inicio': '2026-08-05T09:00:00-05:00', 'fin': '2026-08-05T10:00:00-05:00',
+        'responsable_id': asunto['abogado_id'], 'enlace': 'https://meet.google.com/demo',
+    })
+    assert cita.status_code == 201, cita.text
     endpoint = f"/api/v1/asuntos/{asunto['id']}/flujo/avanzar"
     steps = [
         (
@@ -154,9 +160,7 @@ async def test_workflow_can_complete_all_steps(client):
         (
             "agendar_audiencia",
             {
-                "fecha_hora": "2026-08-05T09:00",
-                "modalidad": "virtual",
-                "enlace_o_lugar": "https://meet.google.com/demo",
+                "cita_id": cita.json()['id'],
             },
         ),
         ("audiencia_agendada", {"audiencia_realizada": True}),
@@ -187,6 +191,15 @@ async def test_workflow_can_complete_all_steps(client):
         json={"paso_codigo": "definicion", "datos": steps[-1][1]},
     )
     assert repeated.status_code == 409
+    draft_on_completed = await client.patch(
+        f"/api/v1/asuntos/{asunto['id']}/flujo/borrador",
+        json={
+            "paso_codigo": "definicion",
+            "datos": {"observaciones": "No debe alterar la historia."},
+            "expected_updated_at": body["pasos"][-1]["updated_at"],
+        },
+    )
+    assert draft_on_completed.status_code == 409
 
 
 @pytest.mark.asyncio
@@ -211,8 +224,8 @@ async def test_lawyer_cannot_advance_another_lawyers_work(alejandro_client):
             },
         },
     )
-    assert response.status_code == 403
-    assert response.json()["detail"] == "Esta tarea está asignada a otro responsable"
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Asunto no encontrado"
 
 
 @pytest.mark.asyncio
@@ -237,10 +250,10 @@ async def test_workflow_stops_when_viability_is_not_confirmed(client):
 @pytest.mark.asyncio
 async def test_create_case_rejects_duplicate_radicado(client):
     radicado = f"TEST-FLUJO-{uuid.uuid4().hex[:8]}"
-    payload = {"radicado": radicado, "cliente_id": CLIENTE_CARLOS_ID}
+    payload = {"titulo": "Colisión de código", "radicado": radicado, "cliente_id": CLIENTE_CARLOS_ID}
     assert (await client.post("/api/v1/asuntos", json=payload)).status_code == 201
     duplicate = await client.post("/api/v1/asuntos", json=payload)
-    assert duplicate.status_code == 400
+    assert duplicate.status_code == 409
 
 
 @pytest.mark.asyncio

@@ -11,13 +11,18 @@ import {
 
 import { Tooltip } from '@/components/ui/Tooltip';
 import { fetchMiTrabajo, type AlcanceTrabajo } from '../api/tareas';
+import { AgendaTrabajo } from './AgendaTrabajo';
+import { fechaTrabajo } from '../fechas';
+import './MiTrabajo.css';
 
 interface MiTrabajoProps {
   isAdmin: boolean;
+  isAuxiliar?: boolean;
 }
 
-export function MiTrabajo({ isAdmin }: MiTrabajoProps) {
-  const [alcance, setAlcance] = useState<AlcanceTrabajo>('mio');
+export function MiTrabajo({ isAdmin, isAuxiliar = false }: MiTrabajoProps) {
+  const [alcance, setAlcance] = useState<AlcanceTrabajo>(isAuxiliar ? 'equipo' : 'mio');
+  const [vista, setVista] = useState<'pendientes' | 'agenda'>('pendientes');
   const {
     data,
     error,
@@ -25,13 +30,14 @@ export function MiTrabajo({ isAdmin }: MiTrabajoProps) {
     isFetching,
     refetch,
   } = useQuery({
-    queryKey: ['tareas', 'mi-trabajo', alcance],
-    queryFn: () => fetchMiTrabajo(alcance),
+    queryKey: ['tareas', 'mi-trabajo', isAdmin ? alcance : 'mio'],
+    queryFn: () => fetchMiTrabajo(isAdmin ? alcance : 'mio'),
     staleTime: 30_000,
     refetchOnWindowFocus: true,
+    enabled: vista === 'pendientes',
   });
   const total = data?.total || 0;
-  const totalLabel = alcance === 'equipo'
+  const totalLabel = isAdmin && alcance === 'equipo'
     ? total === 1
       ? '1 pendiente del equipo.'
       : `${total} pendientes del equipo.`
@@ -43,13 +49,10 @@ export function MiTrabajo({ isAdmin }: MiTrabajoProps) {
     <div className="workbench">
       <div className="toolbar workbench-toolbar">
         <div>
-          <span className="page-eyebrow">Bandeja de trabajo</span>
           <h2>Mi trabajo</h2>
-          <p className="muted">
-            {isLoading ? 'Consultando trabajo…' : totalLabel}
-          </p>
+          {vista === 'pendientes' && <p className="muted">{isLoading ? 'Consultando trabajo…' : error && !data ? 'Bandeja no disponible.' : totalLabel}</p>}
         </div>
-        <button
+        {vista === 'pendientes' && <button
           className="secondary-button"
           type="button"
           onClick={() => refetch()}
@@ -57,10 +60,15 @@ export function MiTrabajo({ isAdmin }: MiTrabajoProps) {
         >
           <RefreshCw size={16} aria-hidden="true" />
           {isFetching ? 'Actualizando…' : 'Actualizar'}
-        </button>
+        </button>}
       </div>
 
-      {isAdmin && (
+      <div className="scope-tabs" role="group" aria-label="Vista de trabajo">
+        <button className={vista === 'pendientes' ? 'active' : ''} type="button" aria-pressed={vista === 'pendientes'} onClick={() => setVista('pendientes')}>Pendientes</button>
+        <button className={vista === 'agenda' ? 'active' : ''} type="button" aria-pressed={vista === 'agenda'} onClick={() => setVista('agenda')}>Agenda</button>
+      </div>
+
+      {(isAdmin || (isAuxiliar && vista === 'agenda')) && (
         <div className="scope-tabs" role="group" aria-label="Alcance del trabajo">
           <button
             className={alcance === 'mio' ? 'active' : ''}
@@ -76,10 +84,12 @@ export function MiTrabajo({ isAdmin }: MiTrabajoProps) {
             aria-pressed={alcance === 'equipo'}
             onClick={() => setAlcance('equipo')}
           >
-            Pendientes del equipo
+            Equipo
           </button>
         </div>
       )}
+
+      {vista === 'agenda' ? <AgendaTrabajo alcance={alcance} /> : <>
 
       {isLoading && (
         <div className="panel work-list" aria-label="Cargando trabajo">
@@ -117,7 +127,6 @@ export function MiTrabajo({ isAdmin }: MiTrabajoProps) {
           <BriefcaseBusiness size={24} aria-hidden="true" />
           <div>
             <h3>Sin tareas pendientes</h3>
-            <p className="muted small">No hay pasos abiertos en este momento.</p>
           </div>
         </div>
       )}
@@ -125,60 +134,59 @@ export function MiTrabajo({ isAdmin }: MiTrabajoProps) {
       {!isLoading && data && data.items.length > 0 && (
         <div className="panel work-list">
           {data.items.map((tarea) => (
-            <Link
-              className="work-item"
+            <div
+              className={`work-item-row${tarea.consecuencia ? ' has-tooltip' : ''}`}
               key={tarea.id}
-              to={`/oficina/asuntos/${tarea.asunto.id}#paso-activo`}
-              aria-label={`Abrir ${tarea.asunto.radicado}: ${tarea.titulo}`}
             >
-              <span className="work-item-status" aria-hidden="true" />
-              <span className="work-item-body">
-                <span className="work-item-context">
-                  <strong>{tarea.asunto.cliente.nombre}</strong>
-                  <span>{tarea.asunto.radicado}</span>
-                </span>
-                <strong className="work-item-title">{tarea.titulo}</strong>
-                <span className="muted work-item-instruction">
-                  {tarea.instruccion}
-                  {tarea.consecuencia && (
-                    <Tooltip content={tarea.consecuencia} />
+              <Link
+                className="work-item"
+                to={`/oficina/asuntos/${tarea.asunto.id}${tarea.tipo === 'completar_paso' ? '#paso-activo' : '#tareas-expediente'}`}
+                aria-label={`Abrir ${tarea.asunto.radicado}: ${tarea.titulo}`}
+              >
+                <span className="work-item-status" aria-hidden="true" />
+                <span className="work-item-body">
+                  <span className="work-item-context">
+                    <strong>{tarea.asunto.cliente.nombre}</strong>
+                    <span>{tarea.asunto.radicado}</span>
+                  </span>
+                  <strong className="work-item-title">{tarea.titulo}</strong>
+                  <span className="muted work-item-instruction">
+                    {tarea.instruccion}
+                  </span>
+                  {(tarea.prioridad === 'alta'
+                    || tarea.prioridad === 'urgente'
+                    || tarea.vence_en) && (
+                    <span className="work-item-meta">
+                      {(tarea.prioridad === 'alta' || tarea.prioridad === 'urgente') && (
+                        <span className={`badge ${tarea.prioridad === 'urgente' ? 'danger' : 'warning'}`}>
+                          Prioridad {tarea.prioridad}
+                        </span>
+                      )}
+                      {tarea.vence_en && (
+                        <span className="muted small">
+                          <CalendarClock size={14} aria-hidden="true" />
+                          Vence {fechaTrabajo(tarea.vence_en)}
+                        </span>
+                      )}
+                    </span>
+                  )}
+                  {alcance === 'equipo' && (
+                    <span className="muted small">
+                      Responsable · {tarea.responsable.nombre}
+                    </span>
                   )}
                 </span>
-                {(tarea.prioridad === 'alta'
-                  || tarea.prioridad === 'urgente'
-                  || tarea.vence_en) && (
-                  <span className="work-item-meta">
-                    {(tarea.prioridad === 'alta' || tarea.prioridad === 'urgente') && (
-                      <span className={`badge ${tarea.prioridad === 'urgente' ? 'danger' : 'warning'}`}>
-                        Prioridad {tarea.prioridad}
-                      </span>
-                    )}
-                    {tarea.vence_en && (
-                      <span className="muted small">
-                        <CalendarClock size={14} aria-hidden="true" />
-                        Vence {new Intl.DateTimeFormat('es-CO', {
-                          timeZone: 'America/Bogota',
-                          dateStyle: 'medium',
-                          timeStyle: 'short',
-                        }).format(new Date(tarea.vence_en))}
-                      </span>
-                    )}
-                  </span>
-                )}
-                {alcance === 'equipo' && (
-                  <span className="muted small">
-                    Responsable · {tarea.responsable.nombre}
-                  </span>
-                )}
-              </span>
-              <span className="work-item-action">
-                Abrir
-                <ArrowRight size={16} aria-hidden="true" />
-              </span>
-            </Link>
+                <span className="work-item-action">
+                  Abrir
+                  <ArrowRight size={16} aria-hidden="true" />
+                </span>
+              </Link>
+              {tarea.consecuencia && <Tooltip content={tarea.consecuencia} />}
+            </div>
           ))}
         </div>
       )}
+      </>}
     </div>
   );
 }

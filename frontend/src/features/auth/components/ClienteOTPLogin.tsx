@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
 import { ShieldCheck, Mail, ArrowRight, ExternalLink } from 'lucide-react';
-import { apiClient } from '@/lib/axios';
+import { mensajeAuth, solicitarOTPAPI, verificarOTPAPI } from '@/features/auth/api/auth';
 import type { User } from '@/types/api';
+import { FirmaAccesoField } from './FirmaAccesoField';
+import { Tooltip } from '@/components/ui/Tooltip';
 
 interface ClienteOTPLoginProps {
   onSuccess: (user: User) => void;
+  firmaSlug: string;
+  onFirmaChange: (value: string) => void;
 }
 
 const formatCedulaInput = (val: string): string => {
@@ -13,13 +17,14 @@ const formatCedulaInput = (val: string): string => {
   return digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 };
 
-export function ClienteOTPLogin({ onSuccess }: ClienteOTPLoginProps) {
+export function ClienteOTPLogin({ onSuccess, firmaSlug, onFirmaChange }: ClienteOTPLoginProps) {
   const isDevelopment = import.meta.env.DEV;
   const [step, setStep] = useState<'cedula' | 'otp'>('cedula');
-  const [cedula, setCedula] = useState('1.094.852.140');
-  const [code, setCode] = useState(isDevelopment ? '12345' : '');
+  const [cedula, setCedula] = useState('');
+  const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [expiresIn, setExpiresIn] = useState<number | null>(null);
 
   const handleCedulaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setCedula(formatCedulaInput(e.target.value));
@@ -27,16 +32,17 @@ export function ClienteOTPLogin({ onSuccess }: ClienteOTPLoginProps) {
 
   const handleSolicitarOTP = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!cedula.trim()) return;
+    if (loading || !cedula.trim() || !firmaSlug.trim()) return;
 
     setLoading(true);
     setError('');
 
     try {
-      await apiClient.post('/auth/otp/request', { cedula, firma_slug: 'demo' });
+      const result = await solicitarOTPAPI(firmaSlug, cedula);
+      setExpiresIn(result.expires_in_seconds);
       setStep('otp');
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Error de verificación.');
+    } catch (err: unknown) {
+      setError(mensajeAuth(err, 'Error de verificación.'));
     } finally {
       setLoading(false);
     }
@@ -44,20 +50,15 @@ export function ClienteOTPLogin({ onSuccess }: ClienteOTPLoginProps) {
 
   const handleVerificarOTP = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!code.trim()) return;
+    if (loading || !code.trim() || !firmaSlug.trim()) return;
 
     setLoading(true);
     setError('');
 
     try {
-      const response = await apiClient.post('/auth/otp/verify', {
-        cedula,
-        code,
-        firma_slug: 'demo',
-      });
-      onSuccess(response.data.user);
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Código incorrecto.');
+      onSuccess(await verificarOTPAPI(firmaSlug, cedula, code));
+    } catch (err: unknown) {
+      setError(mensajeAuth(err, 'Código incorrecto.'));
     } finally {
       setLoading(false);
     }
@@ -86,6 +87,7 @@ export function ClienteOTPLogin({ onSuccess }: ClienteOTPLoginProps) {
 
         {step === 'cedula' && (
           <form onSubmit={handleSolicitarOTP} className="stack">
+            <FirmaAccesoField value={firmaSlug} onChange={onFirmaChange} disabled={loading} />
             <div className="field">
               <label htmlFor="cedula" style={{ textAlign: 'left' }}>Cédula de ciudadanía</label>
               <input
@@ -116,19 +118,23 @@ export function ClienteOTPLogin({ onSuccess }: ClienteOTPLoginProps) {
           <form onSubmit={handleVerificarOTP} className="stack">
             <div className="badge warning" style={{ width: '100%', justifyContent: 'center', padding: '6px' }}>
               <Mail size={13} />
-              Código enviado al correo{isDevelopment ? ' (Local: 12345)' : ''}
+              Revisa tu correo
+              <Tooltip content="Si la firma y el documento coinciden con tu registro, enviaremos un código al correo registrado." />
             </div>
+            {expiresIn && <span className="muted small">El código vence en {Math.ceil(expiresIn / 60)} min.</span>}
 
             <div className="field" style={{ marginTop: '12px' }}>
               <label htmlFor="otp-code" style={{ textAlign: 'left' }}>Código de seguridad</label>
               <input
                 id="otp-code"
                 type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
                 maxLength={6}
                 required
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
-                placeholder="12345"
+                placeholder="Código recibido"
                 style={{ height: '48px', fontSize: '20px', textAlign: 'center', letterSpacing: '4px', fontWeight: 'bold' }}
               />
             </div>
@@ -142,6 +148,9 @@ export function ClienteOTPLogin({ onSuccess }: ClienteOTPLoginProps) {
               {loading ? 'Verificando...' : 'Ingresar'}
               <ShieldCheck size={16} />
             </button>
+            <button className="secondary-button" type="button" disabled={loading} onClick={() => {
+              setStep('cedula'); setCode(''); setError('');
+            }}>Cambiar firma o documento</button>
 
             {isDevelopment && (
               <div style={{ marginTop: '16px', borderTop: '1px dashed var(--line)', paddingTop: '12px' }}>

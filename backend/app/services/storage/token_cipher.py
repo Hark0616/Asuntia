@@ -24,4 +24,4 @@ class StorageTokenCipher:
         try:
             return self.fernet.decrypt(value.encode("ascii")).decode("utf-8")
         except InvalidToken as exc:
-            raise ValueError("No fue posible descifrar las credenciales de Google Drive") from exc
+            raise ValueError("No fue posible descifrar las credenciales de almacenamiento") from exc

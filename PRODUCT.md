@@ -6,7 +6,7 @@ product
 
 ## Users
 
-Asuntia tiene cinco perfiles principales:
+La visión de Asuntia contempla los siguientes perfiles. Su enumeración describe responsabilidades de producto, no certifica que todas las funciones estén implementadas. El núcleo vigente se centra en jefe de firma, abogado, auxiliar/secretaria y cliente; soporte técnico excepcional, finanzas y otras ampliaciones necesitan su especificación y autorización propias.
 
 - **Superadministrador técnico:** propietario o responsable técnico de la plataforma. Administra firmas, configuración global, soporte, pruebas y accesos de emergencia. Sus intervenciones deben quedar justificadas y auditadas.
 - **Administrador de la firma:** dirige la operación de una oficina, administra su equipo, permisos, asuntos, finanzas y configuración propia.
@@ -18,13 +18,17 @@ Los usuarios internos trabajan principalmente en escritorio y necesitan densidad
 
 ## Product Purpose
 
-Asuntia es una herramienta operativa para gestionar asuntos jurídicos de una firma, con alcance inicial centrado en insolvencia de personas naturales y pequeñas comerciantes en Colombia.
+Asuntia es una herramienta operativa para gestionar asuntos jurídicos de una firma. El expediente compartido es su núcleo general; insolvencia es una especialización que puede aportar una guía de trabajo, sin ser requisito para abrir o gestionar cualquier asunto.
 
 Su propósito es convertir información dispersa entre WhatsApp, hojas de cálculo, carpetas y notas en un expediente único, verificable y accionable. Debe ayudar al equipo a controlar términos, documentos, actuaciones, acreencias, pagos, comunicaciones y responsabilidades, y permitir al cliente comprender el estado de su asunto sin crear falsas expectativas.
 
 El producto tiene éxito cuando cada usuario sabe qué requiere atención, puede encontrar la evidencia correcta rápidamente y ninguna decisión importante depende de memoria, búsquedas en chats o datos duplicados.
 
-La promesa visible prioritaria es que el cliente pueda saber cómo avanza su asunto sin llamar o escribir repetidamente al despacho. La información que el equipo ya genera al trabajar debe convertirse, sin una segunda digitación, en una vista sencilla y actualizada para el cliente, siempre que haya sido validada y autorizada para publicación.
+La prioridad es facilitar el trabajo diario dentro de un expediente compartido: los abogados actualizan sus asuntos, la auxiliar captura información y ejecuta tareas delegadas, y la dirección consulta el conjunto, asigna responsables y ayuda a resolver pendientes. Documentos, actividad, fechas y tareas se relacionan con el mismo asunto, sin volver a capturar información para cada vista.
+
+El cliente consulta una selección autorizada de ese trabajo. Publicar un avance conserva la nota original y su autoría; la vista del cliente se actualiza sin mantener una segunda historia del expediente. La agenda se alimenta de las fechas existentes y la bandeja muestra el trabajo asignado.
+
+La dirección vigente es construir un producto duradero mediante entregas completas, con datos y permisos reales, migraciones compatibles, recuperación de errores y verificación. La prioridad está en [la base y el checklist del producto](docs/CHECKLIST_PRODUCTO_2026-10-14.md). Una entrega pequeña no reduce esos requisitos. Versionado documental y ampliaciones como IA o sincronización externa no forman parte automática de esta decisión de calidad.
 
 ## Brand Personality
 
@@ -56,4 +60,4 @@ La interfaz debe transmitir control profesional y calma. El tono es directo, res
 
 ## Accessibility & Inclusion
 
-La accesibilidad formal no es un criterio de salida prioritario durante esta etapa de definición. Aun así, la experiencia debe conservar legibilidad, contraste suficiente, navegación comprensible, objetivos táctiles cómodos, mensajes que no dependan solo del color y adaptación estructural entre móvil y escritorio. Estas decisiones son parte de un UX coherente y reducen retrabajo futuro.
+La accesibilidad es un criterio de calidad de cada recorrido: legibilidad, contraste verificado, navegación por teclado, foco visible y restaurado, etiquetas y errores accesibles, objetivos táctiles cómodos, mensajes que no dependan solo del color y adaptación entre móvil y escritorio. Se comprueba con pruebas automáticas y revisión manual de los recorridos; no se declara conformidad normativa sin evaluarla. El minimalismo debe facilitar encontrar y usar las herramientas, preservando las instrucciones operativas necesarias.

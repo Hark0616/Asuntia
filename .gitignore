@@ -33,3 +33,6 @@ postgres_data/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Runtime descargable de la skill (se instala con su launcher)
+.agents/skills/impeccable/scripts/bin/

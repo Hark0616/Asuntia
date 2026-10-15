@@ -283,6 +283,8 @@ async def seed_data():
         asunto1 = Asunto(
             id=uuid.UUID("00000000-0000-0000-0000-000000000201"),
             firma_id=DEFAULT_FIRMA_ID,
+            titulo="Insolvencia Persona Natural",
+            paso_actual=1, flujo_estado="activo",
             radicado="AS-2026-001",
             cliente_id=cliente_carlos.id,
             abogado_id=abogada_daniela.id,
@@ -295,6 +297,8 @@ async def seed_data():
         asunto2 = Asunto(
             id=uuid.UUID("00000000-0000-0000-0000-000000000202"),
             firma_id=DEFAULT_FIRMA_ID,
+            titulo="Insolvencia Persona Natural",
+            paso_actual=1, flujo_estado="activo",
             radicado="AS-2026-002",
             cliente_id=cliente_transportes.id,
             abogado_id=abogado_alejandro.id,
@@ -307,6 +311,8 @@ async def seed_data():
         asunto3 = Asunto(
             id=uuid.UUID("00000000-0000-0000-0000-000000000203"),
             firma_id=DEFAULT_FIRMA_ID,
+            titulo="Insolvencia Persona Natural",
+            paso_actual=1, flujo_estado="activo",
             radicado="AS-2026-003",
             cliente_id=cliente_elena.id,
             abogado_id=abogada_daniela.id,
@@ -319,6 +325,8 @@ async def seed_data():
         asunto4 = Asunto(
             id=uuid.UUID("00000000-0000-0000-0000-000000000204"),
             firma_id=DEFAULT_FIRMA_ID,
+            titulo="Insolvencia Persona Natural",
+            paso_actual=1, flujo_estado="activo",
             radicado="AS-2026-004",
             cliente_id=cliente_jorge.id,
             abogado_id=abogado_alejandro.id,

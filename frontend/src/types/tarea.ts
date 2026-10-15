@@ -37,3 +37,43 @@ export interface MiTrabajoResponse {
   items: Tarea[];
   total: number;
 }
+
+export interface MiembroEquipo extends TareaPersonaResumen {
+  rol: 'administrador' | 'abogado' | 'auxiliar';
+}
+
+export interface TareaCreate {
+  asunto_id: string;
+  titulo: string;
+  instruccion: string;
+  responsable_id: string;
+  prioridad: TareaPrioridad;
+  vence_en: string | null;
+}
+
+export interface TareaUpdate {
+  expected_updated_at: string;
+  titulo?: string;
+  instruccion?: string;
+  responsable_id?: string;
+  prioridad?: TareaPrioridad;
+  vence_en?: string | null;
+  estado?: TareaEstado;
+}
+
+export interface AgendaItem {
+  id: string;
+  origen: 'tarea' | 'cita';
+  titulo: string;
+  fecha: string;
+  fin?: string | null;
+  zona_horaria?: string | null;
+  cita_id?: string | null;
+  asunto: TareaAsuntoResumen;
+  responsable: TareaPersonaResumen;
+}
+
+export interface AgendaResponse {
+  items: AgendaItem[];
+  total: number;
+}

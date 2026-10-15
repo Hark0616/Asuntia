@@ -1,5 +1,7 @@
 import uuid
+from datetime import date, datetime
 from typing import Any
+from urllib.parse import urlsplit
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,6 +12,8 @@ from app.repositories.asunto_repository import AsuntoRepository
 from app.repositories.novedad_repository import NovedadRepository
 from app.repositories.paso_repository import PasoRepository
 from app.repositories.tarea_repository import TareaRepository
+from app.repositories.cita_repository import CitaRepository
+from app.services.office_lock import lock_office_actor
 
 
 RUTA_INSOLVENCIA_PERSONA_NATURAL: list[dict[str, Any]] = [
@@ -54,14 +58,9 @@ RUTA_INSOLVENCIA_PERSONA_NATURAL: list[dict[str, Any]] = [
         "orden": 4,
         "codigo": "agendar_audiencia",
         "titulo": "Agendar audiencia",
-        "descripcion": "Define fecha, hora y medio de la audiencia.",
+        "descripcion": "Selecciona una audiencia registrada en las citas del expediente.",
         "campos": [
-            {"clave": "fecha_hora", "etiqueta": "Fecha y hora", "tipo": "datetime", "requerido": True},
-            {"clave": "modalidad", "etiqueta": "Modalidad", "tipo": "select", "requerido": True, "opciones": [
-                {"valor": "virtual", "etiqueta": "Virtual"},
-                {"valor": "presencial", "etiqueta": "Presencial"},
-            ]},
-            {"clave": "enlace_o_lugar", "etiqueta": "Enlace o lugar", "tipo": "text", "requerido": True},
+            {"clave": "cita_id", "etiqueta": "Audiencia del expediente", "tipo": "cita", "requerido": True},
         ],
     },
     {
@@ -115,13 +114,125 @@ def initial_workflow_steps() -> list[dict[str, Any]]:
 
 class WorkflowService:
     def __init__(self, session: AsyncSession, firma_id: uuid.UUID):
+        self.session = session
+        self.firma_id = firma_id
         self.asuntos = AsuntoRepository(session, firma_id)
         self.novedades = NovedadRepository(session, firma_id)
         self.pasos = PasoRepository(session, firma_id)
         self.tareas = TareaRepository(session, firma_id)
 
     @staticmethod
+    def _merge_step_data(step: AsuntoPaso, supplied: dict[str, Any]) -> dict[str, Any]:
+        """Valida una captura parcial; null retira el valor previamente guardado."""
+        fields = {field["clave"]: field for field in step.campos}
+        if set(supplied) - fields.keys():
+            raise DomainException(detail="La captura contiene campos ajenos al paso", status_code=422)
+        merged = dict(step.datos)
+        for key, value in supplied.items():
+            if value is None:
+                merged.pop(key, None)
+                continue
+            field = fields[key]
+            kind = field["tipo"]
+            if kind == "boolean":
+                if not isinstance(value, bool):
+                    raise DomainException(detail=f"El campo '{field['etiqueta']}' debe ser verdadero o falso")
+            elif not isinstance(value, str):
+                raise DomainException(detail=f"El campo '{field['etiqueta']}' debe ser texto")
+            elif value.strip():
+                if kind == "select" and value not in {option["valor"] for option in field.get("opciones", [])}:
+                    raise DomainException(detail=f"Valor inválido para '{field['etiqueta']}'")
+                if kind in {"date", "datetime"}:
+                    try:
+                        if kind == "date":
+                            parsed = date.fromisoformat(value)
+                            if parsed.isoformat() != value:
+                                raise ValueError
+                        else:
+                            if "T" not in value:
+                                raise ValueError
+                            datetime.fromisoformat(value)
+                    except ValueError:
+                        raise DomainException(detail=f"Fecha inválida para '{field['etiqueta']}'")
+                if kind == "url":
+                    try:
+                        url = urlsplit(value)
+                        valid_url = url.scheme in {"http", "https"} and bool(url.hostname)
+                    except ValueError:
+                        valid_url = False
+                    if not valid_url:
+                        raise DomainException(detail=f"Enlace inválido para '{field['etiqueta']}'")
+                if kind == "cita":
+                    try:
+                        value = str(uuid.UUID(value))
+                    except ValueError:
+                        raise DomainException(detail="Selecciona una audiencia válida", status_code=422)
+            merged[key] = value
+        return merged
+
+    @staticmethod
+    def _check_version(step: AsuntoPaso, expected_updated_at: datetime | None) -> None:
+        if expected_updated_at is not None and step.updated_at != expected_updated_at:
+            raise DomainException(
+                detail="El paso cambió desde que lo abriste. Revisa los datos guardados antes de continuar.",
+                status_code=409,
+            )
+
+    async def _get_active_step(
+        self, asunto_id: uuid.UUID, paso_codigo: str, user_id: uuid.UUID, user_role: str,
+    ) -> tuple[Asunto, AsuntoPaso]:
+        await lock_office_actor(self.session, self.firma_id, user_id, user_role)
+        asunto = await self.asuntos.get_by_id_for_update(asunto_id)
+        if not asunto or (user_role == "abogado" and asunto.abogado_id != user_id):
+            raise NotFoundException(detail="Asunto no encontrado")
+        if user_role not in {"administrador", "abogado", "auxiliar"}:
+            raise ForbiddenException(detail="No puedes capturar datos en este asunto")
+        if asunto.flujo_estado == "completado":
+            raise DomainException(detail="El flujo del asunto ya está completado", status_code=409)
+        current = await self.pasos.get_current_for_update(asunto_id)
+        if not current:
+            raise DomainException(detail="El asunto no tiene un paso activo", status_code=409)
+        if current.codigo != paso_codigo:
+            raise DomainException(detail=f"El paso activo es '{current.titulo}'", status_code=409)
+        return asunto, current
+
+    async def save_draft(
+        self, asunto_id: uuid.UUID, paso_codigo: str, data: dict[str, Any],
+        user_id: uuid.UUID, user_role: str, expected_updated_at: datetime,
+    ) -> Asunto:
+        asunto, current = await self._get_active_step(asunto_id, paso_codigo, user_id, user_role)
+        self._check_version(current, expected_updated_at)
+        merged = self._merge_asunto_step_data(asunto, current, data)
+        await self._validate_cita(asunto, current, merged)
+        return await self.pasos.save_draft(current, merged)
+
+    async def _validate_cita(self, asunto, step, data):
+        if step.codigo != "agendar_audiencia" or not data.get("cita_id"):
+            return
+        cita = await CitaRepository(self.session, self.firma_id).get_detail(uuid.UUID(data["cita_id"]), lock=True)
+        if not cita or cita.asunto_id != asunto.id:
+            raise NotFoundException(detail="Audiencia no encontrada en este asunto")
+        if cita.tipo != "audiencia" or cita.estado != "programada":
+            raise DomainException(detail="Selecciona una audiencia programada", status_code=409)
+
+    @staticmethod
+    def _merge_asunto_step_data(asunto: Asunto, step: AsuntoPaso, data: dict[str, Any]) -> dict[str, Any]:
+        merged = WorkflowService._merge_step_data(step, data)
+        if step.codigo == "radicacion":
+            if asunto.radicado_oficial:
+                if "radicado_oficial" in data and merged.get("radicado_oficial") != asunto.radicado_oficial:
+                    raise DomainException(detail="El radicado oficial ya está registrado en el expediente", status_code=409)
+                merged["radicado_oficial"] = asunto.radicado_oficial
+            if len(merged.get("radicado_oficial", "").strip()) > 100:
+                raise DomainException(detail="El radicado oficial admite hasta 100 caracteres", status_code=422)
+        return merged
+
+    @staticmethod
     def _validate_step_data(step: AsuntoPaso, data: dict[str, Any]) -> None:
+        # También valida capturas previas antes de convertirlas en un paso completado.
+        # La captura histórica migrada y las instantáneas del servidor no son campos editables.
+        WorkflowService._merge_step_data(step, {key: value for key, value in data.items()
+                                               if key in {field["clave"] for field in step.campos}})
         for field in step.campos:
             key = field["clave"]
             value = data.get(key)
@@ -169,23 +280,19 @@ class WorkflowService:
         data: dict[str, Any],
         user_id: uuid.UUID,
         user_role: str,
+        expected_updated_at: datetime | None = None,
     ) -> Asunto:
-        asunto = await self.asuntos.get_by_id(asunto_id)
-        if not asunto:
-            raise NotFoundException(detail="Asunto no encontrado")
-        if asunto.flujo_estado == "completado":
-            raise DomainException(detail="El flujo del asunto ya está completado", status_code=409)
-
-        current = await self.pasos.get_current_for_update(asunto_id)
-        if not current:
-            raise DomainException(detail="El asunto no tiene un paso activo", status_code=409)
-        if current.codigo != paso_codigo:
-            raise DomainException(
-                detail=f"El paso activo es '{current.titulo}'",
-                status_code=409,
-            )
-
+        if user_role not in {"administrador", "abogado"}:
+            raise ForbiddenException(detail="Solo el abogado responsable o administrador puede completar el paso")
+        asunto, current = await self._get_active_step(asunto_id, paso_codigo, user_id, user_role)
+        self._check_version(current, expected_updated_at)
+        data = self._merge_asunto_step_data(asunto, current, data)
         self._validate_step_data(current, data)
+        await self._validate_cita(asunto, current, data)
+        if current.codigo == "agendar_audiencia":
+            from app.services.cita_service import CitaService
+            cita = await CitaRepository(self.session, self.firma_id).get_detail(uuid.UUID(data["cita_id"]))
+            data["cita_snapshot"] = CitaService.snapshot(cita)
         next_step = await self.pasos.get_by_order(asunto_id, current.orden + 1)
         current_task = await self.tareas.get_open_for_step_for_update(
             asunto_id, current.id

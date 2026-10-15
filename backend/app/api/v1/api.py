@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 from app.api.v1.endpoints import (
     asuntos,
+    citas,
     auth,
     clientes,
     documentos,
@@ -9,7 +10,9 @@ from app.api.v1.endpoints import (
     firma_storage,
     novedades,
     oauth_storage,
+    portal,
     tareas,
+    storage,
 )
 
 api_router = APIRouter()
@@ -23,4 +26,7 @@ api_router.include_router(equipo.router, prefix="/equipo", tags=["Equipo"])
 api_router.include_router(firma_storage.router, prefix="/firma/storage", tags=["Configuración Almacenamiento Firma"])
 api_router.include_router(oauth_storage.router, prefix="/storage", tags=["OAuth2 Almacenamiento"])
 api_router.include_router(documentos.router, tags=["Gestión Documental"])
+api_router.include_router(storage.router, tags=["Almacenamiento conectado"])
 api_router.include_router(tareas.router, prefix="/tareas", tags=["Trabajo"])
+api_router.include_router(citas.router, prefix="/citas", tags=["Citas"])
+api_router.include_router(portal.router, prefix="/portal", tags=["Portal del cliente"])

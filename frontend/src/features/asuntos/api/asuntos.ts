@@ -1,4 +1,8 @@
 import { apiClient } from '@/lib/axios';
+import type { AsuntoPortalAPI } from '@/types/portal';
+import type { Novedad } from '@/types/api';
+import type { AsuntoAPI, AsuntoDatosUpdatePayload, AsuntosFiltros, AsuntosPaginaAPI, RutaCodigo } from '@/types/asunto';
+export type { AsuntoAPI } from '@/types/asunto';
 
 export interface EstadoProcesalAPI {
   id: string;
@@ -15,20 +19,21 @@ export interface ClienteAPI {
   nombre: string;
   cedula: string;
   email: string;
-  telefono?: string;
-  fecha_expedicion?: string;
-  direccion?: string;
-  direccion_notificacion?: string;
-  ciudad?: string;
-  departamento?: string;
+  telefono?: string | null;
+  fecha_expedicion?: string | null;
+  direccion?: string | null;
+  direccion_notificacion?: string | null;
+  ciudad?: string | null;
+  departamento?: string | null;
   canal_preferido: 'email' | 'telefono' | 'whatsapp';
-  observaciones?: string;
+  observaciones?: string | null;
   portal_user_id?: string;
   responsable_id?: string;
   portal_habilitado: boolean;
   asuntos_count: number;
   rol: string;
   created_at: string;
+  updated_at: string;
 }
 
 export interface ClienteCreatePayload {
@@ -55,6 +60,9 @@ export interface ResponsableAPI {
 }
 
 export interface AperturaAsuntoPayload {
+  titulo: string;
+  radicado_oficial?: string;
+  ruta_codigo?: RutaCodigo;
   cliente_id?: string;
   cliente_nuevo?: ClienteCreatePayload;
   abogado_id: string;
@@ -64,7 +72,7 @@ export interface AperturaAsuntoPayload {
 export interface PasoCampoAPI {
   clave: string;
   etiqueta: string;
-  tipo: 'text' | 'textarea' | 'date' | 'datetime' | 'url' | 'select' | 'boolean';
+  tipo: 'text' | 'textarea' | 'date' | 'datetime' | 'url' | 'select' | 'boolean' | 'cita';
   requerido: boolean;
   opciones: Array<{ valor: string; etiqueta: string }>;
 }
@@ -78,40 +86,23 @@ export interface AsuntoPasoAPI {
   estado: 'bloqueado' | 'activo' | 'completado';
   campos: PasoCampoAPI[];
   datos: Record<string, unknown>;
+  updated_at?: string;
   completed_at?: string | null;
   completed_by_id?: string | null;
 }
 
-export interface AsuntoAPI {
-  id: string;
-  radicado: string;
-  fecha_apertura: string;
-  etapa_actual: string;
-  siguiente_paso: string;
-  ruta_codigo: string;
-  paso_actual: number;
-  flujo_estado: 'activo' | 'completado';
-  cliente_id: string;
-  abogado_id?: string;
-  estado?: EstadoProcesalAPI;
-  novedades: Array<{
-    id: string;
-    asunto_id: string;
-    asunto_paso_id?: string;
-    documento_id?: string;
-    tipo: 'nota' | 'paso_completado' | 'documento_incorporado';
-    titulo: string;
-    descripcion: string;
-    publicado_al_cliente: boolean;
-    created_at: string;
-  }>;
-  pasos: AsuntoPasoAPI[];
-  created_at: string;
-  updated_at: string;
-}
-
 export const fetchAsuntos = async (): Promise<AsuntoAPI[]> => {
   const response = await apiClient.get<AsuntoAPI[]>('/asuntos');
+  return response.data;
+};
+
+export const buscarAsuntosAPI = async (params: AsuntosFiltros): Promise<AsuntosPaginaAPI> => {
+  const response = await apiClient.get<AsuntosPaginaAPI>('/asuntos/busqueda', { params });
+  return response.data;
+};
+
+export const fetchAsuntosPortalAPI = async (): Promise<AsuntoPortalAPI[]> => {
+  const response = await apiClient.get<AsuntoPortalAPI[]>('/portal/asuntos');
   return response.data;
 };
 
@@ -137,8 +128,22 @@ export const crearClienteAPI = async (payload: ClienteCreatePayload) => {
   return response.data;
 };
 
-export const crearAsuntoAPI = async (payload: { radicado?: string; cliente_id: string; abogado_id?: string; estado_id?: string; fecha_apertura?: string }) => {
+export const crearAsuntoAPI = async (payload: { titulo: string; codigo_interno?: string; radicado_oficial?: string; ruta_codigo?: RutaCodigo; cliente_id: string; abogado_id?: string; estado_id?: string; fecha_apertura?: string }) => {
   const response = await apiClient.post<AsuntoAPI>('/asuntos', payload);
+  return response.data;
+};
+
+export const fetchAsunto = async (asuntoId: string): Promise<AsuntoAPI> => {
+  const response = await apiClient.get<AsuntoAPI>(`/asuntos/id/${asuntoId}`);
+  return response.data;
+};
+
+export const actualizarDatosAsuntoAPI = async (asuntoId: string, payload: AsuntoDatosUpdatePayload): Promise<AsuntoAPI> => {
+  return (await apiClient.patch<AsuntoAPI>(`/asuntos/${asuntoId}/datos`, payload)).data;
+};
+
+export const incorporarGuiaAPI = async (asuntoId: string, rutaCodigo: RutaCodigo) => {
+  const response = await apiClient.post<AsuntoAPI>(`/asuntos/${asuntoId}/guia`, { ruta_codigo: rutaCodigo });
   return response.data;
 };
 
@@ -149,7 +154,7 @@ export const abrirAsuntoAPI = async (payload: AperturaAsuntoPayload) => {
 
 export const avanzarPasoAPI = async (
   asuntoId: string,
-  payload: { paso_codigo: string; datos: Record<string, unknown> },
+  payload: { paso_codigo: string; datos: Record<string, unknown>; expected_updated_at?: string },
 ) => {
   const response = await apiClient.post<AsuntoAPI>(`/asuntos/${asuntoId}/flujo/avanzar`, payload);
   return response.data;
@@ -160,7 +165,23 @@ export const crearNovedadAPI = async (asuntoId: string, payload: { titulo: strin
   return response.data;
 };
 
-export const actualizarEstadoAPI = async (asuntoId: string, payload: { estado_id?: string }) => {
+export const guardarBorradorPasoAPI = async (
+  asuntoId: string,
+  payload: { paso_codigo: string; datos: Record<string, unknown>; expected_updated_at: string },
+) => {
+  const response = await apiClient.patch<AsuntoAPI>(`/asuntos/${asuntoId}/flujo/borrador`, payload);
+  return response.data;
+};
+
+export const actualizarVisibilidadNovedadAPI = async (
+  novedadId: string,
+  payload: { publicado_al_cliente: boolean },
+) => {
+  const response = await apiClient.patch<Novedad>(`/novedades/${novedadId}/visibilidad`, payload);
+  return response.data;
+};
+
+export const actualizarEstadoAPI = async (asuntoId: string, payload: { estado_id?: string | null }) => {
   const response = await apiClient.patch(`/asuntos/${asuntoId}/estado`, payload);
   return response.data;
 };

@@ -1,4 +1,15 @@
 services:
+  redis:
+    image: redis:7-alpine
+    restart: always
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   db:
     image: postgres:16-alpine
     container_name: asuntia_db
@@ -49,7 +60,7 @@ services:
       dockerfile: Dockerfile
     container_name: asuntia_backend
     restart: always
-    environment:
+    environment: &backend_environment
       - DATABASE_URL=postgresql+asyncpg://asuntia:asuntia_dev@db:5432/asuntia_db
       - SMTP_HOST=mailpit
       - SMTP_PORT=1025
@@ -59,6 +70,10 @@ services:
       - GOOGLE_OAUTH_REDIRECT_URI=${GOOGLE_OAUTH_REDIRECT_URI:-http://127.0.0.1:8000/api/v1/storage/oauth-callback}
       - STORAGE_TOKEN_ENCRYPTION_KEY=${STORAGE_TOKEN_ENCRYPTION_KEY:-}
       - FRONTEND_URL=${FRONTEND_URL:-http://127.0.0.1:5173}
+      - MICROSOFT_CLIENT_ID=${MICROSOFT_CLIENT_ID:-}
+      - MICROSOFT_CLIENT_SECRET=${MICROSOFT_CLIENT_SECRET:-}
+      - MICROSOFT_OAUTH_REDIRECT_URI=${MICROSOFT_OAUTH_REDIRECT_URI:-http://127.0.0.1:8000/api/v1/storage/onedrive/callback}
+      - REDIS_URL=redis://redis:6379/0
     ports:
       - "8000:8000"
     volumes:
@@ -74,6 +89,21 @@ services:
         condition: service_completed_successfully
       mailpit:
         condition: service_started
+
+  storage-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: always
+    command: ["arq", "app.workers.storage.WorkerSettings"]
+    environment: *backend_environment
+    volumes:
+      - asuntia_storage:/app/storage
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
 
 volumes:
   postgres_data:

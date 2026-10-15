@@ -1,13 +1,19 @@
 import uuid
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, StrictBool
 from typing import Optional
 from app.schemas.base import BaseSchemaResponse
 
 class NovedadCreate(BaseModel):
     titulo: str
     descripcion: str
-    publicado_al_cliente: bool = True
+    publicado_al_cliente: bool = False
+
+
+class NovedadVisibilidadUpdate(BaseModel):
+    publicado_al_cliente: StrictBool
+
+    model_config = ConfigDict(extra="forbid")
 
 class NovedadResponse(BaseSchemaResponse):
     id: uuid.UUID

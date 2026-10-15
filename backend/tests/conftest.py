@@ -1,4 +1,5 @@
 import asyncpg
+import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -9,16 +10,48 @@ import app.seed as seed_module
 from app.core.db import get_db
 from app.main import app
 from app.models.base import Base
+from app.config import settings
+from app.api.v1.endpoints import auth as auth_endpoints
+
+
+@pytest.fixture(scope="session")
+def isolated_storage_root(tmp_path_factory):
+    return tmp_path_factory.mktemp("asuntia-private-storage")
+
+
+@pytest.fixture(autouse=True)
+def storage_test_root(monkeypatch, isolated_storage_root):
+    # La BD de pruebas comparte expedientes durante la sesión, al igual que su
+    # raíz temporal. Nunca escribir documentos sintéticos en el storage real.
+    monkeypatch.setattr(settings, "LOCAL_STORAGE_PATH", str(isolated_storage_root))
+
+
+@pytest.fixture(autouse=True)
+def auth_test_budgets(monkeypatch):
+    # Los recorridos de negocio reutilizan identidades seed; las pruebas de abuso
+    # fijan presupuestos pequeños en firmas aisladas dentro de cada caso.
+    for name in ("AUTH_LOGIN_LIMIT", "AUTH_OTP_REQUEST_LIMIT", "AUTH_VERIFY_LIMIT",
+                 "AUTH_RECOVERY_REQUEST_LIMIT", "AUTH_IP_LIMIT"):
+        monkeypatch.setattr(settings, name, 10000)
+    monkeypatch.setattr(settings, "AUTH_MIN_RESPONSE_SECONDS", 0)
+
+    async def capture_only(*args):
+        return True
+
+    # Ninguna prueba de negocio manda correo. El transporte tiene pruebas propias.
+    monkeypatch.setattr(auth_endpoints, "send_otp_email", capture_only)
+    monkeypatch.setattr(auth_endpoints, "send_password_reset_email", capture_only)
+    monkeypatch.setattr(auth_endpoints, "send_password_changed_email", capture_only)
 
 
 TEST_DATABASE_NAME = "asuntia_test"
 TEST_DATABASE_URL = (
-    f"postgresql+asyncpg://asuntia:asuntia_dev@localhost:5432/{TEST_DATABASE_NAME}"
+    f"postgresql+asyncpg://asuntia:asuntia_dev@127.0.0.1:5432/{TEST_DATABASE_NAME}"
 )
 
 engine = create_async_engine(TEST_DATABASE_URL, poolclass=NullPool)
 TestingSessionLocal = async_sessionmaker(
-    engine, expire_on_commit=False, class_=AsyncSession
+    engine, expire_on_commit=False, autoflush=False, class_=AsyncSession
 )
 
 
@@ -41,7 +74,7 @@ async def prepare_test_database():
     admin_connection = await asyncpg.connect(
         user="asuntia",
         password="asuntia_dev",
-        host="localhost",
+        host="127.0.0.1",
         port=5432,
         database="postgres",
     )

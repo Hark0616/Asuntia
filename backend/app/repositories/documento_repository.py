@@ -8,6 +8,34 @@ class DocumentoRepository(BaseRepository[DocumentoAsunto]):
     def __init__(self, session, firma_id: uuid.UUID):
         super().__init__(DocumentoAsunto, session, firma_id)
 
+    async def get_by_id_for_update(self, documento_id: uuid.UUID) -> Optional[DocumentoAsunto]:
+        stmt = (
+            select(DocumentoAsunto)
+            .where(DocumentoAsunto.id == documento_id)
+            .where(DocumentoAsunto.firma_id == self.firma_id)
+            .where(DocumentoAsunto.is_active == True)
+            .with_for_update(of=DocumentoAsunto)
+            .execution_options(populate_existing=True)
+        )
+        result = await self.session.execute(stmt)
+        return result.scalars().first()
+
+    def stage_visibility(self, documento: DocumentoAsunto, compartido: bool) -> None:
+        documento.compartido_con_cliente = compartido
+        self.session.add(documento)
+
+    def stage_archive(self, documento: DocumentoAsunto) -> None:
+        documento.is_active = False
+        documento.compartido_con_cliente = False
+        self.session.add(documento)
+
+    async def find_remote(self, asunto_id: uuid.UUID, connection_id: uuid.UUID, item_id: str):
+        result = await self.session.execute(select(DocumentoAsunto).where(
+            DocumentoAsunto.firma_id == self.firma_id, DocumentoAsunto.is_active.is_(True),
+            DocumentoAsunto.asunto_id == asunto_id, DocumentoAsunto.storage_connection_id == connection_id,
+            DocumentoAsunto.external_file_id == item_id))
+        return result.scalars().first()
+
     async def stage_create(
         self,
         data: dict[str, Any],
@@ -34,12 +62,3 @@ class DocumentoRepository(BaseRepository[DocumentoAsunto]):
         stmt = stmt.order_by(DocumentoAsunto.created_at.desc())
         result = await self.session.execute(stmt)
         return list(result.scalars().all())
-
-    async def toggle_visibilidad(self, documento_id: uuid.UUID, compartido: bool) -> Optional[DocumentoAsunto]:
-        doc = await self.get_by_id(documento_id)
-        if not doc:
-            return None
-        doc.compartido_con_cliente = compartido
-        await self.session.commit()
-        await self.session.refresh(doc)
-        return doc

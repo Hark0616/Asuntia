@@ -10,6 +10,7 @@ from app.core.exceptions import ForbiddenException, UnauthorizedException
 from app.core.security import decode_access_token
 from app.models.user import User
 from app.repositories.user_repository import UserRepository
+from app.repositories.firma_repository import FirmaRepository
 
 
 access_token_cookie = APIKeyCookie(name="access_token", auto_error=False)
@@ -32,8 +33,11 @@ async def get_current_user(
     except (TypeError, ValueError):
         raise UnauthorizedException(detail="Sesión inválida o expirada")
 
+    if not await FirmaRepository(db).get_by_id(firma_id):
+        raise UnauthorizedException(detail="Sesión inválida o expirada")
     user = await UserRepository(db, firma_id).get_by_id(user_id)
-    if not user or user.rol != payload.get("rol"):
+    if (not user or user.rol != payload.get("rol")
+            or user.updated_at.isoformat() != payload.get("user_revision")):
         raise UnauthorizedException(detail="Sesión inválida o expirada")
     return user
 

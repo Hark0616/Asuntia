@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
 import { LogIn } from 'lucide-react';
-import { loginOficinaAPI } from '@/features/auth/api/auth';
+import { loginOficinaAPI, mensajeAuth } from '@/features/auth/api/auth';
 import type { User } from '@/types/api';
+import { FirmaAccesoField } from './FirmaAccesoField';
 
 interface OficinaLoginProps {
   onSuccess: (user: User) => void;
+  firmaSlug: string;
+  onFirmaChange: (value: string) => void;
 }
 
-export function OficinaLogin({ onSuccess }: OficinaLoginProps) {
+export function OficinaLogin({ onSuccess, firmaSlug, onFirmaChange }: OficinaLoginProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -15,12 +18,13 @@ export function OficinaLogin({ onSuccess }: OficinaLoginProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading || !firmaSlug.trim()) return;
     setLoading(true);
     setError('');
     try {
-      onSuccess(await loginOficinaAPI(email, password));
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'No fue posible iniciar sesión.');
+      onSuccess(await loginOficinaAPI(email, password, firmaSlug));
+    } catch (err: unknown) {
+      setError(mensajeAuth(err, 'No fue posible iniciar sesión.'));
     } finally {
       setLoading(false);
     }
@@ -48,6 +52,7 @@ export function OficinaLogin({ onSuccess }: OficinaLoginProps) {
         )}
 
         <form onSubmit={handleSubmit} className="stack">
+          <FirmaAccesoField value={firmaSlug} onChange={onFirmaChange} disabled={loading} />
           <div className="field">
             <label htmlFor="email" style={{ textAlign: 'left' }}>Correo Institucional</label>
             <input
@@ -67,6 +72,7 @@ export function OficinaLogin({ onSuccess }: OficinaLoginProps) {
             <input
               id="password"
               type="password"
+              maxLength={128}
               autoComplete="current-password"
               required
               value={password}
@@ -85,6 +91,7 @@ export function OficinaLogin({ onSuccess }: OficinaLoginProps) {
             <LogIn size={16} />
           </button>
         </form>
+        <a className="auth-recovery-link" href={`/recuperar-acceso?firma=${encodeURIComponent(firmaSlug)}`}>Olvidé mi contraseña</a>
       </div>
     </div>
   );
