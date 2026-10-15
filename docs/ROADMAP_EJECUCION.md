@@ -1,6 +1,8 @@
 # ROADMAP DE EJECUCIÓN — Asuntia
 
-> **Prioridad vigente para el siguiente ciclo (2026-10-04):** [Plan funcional del piloto](PLAN_PILOTO_2026-10-04.md). Completar apertura, asignación, expediente, documentos, portal y agenda/calendario; el versionado documental queda fuera del piloto. Las subfases siguientes se conservan como referencia de alcance mayor.
+> **Prioridad vigente (2026-10-14):** [Base del producto y checklist de construcción](CHECKLIST_PRODUCTO_2026-10-14.md). Construir el producto operativo con contratos de datos estables, permisos, recuperación, UX y verificación desde cada entrega. Conservar el stack; consolidar expediente general, citas, transacciones, almacenamiento y acceso real del equipo. El versionado documental continúa fuera del alcance solicitado.
+
+> **Lectura de las subfases históricas:** se conservan como referencia de alcance y decisiones anteriores. No autorizan por sí solas todas las funciones del documento legado ni postergan controles que el checklist vigente exige desde el núcleo. Las afirmaciones de estado y garantías deben contrastarse con código y evidencia actuales.
 
 > **Documento derivado de:** [SCOPE_FINAL.md](file:///c:/Users/H/Documents/Code/Asuntia/docs/SCOPE_FINAL.md)
 > **Fecha:** 2026-07-26

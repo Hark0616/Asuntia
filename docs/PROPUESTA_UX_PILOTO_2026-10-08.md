@@ -1,5 +1,7 @@
 # Propuesta UX/UI para el piloto de Asuntia
 
+> **Actualización de dirección, 2026-10-14:** las pantallas y principios de interacción siguen siendo una propuesta por implementar y validar. Se construirán sobre componentes y contratos reales, en entregas del producto duradero. El [checklist vigente](CHECKLIST_PRODUCTO_2026-10-14.md) gobierna dependencias y aceptación; las referencias posteriores a piloto o prototipo no exigen una aplicación desechable ni permiten omitir controles de calidad.
+
 **Fecha:** 8 de octubre de 2026. **Base revisada:** `7d71a1c`, rama `codex/mejoras-operacion-juridica`.
 
 **Estado:** propuesta para revisión, anterior a la implementación. Complementa el [plan funcional del piloto](PLAN_PILOTO_2026-10-04.md); no describe funciones ya entregadas ni cambia todavía la interfaz. Los ejemplos de pantalla usan datos ficticios.

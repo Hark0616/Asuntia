@@ -1,5 +1,7 @@
 # Filosofía UX de Asuntia y evaluación de seis especialistas
 
+> **Actualización de dirección, 2026-10-14:** se conserva el razonamiento de estas evaluaciones. El alcance y la calidad exigibles se rigen ahora por [Base del producto y checklist de construcción](CHECKLIST_PRODUCTO_2026-10-14.md). Las propuestas se validarán sobre recorridos reales del producto; las evaluaciones expertas no sustituyen pruebas con usuarios.
+
 **Fecha:** 8 de octubre de 2026. **Implementación examinada:** `5315b3f`. **Estado:** propuesta de diseño, sin cambios funcionales.
 
 Este informe recoge seis evaluaciones independientes, sus diferencias y las decisiones de síntesis. Los refinamientos están incorporados en la [propuesta de pantallas](PROPUESTA_UX_PILOTO_2026-10-08.md), que sigue siendo la especificación de interacción. El [plan funcional](PLAN_PILOTO_2026-10-04.md) conserva el alcance del piloto.

@@ -1,100 +1,40 @@
-# Database Strategy: Local First, Supabase Ready
+# Estrategia de datos: PostgreSQL, FastAPI y Alembic
 
-## Decision
+**Actualizada:** 14 de octubre de 2026. Alineada con `AGENTS.md` y el [checklist vigente del producto](CHECKLIST_PRODUCTO_2026-10-14.md).
 
-Asuntia debe trabajar con migraciones versionadas desde el inicio.
+Esta revisión sustituye las instrucciones antiguas de Supabase CLI, migraciones en `supabase/migrations` y persistencia del producto en `localStorage`. No describían la arquitectura actual y no deben utilizarse para cambios nuevos.
 
-La forma recomendada para emular produccion localmente es usar Supabase CLI con Docker:
+## Decisión
 
-- Supabase local para desarrollo.
-- PostgreSQL local manejado por Supabase.
-- Migraciones en `supabase/migrations`.
-- Seed local para datos demo.
-- Tipos generados desde el schema.
-- Las mismas migraciones se aplican luego al proyecto remoto en Supabase.
+- PostgreSQL 16 es la base de datos. Localmente se usa PostgreSQL en Docker o el entorno PostgreSQL de desarrollo documentado para el equipo.
+- Supabase proporciona exclusivamente hosting de PostgreSQL. En producción la conexión SQLAlchemy/asyncpg utiliza el pooler Supavisor en modo Transaction, puerto `6543`, según las reglas del proyecto.
+- Toda interacción de negocio pasa por FastAPI. El frontend no usa SDK de Supabase, acceso SQL, Supabase Auth, Storage ni RLS como sustituto de autorización del backend.
+- Las consultas y escrituras de negocio viven en repositorios derivados de `BaseRepository`, con alcance por firma y conservación histórica. Las consultas personalizadas y sus relaciones deben mantener esos invariantes.
+- Los cambios de esquema se gestionan únicamente con Alembic en `backend/alembic/versions/`. Los modelos actuales describen el estado deseado; la cadena de migraciones describe cómo llegar a él conservando datos.
+- Los contratos que consume React son DTO de la API. Mantener sincronizados modelos SQLAlchemy, esquemas Pydantic e interfaces TypeScript; no generar un cliente de acceso a tablas para el navegador.
 
-## Por Que
+## Flujo de cambio
 
-Esto permite que el desarrollo local y la nube hablen el mismo idioma:
+1. Definir el significado del dato, su fuente única, relaciones y permisos. Comprobar si ya existe o puede derivarse.
+2. Modificar el modelo y sus contratos Pydantic/TypeScript correspondientes.
+3. Desde `backend/`, ejecutar `alembic revision --autogenerate -m "descripcion_cambio"` contra el entorno de desarrollo.
+4. Inspeccionar la revisión: renombres, backfills, nulabilidad, índices, restricciones y efectos sobre datos existentes no se dan por resueltos por la autogeneración.
+5. Aplicar `alembic upgrade head` en una base de prueba aislada. Verificar instalación vacía y actualización con datos representativos; no usar la base operativa como fixture destructiva.
+6. Ejecutar `pytest`, las pruebas frontend pertinentes y `npm run build`. Las pruebas que usan `Base.metadata.create_all` no sustituyen las pruebas de la cadena Alembic.
+7. Registrar código, contratos, migración y pruebas juntos. Preparar respaldo, promoción y recuperación antes de aplicar en un entorno operativo; no usar `downgrade` a ciegas si una migración puede perder datos.
 
-- Se prueba contra PostgreSQL real.
-- Se versiona cada cambio de schema.
-- Se evita crear tablas manualmente en el dashboard.
-- Se reducen diferencias entre local y produccion.
-- Se puede revisar cada migracion en GitHub.
+No se altera el esquema manualmente en el dashboard ni se ejecutan `supabase db push` o `supabase db reset` como mecanismo de migración de Asuntia. Credenciales y archivos `.env` no se incluyen en Git ni en imágenes.
 
-## Flujo Recomendado
+## Integridad y autorización
 
-1. Crear o modificar migracion local.
-2. Ejecutar Supabase local.
-3. Aplicar migraciones localmente.
-4. Correr pruebas.
-5. Commitear migracion y codigo.
-6. Aplicar la misma migracion al proyecto remoto.
-7. Generar tipos actualizados.
+El asunto es la referencia común de tareas, citas, documentos y novedades. Una guía procesal es opcional. Agenda, bandeja y portal proyectan esa información sin mantener copias editables independientes. Este es el contrato objetivo; el checklist identifica las partes que aún requieren implementación o migración.
 
-Comandos esperados en la siguiente fase:
+Cada operación valida pertenencia a firma, acceso al asunto y estado activo de los recursos relacionados. Las restricciones de BD refuerzan unicidad y relaciones; no sustituyen permisos del servidor. El cliente consulta únicamente sus asuntos y recursos autorizados. Las publicaciones y retiros de acceso requieren trazabilidad.
 
-```bash
-supabase init
-supabase start
-supabase migration new initial_schema
-supabase db reset
-supabase gen types typescript --local > src/lib/database.types.ts
-supabase db push
-```
+Los registros de negocio se archivan o desactivan; no se borran físicamente por una acción operativa. Revisar las cascadas ORM/FK existentes forma parte del checklist: no asumir que la presencia de `is_active` ya garantiza conservación en todas las vías.
 
-## Fuente De Verdad
+## Operación y estado de verificación
 
-La fuente de verdad del schema debe ser el repositorio:
+El entorno de producción ya declara un volumen de archivos. Eso no demuestra que exista respaldo ni que se pueda restaurar la relación entre metadatos y contenido. La aceptación requiere recuperación ensayada de BD y almacenamiento, controles de acceso y monitoreo de fallos.
 
-```text
-supabase/migrations
-```
-
-No el dashboard de Supabase.
-
-Si se hace un cambio manual en Supabase, debe convertirse despues en migracion para no perder trazabilidad.
-
-## Modelo Inicial Esperado
-
-Tablas base:
-
-- `firms`
-- `profiles`
-- `clients`
-- `cases`
-- `case_milestones`
-- `case_updates`
-- `requests`
-- `documents`
-- `audit_events`
-
-Relaciones base:
-
-- `clients.firm_id -> firms.id`
-- `profiles.firm_id -> firms.id`
-- `cases.client_id -> clients.id`
-- `cases.firm_id -> firms.id`
-- `case_milestones.case_id -> cases.id`
-- `case_updates.case_id -> cases.id`
-- `requests.case_id -> cases.id`
-- `documents.case_id -> cases.id`
-- `audit_events.firm_id -> firms.id`
-
-## Seguridad
-
-Cuando se conecte Supabase, cada tabla sensible debe tener Row Level Security.
-
-Reglas minimas:
-
-- Un usuario solo puede leer datos de su firma.
-- Un cliente solo puede leer sus casos autorizados.
-- Avances internos no deben ser visibles para clientes.
-- Hitos internos no deben ser visibles para clientes si en el futuro se agrega visibilidad por hito.
-- Documentos internos no deben ser visibles para clientes.
-- Auditoria no debe ser editable desde cliente.
-
-## Pendiente
-
-Este MVP aun usa `localStorage` para validar UX. La siguiente fase tecnica debe reemplazar esa persistencia por Supabase local/remoto usando migraciones.
+Los detalles pendientes de transacciones, identidad del asunto, aislamiento, migraciones, archivos y operación se mantienen en el [checklist del producto](CHECKLIST_PRODUCTO_2026-10-14.md), evitando una segunda lista de estado que pueda divergir.

@@ -1,5 +1,7 @@
 # Plan funcional para el piloto de Asuntia
 
+> **Actualización de dirección, 2026-10-14:** este plan conserva el análisis funcional previo. La prioridad y el criterio de calidad vigentes están en [Base del producto y checklist de construcción](CHECKLIST_PRODUCTO_2026-10-14.md): entregas operativas duraderas, sin tratar permisos, integridad, accesibilidad u operación como trabajo provisional. El nombre histórico del archivo no define el nivel de calidad actual. Versionado documental sigue fuera del alcance solicitado.
+
 Fecha: 4 de octubre de 2026. Base examinada: `3801961`, rama `codex/mejoras-operacion-juridica`.
 
 Este documento propone trabajo futuro. Las funciones descritas como pendientes todavía no están implementadas. Sustituye, para el siguiente ciclo, la prioridad de ampliar el repositorio con versionado documental.
