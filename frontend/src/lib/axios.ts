@@ -43,7 +43,7 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401) {
       console.warn('Sesión expirada o no autorizada');
       const url = error.config?.url || '';
-      if (!/^\/auth\/(login|otp\/|equipo\/activar|logout)/.test(url)) {
+      if (!/^\/auth\/(login|otp\/|password\/|equipo\/activar|logout)/.test(url)) {
         window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
       }
     }

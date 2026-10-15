@@ -39,7 +39,7 @@ TEST_DATABASE_URL = (
 
 engine = create_async_engine(TEST_DATABASE_URL, poolclass=NullPool)
 TestingSessionLocal = async_sessionmaker(
-    engine, expire_on_commit=False, class_=AsyncSession
+    engine, expire_on_commit=False, autoflush=False, class_=AsyncSession
 )
 
 

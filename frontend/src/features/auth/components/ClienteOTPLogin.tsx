@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { ShieldCheck, Mail, ArrowRight, ExternalLink } from 'lucide-react';
-import { solicitarOTPAPI, verificarOTPAPI } from '@/features/auth/api/auth';
+import { mensajeAuth, solicitarOTPAPI, verificarOTPAPI } from '@/features/auth/api/auth';
 import type { User } from '@/types/api';
 import { FirmaAccesoField } from './FirmaAccesoField';
+import { Tooltip } from '@/components/ui/Tooltip';
 
 interface ClienteOTPLoginProps {
   onSuccess: (user: User) => void;
@@ -23,6 +24,7 @@ export function ClienteOTPLogin({ onSuccess, firmaSlug, onFirmaChange }: Cliente
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [expiresIn, setExpiresIn] = useState<number | null>(null);
 
   const handleCedulaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setCedula(formatCedulaInput(e.target.value));
@@ -36,10 +38,11 @@ export function ClienteOTPLogin({ onSuccess, firmaSlug, onFirmaChange }: Cliente
     setError('');
 
     try {
-      await solicitarOTPAPI(firmaSlug, cedula);
+      const result = await solicitarOTPAPI(firmaSlug, cedula);
+      setExpiresIn(result.expires_in_seconds);
       setStep('otp');
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Error de verificación.');
+    } catch (err: unknown) {
+      setError(mensajeAuth(err, 'Error de verificación.'));
     } finally {
       setLoading(false);
     }
@@ -54,8 +57,8 @@ export function ClienteOTPLogin({ onSuccess, firmaSlug, onFirmaChange }: Cliente
 
     try {
       onSuccess(await verificarOTPAPI(firmaSlug, cedula, code));
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Código incorrecto.');
+    } catch (err: unknown) {
+      setError(mensajeAuth(err, 'Código incorrecto.'));
     } finally {
       setLoading(false);
     }
@@ -115,8 +118,10 @@ export function ClienteOTPLogin({ onSuccess, firmaSlug, onFirmaChange }: Cliente
           <form onSubmit={handleVerificarOTP} className="stack">
             <div className="badge warning" style={{ width: '100%', justifyContent: 'center', padding: '6px' }}>
               <Mail size={13} />
-              Código enviado al correo
+              Revisa tu correo
+              <Tooltip content="Si la firma y el documento coinciden con tu registro, enviaremos un código al correo registrado." />
             </div>
+            {expiresIn && <span className="muted small">El código vence en {Math.ceil(expiresIn / 60)} min.</span>}
 
             <div className="field" style={{ marginTop: '12px' }}>
               <label htmlFor="otp-code" style={{ textAlign: 'left' }}>Código de seguridad</label>

@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router';
+import { BrowserRouter, MemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import App from '../App';
@@ -17,7 +17,7 @@ import {
   fetchEstadosAPI,
   fetchResponsablesAPI,
 } from '@/features/asuntos/api/asuntos';
-import { fetchCurrentUserAPI, logoutAPI } from '@/features/auth/api/auth';
+import { fetchCurrentUserAPI, logoutAPI, restablecerPasswordAPI } from '@/features/auth/api/auth';
 import { SESSION_EXPIRED_EVENT } from '@/lib/session';
 import type { User } from '@/types/api';
 import type { AsuntoPortalAPI } from '@/types/portal';
@@ -40,9 +40,11 @@ vi.mock('@/features/asuntos/api/asuntos', () => ({
   asignarResponsableClienteAPI: vi.fn(),
   asignarResponsableAsuntoAPI: vi.fn(),
 }));
-vi.mock('@/features/auth/api/auth', () => ({
+vi.mock('@/features/auth/api/auth', async importOriginal => ({
+  ...await importOriginal<typeof import('@/features/auth/api/auth')>(),
   fetchCurrentUserAPI: vi.fn(),
   logoutAPI: vi.fn(),
+  restablecerPasswordAPI: vi.fn(),
 }));
 vi.mock('@/features/documentos/components/DocumentosTab', () => ({
   DocumentosTab: () => <div>Documentos del expediente</div>,
@@ -123,6 +125,47 @@ beforeEach(() => {
 });
 
 describe('App: proyección autorizada y recuperación', () => {
+  it.each([
+    ['recuperar-acceso', 'challenge', 'Nueva contraseña', 'Recuperar acceso'],
+    ['activar-equipo', 'invitacion', 'Contraseña', 'Activar acceso a Asuntia'],
+  ])('captura un enlace nativo abierto sobre la misma página de %s', async (path, field, label, heading) => {
+    const previousUrl = window.location.href;
+    const query = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    window.history.replaceState({ key: 'same-location', idx: 0 }, '', `/${path}?firma=real`);
+    const view = render(<QueryClientProvider client={query}><BrowserRouter><App /></BrowserRouter></QueryClientProvider>);
+    try {
+      expect(await screen.findByRole('heading', { name: heading })).toBeInTheDocument();
+      expect(screen.queryByLabelText(label)).not.toBeInTheDocument();
+      act(() => {
+        window.history.replaceState(window.history.state, '', `/${path}?firma=real#${field}=00000000-0000-0000-0000-000000000099&token=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa`);
+        window.dispatchEvent(new HashChangeEvent('hashchange'));
+      });
+      expect(await screen.findByLabelText(label)).toHaveValue('');
+      await waitFor(() => expect(window.location.hash).toBe(''));
+      expect(restablecerPasswordAPI).not.toHaveBeenCalled();
+    } finally {
+      view.unmount();
+      window.history.replaceState(null, '', previousUrl);
+    }
+  });
+  it('mantiene el resultado del restablecimiento y permite ingresar con caché limpia', async () => {
+    prepareOffice();
+    vi.mocked(restablecerPasswordAPI).mockResolvedValue(undefined);
+    const query = renderApp('/recuperar-acceso?firma=real#challenge=00000000-0000-0000-0000-000000000099&token=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
+    const user = userEvent.setup();
+    expect(await screen.findByRole('heading', { name: 'Crear nueva contraseña' })).toBeInTheDocument();
+    await waitFor(() => expect(query.getQueryData(['auth', 'me'])).toBeTruthy());
+    query.setQueryData(['privado'], 'sesión anterior');
+    vi.mocked(fetchCurrentUserAPI).mockRejectedValue({ response: { status: 401 } });
+    await user.type(screen.getByLabelText('Nueva contraseña'), 'Password-prueba-2026!');
+    await user.type(screen.getByLabelText('Confirmar contraseña'), 'Password-prueba-2026!');
+    await user.click(screen.getByRole('button', { name: 'Guardar contraseña' }));
+    expect(await screen.findByRole('status')).toHaveTextContent('Contraseña actualizada');
+    expect(query.getQueryData(['privado'])).toBeUndefined();
+    await user.click(screen.getByRole('link', { name: 'Iniciar sesión' }));
+    expect(await screen.findByLabelText('Correo Institucional')).toBeInTheDocument();
+    expect(restablecerPasswordAPI).toHaveBeenCalledTimes(1);
+  });
   it('limpia datos privados ante revocación sin repetir acciones', async () => {
     prepareOffice();
     const query = renderApp('/oficina/asuntos/asunto-1');

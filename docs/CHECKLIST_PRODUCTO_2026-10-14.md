@@ -99,7 +99,7 @@ P0 no significa que todos los hallazgos sean vulnerabilidades demostradas. Inclu
 
 - [x] **C01 · P0 · Resolver la firma sin constantes de demostración.** Por qué: una instalación real necesita contexto inequívoco. Terminado con resolución/configuración de firma en el ingreso y pruebas de firma desconocida, inactiva o ajena; ninguna operación normal exige usar `demo`.
 - [x] **C02 · P0 · Completar el ciclo de vida del equipo.** Por qué: el jefe debe incorporar, asignar y retirar acceso sin modificar seeds o BD a mano. Terminado con alta o invitación, activación, cambio de rol, desactivación y reasignación explícita del trabajo; impedir que una baja deje el control de la firma inaccesible.
-- [ ] **C03 · P0 · Fortalecer autenticación y recuperación.** Por qué: el acceso debe resistir abuso y errores cotidianos. Terminado con límites de intentos/solicitudes, OTP consumido atómicamente una vez, expiración coherente, recuperación de contraseña y errores que no revelen cuentas; pruebas de solicitudes concurrentes, caducadas y reutilizadas.
+- [x] **C03 · P0 · Fortalecer autenticación y recuperación.** Por qué: el acceso debe resistir abuso y errores cotidianos. Terminado con límites de intentos/solicitudes, OTP consumido atómicamente una vez, expiración coherente, recuperación de contraseña y errores que no revelen cuentas; pruebas de solicitudes concurrentes, caducadas y reutilizadas.
 - [x] **C04 · P0 · Completar la vida de la sesión.** Por qué: cerrar sesión, cambiar permisos o desactivar un usuario debe tener efectos comprobables. Terminado con política de revocación y expiración, revalidación de firma/usuario, limpieza de caché al salir y recuperación clara ante 401 sin publicar ni reenviar una acción automáticamente.
 - [ ] **C05 · P0 · Verificar cookies, origen y secretos en despliegue.** Por qué: las propiedades locales no prueban el acceso seguro en dominios reales. Terminado con HTTPS, dominio compartido, cookies seguras, CORS explícito, defensa CSRF/origen verificada y configuración que rechace valores inseguros; incluir pruebas de solicitudes desde orígenes no autorizados.
 - [ ] **C06 · P0 · Hacer confiable el envío de acceso por correo.** Por qué: un OTP generado pero no entregado no completa el recorrido. Terminado con proveedor transaccional configurado, transporte seguro, timeout, fallos observables, reintentos acotados y mensajes de expiración derivados de la misma configuración. Sacar I/O bloqueante del ciclo async y llevar envíos masivos a cola; validar entrega en un entorno controlado, sin prometer recepción garantizada.
@@ -329,5 +329,55 @@ sus criterios pendientes en el checklist.
 No se añadió una tabla ni dependencia: se reutiliza `AuthChallenge` y la revisión
 existente del usuario. No se necesita migración para esta entrega. B08 continúa
 abierto: revocar sesiones y conservar autores no sustituye una bitácora de cambios.
-C03, C05 y C06 conservan sus pendientes de recuperación, límites de abuso,
+En este corte, C03, C05 y C06 quedaban pendientes de recuperación, límites de abuso,
 verificación en dominios reales y entrega de correo.
+
+## 10. Autenticación y recuperación de acceso
+
+**Backend:** [28decaf](https://github.com/Hark0616/Asuntia/commit/28decaf).
+Interfaz integrada en `/recuperar-acceso`, con entrada desde el ingreso de oficina.
+
+- **C03 cerrado:** límites por identidad normalizada e IP de la firma, compartidos
+  entre procesos mediante UPSERT condicional de PostgreSQL. Los presupuestos
+  incluyen identidades inexistentes, se conservan al reiniciar la API y responden
+  429 con `Retry-After`, legible entre orígenes mediante CORS. La interfaz muestra
+  el tiempo recibido y conserva la captura para reintentar.
+- Emisión y consumo de OTP serializados, un código activo por usuario, intento
+  máximo persistente y vencimiento común a API, correo e interfaz. Dos
+  verificaciones simultáneas producen un éxito y un rechazo. No se emite una
+  sesión con código agotado, vencido o reutilizado.
+- Recuperación por enlace aleatorio de 256 bits guardado como HMAC, con propósito,
+  firma, vencimiento y consumo único. Confirmar actualiza la contraseña y consume
+  el desafío en una transacción, revoca sesiones y elimina la cookie. No inicia
+  sesión automáticamente. Renovar, cambiar rol o retirar acceso invalida enlaces
+  anteriores. Un enlace de otra firma o propósito no permite cambiar contraseña.
+- Respuestas públicas uniformes sin enlaces, correos ni usuarios; mismo mínimo
+  temporal para solicitudes de acceso y hash sustituto al verificar una cuenta
+  ausente. Las solicitudes sin autenticación no atribuyen un autor verificado.
+  Los parámetros SQL se ocultan, incluidos los de excepciones.
+- Enlaces con secreto en el fragmento, retirado del historial al abrir la vista.
+  El navegador mostró un caso de navegación al fragmento en la misma pestaña que
+  no actualizaba el formulario: quedó corregido y cubierto para recuperación y
+  activación. Se verifica el resultado sin introducir contraseñas en el navegador.
+- **C06 parcial:** SMTP con TLS obligatorio en producción, timeout, reintentos
+  acotados y fallos observables sin secretos. El envío individual corre después
+  de la respuesta y fuera del event loop. Las vigencias se derivan de configuración.
+  Falta verificar un proveedor real y su operación; `BackgroundTasks` no es una
+  cola durable y los envíos masivos permanecen reservados a workers.
+
+### Evidencia de aceptación
+
+| Verificación | Resultado y límite |
+| --- | --- |
+| Backend completo, PostgreSQL 16 | 284 pruebas correctas en 179,39 s, con `autoflush=False` como la API real e incluidas las migraciones. Tras ajustar la atribución de solicitudes públicas, 22 pruebas afectadas correctas. |
+| Seguridad y correo | 31 casos nuevos: límites y ventana, presupuesto concurrente, normalización, aislamiento, 429, OTP consumido/agotado/vencido, recuperación concurrente, renovación, propósito, baja, cambio de rol, validaciones y rollback; más transporte SMTP y configuración. |
+| SMTP controlado | Entrega real por socket TCP local y MIME recibido; no bloquea el event loop. Pruebas de TLS antes del login, timeout explícito, reintentos limitados y ausencia de destinatarios, enlaces o credenciales en logs de correo. No equivale a recepción en producción. |
+| Migración `4286c195fcc2` | Autogenerada e inspeccionada, aplicada localmente y `alembic check` sin diferencias. Cadena real sobre bases vacías y datos históricos, actualización/reversión y aborto transaccional por duplicados previos. |
+| Frontend completo, Node 24 | 132 pruebas correctas y `npm run build` correcto. Incluye recuperación, confirmación, 429, error/vencimiento, caché limpia y navegación al enlace en la misma pestaña. |
+| Navegador local | Entrada desde oficina conserva firma; solicitud de identidad de prueba ausente muestra respuesta genérica y vigencia de 30 minutos. Formularios de solicitud y nueva contraseña a 390 px sin desbordamiento, sin introducir ni cambiar credenciales reales. |
+| GitHub Actions | [Backend de 28decaf](https://github.com/Hark0616/Asuntia/actions/runs/38671416778) correcto en ambos jobs, con PostgreSQL independiente. La interfaz y evidencia de aceptación se incorporan después de ese corte. |
+
+No se añadieron dependencias. La instalación debe aplicar Alembic antes de ejecutar
+la nueva API y configurar SMTP seguro y `FRONTEND_URL` HTTPS en producción; los
+valores están documentados en `.env.example`. C05, la operación de correo en C06
+y los demás bloques abiertos conservan sus criterios pendientes.

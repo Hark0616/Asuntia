@@ -9,7 +9,7 @@ vi.mock('@/lib/axios', () => ({
     post: vi.fn((url: string, body: any) => {
       if (url === '/auth/otp/request') {
         if (body.cedula === '1.094.852.140') {
-          return Promise.resolve({ data: { message: 'Código OTP enviado' } });
+          return Promise.resolve({ data: { message: 'Si los datos coinciden, enviaremos un código', expires_in_seconds: 600 } });
         }
         return Promise.reject({ response: { data: { detail: 'Cédula no encontrada' } } });
       }
@@ -51,6 +51,7 @@ describe('ClienteOTPLogin Component', () => {
     const otpInput = await screen.findByLabelText(/Código de seguridad/i);
     expect(otpInput).toBeInTheDocument();
     expect(otpInput).toHaveValue('');
+    expect(screen.getByText('El código vence en 10 min.')).toBeInTheDocument();
     expect(apiClient.post).toHaveBeenCalledWith('/auth/otp/request', { cedula: '1.094.852.140', firma_slug: 'firma-real' });
     expect(screen.queryByText(/Local: 12345/i)).not.toBeInTheDocument();
   });

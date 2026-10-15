@@ -42,6 +42,7 @@ import { DocumentosTab } from '@/features/documentos/components/DocumentosTab';
 import { ConfiguracionAlmacenamiento } from '@/features/firma/components/ConfiguracionAlmacenamiento';
 import { GestionEquipo } from '@/features/equipo/components/GestionEquipo';
 import { ActivarEquipo } from '@/features/equipo/components/ActivarEquipo';
+import { RecuperarAcceso } from '@/features/auth/components/RecuperarAcceso';
 import { FlujoAsunto } from '@/features/asuntos/components/FlujoAsunto';
 import { ActividadExpediente } from '@/features/asuntos/components/ActividadExpediente';
 import { ResponsableAsignacion } from '@/features/asuntos/components/ResponsableAsignacion';
@@ -66,6 +67,17 @@ export default function App() {
   const [casoIdSeleccionado, setCasoIdSeleccionado] = useState<string>('');
   const [aperturaAbierta, setAperturaAbierta] = useState(false);
   const [clienteInicialAperturaId, setClienteInicialAperturaId] = useState('');
+  React.useEffect(() => {
+    if (!['/activar-equipo', '/recuperar-acceso'].includes(location.pathname)) return;
+    const captureLink = () => {
+      if (!window.location.hash) return;
+      // Una navegación nativa al fragmento no siempre genera una ubicación nueva
+      // en BrowserRouter. Captura el enlace antes de retirarlo del historial.
+      navigate(window.location.pathname + window.location.search + window.location.hash, { replace: true });
+    };
+    window.addEventListener('hashchange', captureLink);
+    return () => window.removeEventListener('hashchange', captureLink);
+  }, [location.pathname, navigate]);
   const asuntoRouteMatch = matchPath(
     '/oficina/asuntos/:asuntoId',
     location.pathname,
@@ -120,7 +132,7 @@ export default function App() {
   }, [usuarioAutenticado, queryClient, navigate]);
 
   // Consultas API protegidas por la sesión y el rol.
-  const authenticated = Boolean(usuarioAutenticado) && location.pathname !== '/activar-equipo';
+  const authenticated = Boolean(usuarioAutenticado) && !['/activar-equipo', '/recuperar-acceso'].includes(location.pathname);
   const officeUser = authenticated && usuarioAutenticado?.rol !== 'cliente';
   const asuntoIdRuta = asuntoRouteMatch?.params.asuntoId;
   const detalleQuery = useQuery({
@@ -314,7 +326,10 @@ export default function App() {
   };
 
   if (location.pathname === '/activar-equipo') {
-    return <ActivarEquipo search={location.search} hash={location.hash} />;
+    return <ActivarEquipo key={location.key} search={location.search} hash={location.hash} />;
+  }
+  if (location.pathname === '/recuperar-acceso') {
+    return <RecuperarAcceso key={location.key} search={location.search} hash={location.hash} />;
   }
 
   if (usuarioAutenticado === undefined) {

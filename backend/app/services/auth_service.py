@@ -107,7 +107,7 @@ class AuthService:
             else f"{secrets.randbelow(1_000_000):06d}"
         )
         await repo.stage_create(user.id, self.CLIENT_LOGIN_PURPOSE, self._hash_code(otp_code),
-            datetime.now(timezone.utc) + timedelta(minutes=settings.OTP_TTL_MINUTES), user.id)
+            datetime.now(timezone.utc) + timedelta(minutes=settings.OTP_TTL_MINUTES), None)
         await self.session.commit()
         return user, otp_code, cliente.email
 
@@ -177,7 +177,7 @@ class AuthService:
         token = secrets.token_urlsafe(32)
         challenge = await repo.stage_create(user.id, self.PASSWORD_RESET_PURPOSE,
             self._hash_code(token), datetime.now(timezone.utc)
-            + timedelta(minutes=settings.PASSWORD_RESET_TTL_MINUTES), user.id)
+            + timedelta(minutes=settings.PASSWORD_RESET_TTL_MINUTES), None)
         await self.session.commit()
         fragment = urlencode({"challenge": str(challenge.id), "token": token})
         link = f"{settings.FRONTEND_URL}/recuperar-acceso?{urlencode({'firma': firma.subdominio})}#{fragment}"

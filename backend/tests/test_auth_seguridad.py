@@ -80,6 +80,7 @@ async def test_otp_consumed_once_under_concurrent_verification(auth_case, db_ses
     active = list((await db_session.scalars(select(AuthChallenge).where(
         AuthChallenge.user_id == auth_case["portal"].id, AuthChallenge.is_active.is_(True)))).all())
     assert len(active) == 1
+    assert active[0].created_by_id is None  # Solicitud pública, no actor autenticado.
     results = await asyncio.gather(*[api.post("/api/v1/auth/otp/verify", json={**otp(auth_case), "code": "12345"}) for _ in range(2)])
     assert sorted(result.status_code for result in results) == [200, 401]
     await db_session.refresh(active[0])
@@ -160,12 +161,29 @@ async def test_login_errors_and_recovery_do_not_reveal_accounts(auth_case):
     assert len([message for message in auth_case["messages"] if message[0] == "reset"]) == 1
 
 
-async def test_non_development_otp_is_random_six_digits_and_cannot_reset_password(auth_case, monkeypatch):
+async def test_non_development_otp_is_random_six_digits(auth_case, monkeypatch):
     monkeypatch.setattr(settings, "ENVIRONMENT", "staging")
     await auth_case["api"].post("/api/v1/auth/otp/request", json=otp(auth_case))
     code = auth_case["messages"][-1][2]
     assert len(code) == 6 and code.isdigit()
     assert (await auth_case["api"].post("/api/v1/auth/otp/verify", json={**otp(auth_case), "code": code})).status_code == 200
+
+
+async def test_reset_rejects_a_valid_secret_from_another_purpose(auth_case, db_session):
+    from app.services.auth_service import AuthService
+
+    token = "a" * 43
+    challenge = AuthChallenge(firma_id=auth_case["firm"].id, user_id=auth_case["office"].id,
+        purpose="team_activation", code_hash=AuthService._hash_code(token),
+        expires_at=datetime.now(timezone.utc) + timedelta(minutes=1))
+    db_session.add(challenge)
+    await db_session.commit()
+    result = await auth_case["api"].post("/api/v1/auth/password/confirm", json={
+        "firma_slug": auth_case["firm"].subdominio, "challenge_id": str(challenge.id),
+        "token": token, "password": NEW_PASSWORD})
+    assert result.status_code == 400
+    await db_session.refresh(auth_case["office"])
+    assert verify_password(PASSWORD, auth_case["office"].hashed_password)
 
 
 async def test_team_role_change_revokes_pending_password_reset(auth_case):
@@ -214,6 +232,7 @@ async def test_reset_consumes_link_changes_password_and_revokes_sessions(auth_ca
     assert auth_case["office"].email not in response.text
     stored = await db_session.get(AuthChallenge, uuid.UUID(body["challenge_id"]))
     assert stored.code_hash != body["token"]
+    assert stored.created_by_id is None
     results = await asyncio.gather(*[api.post("/api/v1/auth/password/confirm", json=body) for _ in range(2)])
     assert sorted(result.status_code for result in results) == [204, 400]
     accepted = next(result for result in results if result.status_code == 204)

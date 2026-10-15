@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { LogIn } from 'lucide-react';
-import { loginOficinaAPI } from '@/features/auth/api/auth';
+import { loginOficinaAPI, mensajeAuth } from '@/features/auth/api/auth';
 import type { User } from '@/types/api';
 import { FirmaAccesoField } from './FirmaAccesoField';
 
@@ -23,8 +23,8 @@ export function OficinaLogin({ onSuccess, firmaSlug, onFirmaChange }: OficinaLog
     setError('');
     try {
       onSuccess(await loginOficinaAPI(email, password, firmaSlug));
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'No fue posible iniciar sesión.');
+    } catch (err: unknown) {
+      setError(mensajeAuth(err, 'No fue posible iniciar sesión.'));
     } finally {
       setLoading(false);
     }
@@ -72,6 +72,7 @@ export function OficinaLogin({ onSuccess, firmaSlug, onFirmaChange }: OficinaLog
             <input
               id="password"
               type="password"
+              maxLength={128}
               autoComplete="current-password"
               required
               value={password}
@@ -90,6 +91,7 @@ export function OficinaLogin({ onSuccess, firmaSlug, onFirmaChange }: OficinaLog
             <LogIn size={16} />
           </button>
         </form>
+        <a className="auth-recovery-link" href={`/recuperar-acceso?firma=${encodeURIComponent(firmaSlug)}`}>Olvidé mi contraseña</a>
       </div>
     </div>
   );

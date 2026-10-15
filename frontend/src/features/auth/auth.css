@@ -1,0 +1,8 @@
+.auth-recovery-shell { display: grid; place-items: start center; padding: var(--space-8) var(--space-4); }
+.auth-recovery { width: min(100%, var(--activation-max-width)); }
+.auth-recovery h1 { font-size: var(--font-size-heading); margin: 0; }
+.auth-recovery a { color: var(--brand-dark); }
+.auth-recovery a.primary-button { color: var(--panel); }
+.auth-recovery-form { display: grid; gap: var(--space-4); margin-top: var(--space-6); }
+.auth-recovery-link { display: inline-block; margin-top: var(--space-6); color: var(--brand-dark); }
+.auth-recovery > .primary-button { display: inline-flex; margin-top: var(--space-4); }

@@ -226,6 +226,8 @@ configuran juntos. Producción exige `FRONTEND_URL` con HTTPS. El vencimiento de
 correo y la API proviene de la misma configuración. Los fallos se registran con
 propósito, número de intento y categoría de error; nunca destinatarios, códigos,
 enlaces, contraseñas ni contenido de excepciones SMTP.
+Los parámetros SQL se ocultan también en desarrollo y en excepciones de BD para
+evitar que las operaciones de identidad registren correos o hashes de credenciales.
 
 Los correos individuales de autenticación usan `BackgroundTasks` y un thread para
 SMTP; no bloquean el event loop ni la respuesta. No es una cola durable: si el
