@@ -21,7 +21,7 @@ PUBLIC_EVENT_FIELDS = {"id", "titulo", "descripcion", "tipo", "created_at"}
 async def open_case(client, **extra):
     response = await client.post(
         "/api/v1/asuntos",
-        json={"cliente_id": CARLOS_ID, **extra},
+        json={"titulo": "Expediente de prueba", "ruta_codigo": "insolvencia_persona_natural:v2", "cliente_id": CARLOS_ID, **extra},
     )
     assert response.status_code == 201, response.text
     return response.json()
@@ -182,7 +182,7 @@ async def test_public_projection_and_mutations_preserve_firma_isolation(
     firma = Firma(id=uuid.uuid4(), nombre="Firma aislada", subdominio=f"aislada-{uuid.uuid4().hex}")
     actor = User(id=uuid.uuid4(), firma_id=firma.id, nombre="Usuario externo", email=f"externo-{uuid.uuid4().hex}@example.com", cedula=uuid.uuid4().hex, rol="cliente")
     foreign_client = Cliente(id=uuid.uuid4(), firma_id=firma.id, nombre="Cliente externo", email=actor.email, numero_documento=actor.cedula, numero_documento_normalizado=actor.cedula, portal_user_id=actor.id)
-    foreign_case = Asunto(id=uuid.uuid4(), firma_id=firma.id, cliente_id=foreign_client.id, radicado=f"EXT-{uuid.uuid4().hex}")
+    foreign_case = Asunto(titulo="Asunto externo", id=uuid.uuid4(), firma_id=firma.id, cliente_id=foreign_client.id, radicado=f"EXT-{uuid.uuid4().hex}")
     db_session.add(firma)
     db_session.add(actor)
     await db_session.flush()

@@ -1642,6 +1642,9 @@ button {
 
 .opening-scroll {
   min-height: 0;
+  flex: 1;
+  display: grid;
+  gap: var(--space-6);
   padding: var(--space-6);
   overflow-y: auto;
 }

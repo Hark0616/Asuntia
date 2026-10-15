@@ -22,7 +22,7 @@ CARLOS = "00000000-0000-0000-0000-000000000020"
 
 @pytest_asyncio.fixture
 async def case(client):
-    response = await client.post("/api/v1/asuntos", json={"cliente_id": CARLOS, "abogado_id": ALEJANDRO})
+    response = await client.post("/api/v1/asuntos", json={"titulo": "Expediente de prueba", "ruta_codigo": "insolvencia_persona_natural:v2", "cliente_id": CARLOS, "abogado_id": ALEJANDRO})
     assert response.status_code == 201, response.text
     body = response.json()
     yield body
@@ -135,7 +135,7 @@ async def test_reassigning_case_preserves_manual_delegation(case, client):
 @pytest.mark.asyncio
 async def test_lawyer_without_case_access_cannot_read_or_mutate_tasks(case, client, alejandro_client):
     # La administración conserva el asunto; otro abogado no obtiene acceso por conocer un UUID.
-    other = await client.post("/api/v1/asuntos", json={"cliente_id": CARLOS})
+    other = await client.post("/api/v1/asuntos", json={"titulo": "Expediente de prueba", "ruta_codigo": "insolvencia_persona_natural:v2", "cliente_id": CARLOS})
     assert other.status_code == 201
     matter = other.json()
     try:

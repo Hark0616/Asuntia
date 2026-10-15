@@ -18,7 +18,7 @@ WINDOW = {"desde": "2026-10-05T00:00:00-05:00", "hasta": "2026-10-12T00:00:00-05
 
 @pytest_asyncio.fixture
 async def case(client):
-    response = await client.post("/api/v1/asuntos", json={"cliente_id": CARLOS, "abogado_id": ALEJANDRO})
+    response = await client.post("/api/v1/asuntos", json={"titulo": "Expediente de prueba", "ruta_codigo": "insolvencia_persona_natural:v2", "cliente_id": CARLOS, "abogado_id": ALEJANDRO})
     assert response.status_code == 201
     body = response.json()
     yield body

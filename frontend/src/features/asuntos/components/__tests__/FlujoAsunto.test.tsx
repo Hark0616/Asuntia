@@ -48,6 +48,12 @@ const pasos: AsuntoPasoAPI[] = [
 
 
 describe('FlujoAsunto', () => {
+  it('muestra el radicado ya registrado sin permitir una segunda captura', () => {
+    render(<FlujoAsunto pasos={[{ ...pasos[0], datos: { radicado_oficial: 'RAD-2026-88' } }]}
+      flujoEstado="activo" radicadoOficial="RAD-2026-88" onAdvance={vi.fn()} />);
+    expect(screen.getByLabelText(/Radicado oficial/)).toHaveValue('RAD-2026-88');
+    expect(screen.getByLabelText(/Radicado oficial/)).toHaveAttribute('readonly');
+  });
   const audiencia: AsuntoPasoAPI = {
     ...pasos[0], codigo: 'agendar_audiencia', titulo: 'Agendar audiencia',
     campos: [{ clave: 'fecha_hora', etiqueta: 'Fecha y hora', tipo: 'datetime', requerido: true, opciones: [] }],

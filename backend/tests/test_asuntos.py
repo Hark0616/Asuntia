@@ -75,6 +75,7 @@ async def test_create_and_soft_delete_asunto(client):
     """
     radicado_test = f"AS-TEST-DEL-{uuid.uuid4().hex[:4]}"
     create_payload = {
+        "titulo": "Expediente para archivo",
         "radicado": radicado_test,
         "cliente_id": "00000000-0000-0000-0000-000000000020",
     }
@@ -96,7 +97,7 @@ async def test_create_and_soft_delete_asunto(client):
 async def test_open_case_with_existing_client(client):
     response = await client.post(
         "/api/v1/asuntos/apertura",
-        json={
+        json={"titulo": "Expediente de prueba", "ruta_codigo": "insolvencia_persona_natural:v2",
             "cliente_id": "00000000-0000-0000-0000-000000000020",
             "abogado_id": "00000000-0000-0000-0000-000000000011",
             "fecha_apertura": "2026-07-29",
@@ -118,7 +119,7 @@ async def test_open_case_creates_complete_new_client_atomically(
     suffix = uuid.uuid4().hex[:8]
     response = await client.post(
         "/api/v1/asuntos/apertura",
-        json={
+        json={"titulo": "Expediente de prueba", "ruta_codigo": "insolvencia_persona_natural:v2",
             "cliente_nuevo": {
                 "tipo_persona": "natural",
                 "tipo_documento": "CC",

@@ -28,10 +28,10 @@ class AsuntoRepository(BaseRepository[Asunto]):
             with_loader_criteria(Novedad, criteria, include_aliases=True),
         )
 
-    async def get_by_id(self, id: uuid.UUID) -> Optional[Asunto]:
+    async def get_by_id(self, id: uuid.UUID, solo_publicas: bool = False) -> Optional[Asunto]:
         stmt = (
             select(Asunto)
-            .options(*self._load_options())
+            .options(*self._load_options(solo_publicas))
             .where(Asunto.id == id)
             .where(Asunto.firma_id == self.firma_id)
             .where(Asunto.is_active == True)
@@ -129,15 +129,13 @@ class AsuntoRepository(BaseRepository[Asunto]):
         result = await self.session.execute(stmt)
         return list(result.scalars().unique().all())
 
-    async def create_with_workflow(
+    async def create_pending(
         self,
         asunto_data: dict[str, Any],
         step_definitions: List[dict[str, Any]],
         created_by_id: uuid.UUID,
     ) -> Asunto:
-        """Crea el expediente y su ruta inicial en una sola transacción."""
-        from app.models.asunto_paso import AsuntoPaso
-
+        """Prepara el expediente y su guía; el servicio confirma la operación completa."""
         asunto = Asunto(
             **asunto_data,
             firma_id=self.firma_id,
@@ -145,10 +143,22 @@ class AsuntoRepository(BaseRepository[Asunto]):
         )
         self.session.add(asunto)
         await self.session.flush()
+        if step_definitions:
+            await self.stage_workflow(asunto, step_definitions, created_by_id)
+        return asunto
+
+    async def stage_workflow(
+        self, asunto: Asunto, step_definitions: List[dict[str, Any]], created_by_id: uuid.UUID,
+    ) -> None:
+        from app.models.asunto_paso import AsuntoPaso
 
         pasos = [
             AsuntoPaso(
-                **step,
+                **{
+                    **step,
+                    "datos": {"radicado_oficial": asunto.radicado_oficial}
+                    if step["codigo"] == "radicacion" and asunto.radicado_oficial else step["datos"],
+                },
                 asunto_id=asunto.id,
                 firma_id=self.firma_id,
                 created_by_id=created_by_id,
@@ -177,11 +187,7 @@ class AsuntoRepository(BaseRepository[Asunto]):
                 created_by_id=created_by_id,
             )
         )
-        await self.session.commit()
-        created = await self.get_by_id(asunto.id)
-        if created is None:
-            raise RuntimeError("El asunto creado no pudo recargarse")
-        return created
+        await self.session.flush()
 
     def stage_responsible(
         self,

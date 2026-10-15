@@ -1,18 +1,25 @@
 import uuid
 from datetime import date
 from typing import Optional, List
-from sqlalchemy import Date, Integer, String, ForeignKey, text
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import Date, Integer, String, ForeignKey, UniqueConstraint, text
+from sqlalchemy.orm import Mapped, mapped_column, relationship, synonym
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from app.models.base import BaseModel
 
 class Asunto(BaseModel):
     """
-    Modelo del Expediente de Insolvencia de Persona Natural.
+    Expediente jurídico general, con guía de procedimiento opcional.
     """
     __tablename__ = "asuntos"
+    __table_args__ = (
+        UniqueConstraint("firma_id", "radicado", name="uq_asuntos_firma_codigo_interno"),
+    )
 
-    radicado: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    # Conserva el nombre físico histórico sin duplicar la identidad del expediente.
+    codigo_interno: Mapped[str] = mapped_column("radicado", String(100), nullable=False, index=True)
+    radicado = synonym("codigo_interno")
+    titulo: Mapped[str] = mapped_column(String(255), nullable=False)
+    radicado_oficial: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
 
     fecha_apertura: Mapped[date] = mapped_column(
         Date,
@@ -34,26 +41,24 @@ class Asunto(BaseModel):
     )
 
     etapa_actual: Mapped[str] = mapped_column(
-        String(255), nullable=False, default="Etapa 1: Evaluación y Radicación"
+        String(255), nullable=False, default="Sin guía"
     )
     
     siguiente_paso: Mapped[str] = mapped_column(
-        String(255), nullable=False, default="Revisión inicial de documentación"
+        String(255), nullable=False, default="Sin acción de guía"
     )
 
-    ruta_codigo: Mapped[str] = mapped_column(
+    ruta_codigo: Mapped[Optional[str]] = mapped_column(
         String(80),
-        nullable=False,
-        default="insolvencia_persona_natural:v2",
-        server_default="insolvencia_persona_natural:v2",
+        nullable=True,
     )
 
-    paso_actual: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=1, server_default="1"
+    paso_actual: Mapped[Optional[int]] = mapped_column(
+        Integer, nullable=True
     )
 
-    flujo_estado: Mapped[str] = mapped_column(
-        String(30), nullable=False, default="activo", server_default="activo"
+    flujo_estado: Mapped[Optional[str]] = mapped_column(
+        String(30), nullable=True
     )
 
     google_drive_folder_id: Mapped[Optional[str]] = mapped_column(

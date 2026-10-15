@@ -18,7 +18,7 @@ PUBLIC_DOCUMENT_FIELDS = {
 
 async def create_case(client, **extra):
     response = await client.post(
-        "/api/v1/asuntos", json={"cliente_id": CARLOS_ID, **extra}
+        "/api/v1/asuntos", json={"titulo": "Expediente de prueba", "ruta_codigo": "insolvencia_persona_natural:v2", "cliente_id": CARLOS_ID, **extra}
     )
     assert response.status_code == 201, response.text
     return response.json()

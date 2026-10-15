@@ -16,6 +16,8 @@ import {
 } from 'lucide-react';
 import { 
   fetchAsuntos, 
+  fetchAsunto,
+  incorporarGuiaAPI,
   fetchAsuntosPortalAPI,
   fetchEstadosAPI, 
   fetchClientesAPI,
@@ -28,7 +30,6 @@ import {
   asignarResponsableAsuntoAPI,
   AsuntoAPI, 
   EstadoProcesalAPI,
-  ClienteAPI,
   AperturaAsuntoPayload,
 } from '@/features/asuntos/api/asuntos';
 import { ClienteOTPLogin } from '@/features/auth/components/ClienteOTPLogin';
@@ -52,6 +53,8 @@ import { formatAsuntosCount } from '@/lib/formatAsuntos';
 interface CasoData {
   id: string;
   codigo: string;
+  radicadoOficial: string | null;
+  rutaCodigo: string | null;
   nombre: string;
   responsable: string;
   estadoBadge: string;
@@ -63,7 +66,7 @@ interface CasoData {
   prioridad: 'alta' | 'normal';
   novedades: Novedad[];
   pasos: AsuntoPasoAPI[];
-  flujoEstado: 'activo' | 'completado';
+  flujoEstado: 'activo' | 'completado' | null;
 }
 
 interface ClienteData {
@@ -74,7 +77,7 @@ interface ClienteData {
   identificacion: string;
   responsableId?: string;
   responsableNombre: string;
-  asuntosRegistrados: number;
+  asuntosRegistrados?: number;
   casos: CasoData[];
 }
 
@@ -133,6 +136,14 @@ export default function App() {
     enabled: officeUser,
   });
   const { data: asuntosAPI } = asuntosQuery;
+  const asuntoIdRuta = asuntoRouteMatch?.params.asuntoId;
+  const detalleQuery = useQuery({
+    queryKey: ['asuntos', 'detalle', asuntoIdRuta],
+    queryFn: () => fetchAsunto(asuntoIdRuta!),
+    retry: false,
+    enabled: officeUser && Boolean(asuntoIdRuta),
+  });
+  const detalle = detalleQuery.data;
   const portalQuery = useQuery({
     queryKey: ['portal', 'asuntos'],
     queryFn: fetchAsuntosPortalAPI,
@@ -171,10 +182,19 @@ export default function App() {
       setCasoIdSeleccionado(newAsunto.id);
       setAperturaAbierta(false);
       setClienteInicialAperturaId('');
-      navigate(`/oficina/asuntos/${newAsunto.id}#paso-activo`);
+      queryClient.setQueryData(['asuntos', 'detalle', newAsunto.id], newAsunto);
+      navigate(`/oficina/asuntos/${newAsunto.id}`);
     }
   });
 
+  const mutacionGuia = useMutation({
+    mutationFn: (asuntoId: string) => incorporarGuiaAPI(asuntoId, 'insolvencia_persona_natural:v2'),
+    onSuccess: (asunto) => {
+      queryClient.setQueryData(['asuntos', 'detalle', asunto.id], asunto);
+      queryClient.invalidateQueries({ queryKey: ['asuntos'] });
+      queryClient.invalidateQueries({ queryKey: ['tareas'] });
+    },
+  });
   const mutacionAvanzarPaso = useMutation({
     mutationFn: ({ asuntoId, pasoCodigo, datos, expectedUpdatedAt }: { asuntoId: string; pasoCodigo: string; datos: Record<string, unknown>; expectedUpdatedAt?: string }) =>
       avanzarPasoAPI(asuntoId, { paso_codigo: pasoCodigo, datos, expected_updated_at: expectedUpdatedAt }),
@@ -196,7 +216,7 @@ export default function App() {
 
 
   const mutacionEstado = useMutation({
-    mutationFn: ({ asuntoId, payload }: { asuntoId: string; payload: { estado_id?: string } }) =>
+    mutationFn: ({ asuntoId, payload }: { asuntoId: string; payload: { estado_id: string | null } }) =>
       actualizarEstadoAPI(asuntoId, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['asuntos'] });
@@ -230,8 +250,26 @@ export default function App() {
     },
   });
 
-  const clientes: ClienteData[] = (clientesAPI || []).map((cli: ClienteAPI) => {
-      const casosDelCliente = (asuntosAPI || []).filter((as: AsuntoAPI) => as.cliente_id === cli.id);
+  const asuntosDisponibles = detalle
+    ? [...(asuntosAPI || []).filter((asunto) => asunto.id !== detalle.id), detalle]
+    : (asuntosAPI || []);
+  const perfilesClientes: Array<{
+    id: string; nombre: string; email: string; identificacion: string;
+    responsable_id?: string; asuntos_count?: number;
+  }> = (clientesAPI || []).map((cli) => ({
+    id: cli.id, nombre: cli.nombre, email: cli.email,
+    identificacion: cli.numero_documento, responsable_id: cli.responsable_id,
+    asuntos_count: cli.asuntos_count,
+  }));
+  if (detalle && !perfilesClientes.some((cli) => cli.id === detalle.cliente_id)) {
+    perfilesClientes.push({
+      id: detalle.cliente.id, nombre: detalle.cliente.nombre, email: detalle.cliente.email,
+      responsable_id: detalle.cliente.responsable_id,
+      identificacion: detalle.cliente.numero_documento,
+    });
+  }
+  const clientes: ClienteData[] = perfilesClientes.map((cli) => {
+      const casosDelCliente = asuntosDisponibles.filter((as: AsuntoAPI) => as.cliente_id === cli.id);
       const responsableCliente = (responsablesAPI || []).find(
         (responsable) => responsable.id === cli.responsable_id,
       );
@@ -241,7 +279,7 @@ export default function App() {
         nombre: cli.nombre,
         contacto: cli.nombre.split(' ')[0],
         email: cli.email,
-        identificacion: cli.cedula,
+        identificacion: cli.identificacion,
         responsableId: cli.responsable_id,
         responsableNombre: responsableCliente?.nombre || 'Sin asignar',
         asuntosRegistrados: cli.asuntos_count,
@@ -251,10 +289,12 @@ export default function App() {
           );
           return {
           id: as.id,
-          codigo: as.radicado,
-          nombre: 'Insolvencia Persona Natural',
+          codigo: as.codigo_interno,
+          radicadoOficial: as.radicado_oficial,
+          rutaCodigo: as.ruta_codigo,
+          nombre: as.titulo,
           responsable: responsableAsunto?.nombre || 'Sin asignar',
-          estadoBadge: as.estado?.nombre || 'En trámite',
+          estadoBadge: as.estado?.nombre || 'Sin estado registrado',
           estadoTipo: (as.estado?.color_tipo as any) || 'mint',
           estadoId: as.estado?.id,
           estadoDescripcion: as.estado?.descripcion,
@@ -271,8 +311,12 @@ export default function App() {
     });
 
   // Selección activa
-  const clienteActivo = clientes.find(c => c.id === clienteIdSeleccionado) || null;
-  const casoActivo = clienteActivo && clienteActivo.casos ? (clienteActivo.casos.find(c => c.id === casoIdSeleccionado) || clienteActivo.casos[0] || null) : null;
+  const clienteActivo = clientes.find(c => c.id === (asuntoIdRuta ? detalle?.cliente_id : clienteIdSeleccionado)) || null;
+  const casoActivo = clienteActivo
+    ? asuntoIdRuta
+      ? clienteActivo.casos.find(c => c.id === asuntoIdRuta) || null
+      : clienteActivo.casos.find(c => c.id === casoIdSeleccionado) || clienteActivo.casos[0] || null
+    : null;
   const puedeDecidirCaso = usuarioAutenticado?.rol === 'administrador'
     || (usuarioAutenticado?.rol === 'abogado' && casoActivo?.abogadoId === usuarioAutenticado.id);
 
@@ -284,13 +328,13 @@ export default function App() {
 
   React.useEffect(() => {
     const asuntoId = asuntoRouteMatch?.params.asuntoId;
-    if (!asuntoId || !asuntosAPI) return;
-    const asunto = asuntosAPI.find((item) => item.id === asuntoId);
+    if (!asuntoId || !detalle) return;
+    const asunto = detalle;
     if (asunto) {
       setClienteIdSeleccionado(asunto.cliente_id);
       setCasoIdSeleccionado(asunto.id);
     }
-  }, [asuntoRouteMatch?.params.asuntoId, asuntosAPI]);
+  }, [asuntoRouteMatch?.params.asuntoId, detalle]);
 
   React.useEffect(() => {
     if (!casoActivo || !['#paso-activo', '#tareas-expediente'].includes(location.hash)) return;
@@ -308,7 +352,7 @@ export default function App() {
       mutacionEstado.mutate({
         asuntoId: casoActivo.id,
         payload: {
-          estado_id: estadoSeleccionadoId || casoActivo.estadoId
+          estado_id: estadoSeleccionadoId || null
         }
       });
     }
@@ -579,8 +623,7 @@ export default function App() {
                         >
                           <strong>{cli.nombre}</strong>
                           <span className="muted small">
-                            {formatAsuntosCount(cli.asuntosRegistrados)}
-                            {' · '}
+                            {cli.asuntosRegistrados !== undefined && `${formatAsuntosCount(cli.asuntosRegistrados)} · `}
                             {cli.responsableNombre}
                           </span>
                         </NavLink>
@@ -629,12 +672,20 @@ export default function App() {
               <MiTrabajo
                 isAdmin={usuarioAutenticado.rol === 'administrador'}
               />
-            ) : asuntosQuery.isLoading || clientesQuery.isLoading ? (
+            ) : asuntoIdRuta && detalleQuery.isLoading ? (
+              <div className="panel work-empty" role="status">Consultando expediente…</div>
+            ) : asuntoIdRuta && detalleQuery.isError && !detalle ? (
+              <div className="panel work-empty" role="alert">
+                <h3>No pudimos abrir el expediente</h3>
+                <button className="secondary-button" onClick={() => detalleQuery.refetch()}>Reintentar</button>
+                <NavLink to="/oficina/asuntos">Volver a expedientes</NavLink>
+              </div>
+            ) : !asuntoIdRuta && (asuntosQuery.isLoading || clientesQuery.isLoading) ? (
               <div className="panel work-empty" role="status">
                 <span className="muted">Consultando expedientes…</span>
               </div>
-            ) : (asuntosQuery.isError && !asuntosAPI)
-              || (clientesQuery.isError && !clientesAPI) ? (
+            ) : !asuntoIdRuta && ((asuntosQuery.isError && !asuntosAPI)
+              || (clientesQuery.isError && !clientesAPI)) ? (
               <div className="panel work-empty" role="alert">
                 <div>
                   <h3>No pudimos consultar los expedientes</h3>
@@ -745,6 +796,7 @@ export default function App() {
                           <div>
                             <h3>{casoActivo.nombre}</h3>
                             <span className="muted small">{casoActivo.codigo}</span>
+                            {casoActivo.radicadoOficial && <p className="muted small">Radicado oficial · {casoActivo.radicadoOficial}</p>}
                           </div>
                           <div className="case-overview-actions">
                             <ResponsableAsignacion
@@ -791,17 +843,16 @@ export default function App() {
                                   <div className="row"><label htmlFor="estado-procesal-select">Actualizar estado</label><Tooltip content="Registra el estado del expediente sin completar los pasos de trabajo." /></div>
                                   <select
                                     id="estado-procesal-select"
-                                    value={estadoSeleccionadoId || casoActivo.estadoId || ''}
+                                    value={estadoSeleccionadoId}
                                     onChange={(e) => setEstadoSeleccionadoId(e.target.value)}
                                   >
-                                    {estadosAPI && estadosAPI.length > 0 ? (
+                                    <option value="">Sin estado registrado</option>
+                                    {estadosAPI && estadosAPI.length > 0 && (
                                       estadosAPI.map((est: EstadoProcesalAPI) => (
                                         <option key={est.id} value={est.id}>
                                           {est.nombre}
                                         </option>
                                       ))
-                                    ) : (
-                                      <option value="">{casoActivo.estadoBadge}</option>
                                     )}
                                   </select>
                                 </div>
@@ -821,10 +872,11 @@ export default function App() {
                         )}
                       </section>
 
-                      <FlujoAsunto
+                      {casoActivo.rutaCodigo && casoActivo.flujoEstado ? <FlujoAsunto
                         key={`flujo-${casoActivo.id}`}
                         pasos={casoActivo.pasos}
                         flujoEstado={casoActivo.flujoEstado}
+                        radicadoOficial={casoActivo.radicadoOficial}
                         canAdvance={puedeDecidirCaso}
                         canSave={puedeDecidirCaso || usuarioAutenticado.rol === 'auxiliar'}
                         readOnlyReason={
@@ -840,12 +892,23 @@ export default function App() {
                           asuntoId: casoActivo.id, pasoCodigo, datos, expectedUpdatedAt,
                         })}
                         onReload={async () => {
-                          const result = await asuntosQuery.refetch();
-                          const asunto = result.data?.find((item) => item.id === casoActivo.id);
-                          if (result.isError || !asunto) throw new Error('No disponible');
-                          return asunto;
+                          return queryClient.fetchQuery({
+                            queryKey: ['asuntos', 'detalle', casoActivo.id],
+                            queryFn: () => fetchAsunto(casoActivo.id),
+                            staleTime: 0,
+                          });
                         }}
-                      />
+                      /> : <section className="panel">
+                        <div className="section-title"><h3>Guía de trabajo</h3></div>
+                        <span className="muted small">Sin guía</span>
+                        {puedeDecidirCaso && <button className="secondary-button" type="button"
+                          disabled={mutacionGuia.isPending}
+                          onClick={() => mutacionGuia.mutate(casoActivo.id)}>
+                          {mutacionGuia.isPending ? 'Incorporando…' : 'Incorporar guía de insolvencia'}
+                        </button>}
+                        {mutacionGuia.isError && mutacionGuia.variables === casoActivo.id &&
+                          <p className="form-error" role="alert">No se pudo incorporar la guía. Revisa el expediente antes de reintentar.</p>}
+                      </section>}
 
                       {/* Gestión documental del expediente */}
                       <TareasAsunto
@@ -872,7 +935,6 @@ export default function App() {
                   ) : (
                     <div className="panel" style={{ padding: '32px 24px', textAlign: 'center' }}>
                       <h3>Sin asuntos para este cliente</h3>
-                      <p className="muted small">Abre el primer asunto para iniciar su ruta de trabajo.</p>
                       <button
                         className="primary-button"
                         style={{ margin: '16px auto 0' }}

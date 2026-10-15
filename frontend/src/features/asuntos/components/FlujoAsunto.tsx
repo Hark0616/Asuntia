@@ -8,6 +8,7 @@ import { fechaISO, fechaLocalInput, fechaRegistroISO } from '@/features/tareas/f
 interface FlujoAsuntoProps {
   pasos: AsuntoPasoAPI[];
   flujoEstado: 'activo' | 'completado';
+  radicadoOficial?: string | null;
   isLoading?: boolean;
   canAdvance?: boolean;
   canSave?: boolean;
@@ -29,6 +30,7 @@ function todayInBogota() {
 export function FlujoAsunto({
   pasos,
   flujoEstado,
+  radicadoOficial,
   isLoading = false,
   canAdvance = true,
   canSave = canAdvance,
@@ -245,6 +247,7 @@ export function FlujoAsunto({
                       <input
                         id={`workflow-${campo.clave}`}
                         type={campo.tipo === 'datetime' ? 'datetime-local' : campo.tipo}
+                        readOnly={campo.clave === 'radicado_oficial' && Boolean(radicadoOficial)}
                         required={campo.requerido}
                         value={campo.tipo === 'datetime' ? fechaLocalInput(String(datos[campo.clave] || '')) : String(datos[campo.clave] || '')}
                         onChange={(event) => updateField(campo.clave, campo.tipo === 'datetime' ? fechaISO(event.target.value) : event.target.value)}

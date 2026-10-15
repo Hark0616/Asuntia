@@ -9,7 +9,7 @@ CLIENTE_CARLOS_ID = "00000000-0000-0000-0000-000000000020"
 async def create_case(client):
     response = await client.post(
         "/api/v1/asuntos",
-        json={
+        json={"titulo": "Expediente de prueba", "ruta_codigo": "insolvencia_persona_natural:v2",
             "radicado": f"TEST-TAREA-{uuid.uuid4().hex[:8]}",
             "cliente_id": CLIENTE_CARLOS_ID,
         },

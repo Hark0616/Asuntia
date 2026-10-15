@@ -56,6 +56,9 @@ class PasoRepository(BaseRepository[AsuntoPaso]):
     ) -> Asunto:
         current.estado = "completado"
         current.datos = data
+        if current.codigo == "radicacion":
+            # El expediente conserva la referencia canónica; el paso guarda la evidencia histórica.
+            asunto.radicado_oficial = data["radicado_oficial"].strip()
         current.completed_at = datetime.now(timezone.utc)
         current.completed_by_id = user_id
         self.session.add(current)

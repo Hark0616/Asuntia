@@ -9,6 +9,8 @@ import {
   crearNovedadAPI,
   actualizarEstadoAPI,
   fetchAsuntos,
+  fetchAsunto,
+  incorporarGuiaAPI,
   fetchAsuntosPortalAPI,
   fetchClientesAPI,
   fetchEstadosAPI,
@@ -20,6 +22,8 @@ import type { AsuntoPortalAPI } from '@/types/portal';
 
 vi.mock('@/features/asuntos/api/asuntos', () => ({
   fetchAsuntos: vi.fn(),
+  fetchAsunto: vi.fn(),
+  incorporarGuiaAPI: vi.fn(),
   fetchAsuntosPortalAPI: vi.fn(),
   fetchClientesAPI: vi.fn(),
   fetchEstadosAPI: vi.fn(),
@@ -89,13 +93,18 @@ function prepareOffice(role: 'administrador' | 'auxiliar' | 'abogado' = 'adminis
     email: 'cliente@example.com', canal_preferido: 'email', portal_habilitado: true,
     asuntos_count: 1, rol: 'cliente', created_at: '2026-08-01T12:00:00Z',
   }]);
-  vi.mocked(fetchAsuntos).mockResolvedValue([{
+  const asunto = {
     id: 'asunto-1', radicado: 'AS-2026-001', fecha_apertura: '2026-08-01',
     cliente_id: 'cliente-1', abogado_id: 'abogada-1', etapa_actual: 'Recepción',
     siguiente_paso: 'Preparación', ruta_codigo: 'insolvencia', paso_actual: 1,
-    flujo_estado: 'activo', pasos: [], novedades: [],
+    titulo: 'Expediente de prueba', codigo_interno: 'AS-2026-001', radicado_oficial: null,
+    cliente: { id: 'cliente-1', nombre: 'Ana Cliente', email: 'cliente@example.com', numero_documento: '123456' },
+    flujo_estado: 'activo' as const, pasos: [], novedades: [],
     created_at: '2026-08-01T12:00:00Z', updated_at: '2026-08-01T12:00:00Z',
-  }]);
+  };
+  vi.mocked(fetchAsuntos).mockResolvedValue([asunto]);
+  vi.mocked(fetchAsunto).mockResolvedValue(asunto);
+  return asunto;
 }
 
 beforeEach(() => {
@@ -109,6 +118,44 @@ beforeEach(() => {
 });
 
 describe('App: proyección autorizada y recuperación', () => {
+  it('abre un asunto por URL aunque las listas de asuntos y clientes estén vacías', async () => {
+    const asunto = prepareOffice();
+    vi.mocked(fetchAsunto).mockResolvedValue({
+      ...asunto, titulo: 'Consulta contractual', ruta_codigo: null, paso_actual: null, flujo_estado: null,
+      radicado_oficial: 'JUZ-2026-42',
+    });
+    vi.mocked(fetchAsuntos).mockResolvedValue([]);
+    vi.mocked(fetchClientesAPI).mockResolvedValue([]);
+    renderApp('/oficina/asuntos/asunto-1');
+    expect(await screen.findByRole('heading', { name: 'Consulta contractual' })).toBeInTheDocument();
+    expect(screen.getByText('Radicado oficial · JUZ-2026-42')).toBeInTheDocument();
+    expect(screen.getByLabelText('Contenido')).toBeInTheDocument();
+    expect(fetchAsunto).toHaveBeenCalledWith('asunto-1');
+    expect(screen.queryByText('Recepción y evaluación inicial')).not.toBeInTheDocument();
+  });
+
+  it('un fallo de detalle no abre otro expediente de la lista', async () => {
+    prepareOffice();
+    vi.mocked(fetchAsunto).mockRejectedValue({ response: { status: 404 } });
+    renderApp('/oficina/asuntos/inexistente');
+    expect(await screen.findByText('No pudimos abrir el expediente')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Contenido')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Volver a expedientes' })).toBeInTheDocument();
+  });
+
+  it('incorpora la guía desde el expediente general', async () => {
+    const user = userEvent.setup();
+    const initial = prepareOffice();
+    vi.mocked(fetchAsunto).mockResolvedValue({ ...initial, ruta_codigo: null, paso_actual: null, flujo_estado: null });
+    renderApp('/oficina/asuntos/asunto-1');
+    const button = await screen.findByRole('button', { name: 'Incorporar guía de insolvencia' });
+    vi.mocked(incorporarGuiaAPI).mockResolvedValue(initial);
+    vi.mocked(fetchAsunto).mockResolvedValue(initial);
+    await user.click(button);
+    await waitFor(() => expect(incorporarGuiaAPI).toHaveBeenCalledWith('asunto-1', 'insolvencia_persona_natural:v2'));
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Incorporar guía de insolvencia' })).not.toBeInTheDocument());
+  });
+
   it('el enlace de agenda desplaza y enfoca las tareas del expediente', async () => {
     const previous = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollIntoView');
     const scroll = vi.fn();

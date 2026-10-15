@@ -28,7 +28,7 @@ async def test_administrator_assigns_client_without_changing_its_cases(client):
     created_client = await create_client(client)
     created_case = await client.post(
         "/api/v1/asuntos",
-        json={"cliente_id": created_client["id"]},
+        json={"titulo": "Expediente de prueba", "ruta_codigo": "insolvencia_persona_natural:v2", "cliente_id": created_client["id"]},
     )
     assert created_case.status_code == 201, created_case.text
 
@@ -70,7 +70,7 @@ async def test_reassigning_case_moves_open_workflow_to_new_lawyer(
     created_client = await create_client(client, prefix="Transferencia")
     created_case = await client.post(
         "/api/v1/asuntos",
-        json={"cliente_id": created_client["id"]},
+        json={"titulo": "Expediente de prueba", "ruta_codigo": "insolvencia_persona_natural:v2", "cliente_id": created_client["id"]},
     )
     assert created_case.status_code == 201, created_case.text
     case_id = created_case.json()["id"]

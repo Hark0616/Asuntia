@@ -195,9 +195,21 @@ class WorkflowService:
         self, asunto_id: uuid.UUID, paso_codigo: str, data: dict[str, Any],
         user_id: uuid.UUID, user_role: str, expected_updated_at: datetime,
     ) -> Asunto:
-        _, current = await self._get_active_step(asunto_id, paso_codigo, user_id, user_role)
+        asunto, current = await self._get_active_step(asunto_id, paso_codigo, user_id, user_role)
         self._check_version(current, expected_updated_at)
-        return await self.pasos.save_draft(current, self._merge_step_data(current, data))
+        return await self.pasos.save_draft(current, self._merge_asunto_step_data(asunto, current, data))
+
+    @staticmethod
+    def _merge_asunto_step_data(asunto: Asunto, step: AsuntoPaso, data: dict[str, Any]) -> dict[str, Any]:
+        merged = WorkflowService._merge_step_data(step, data)
+        if step.codigo == "radicacion":
+            if asunto.radicado_oficial:
+                if "radicado_oficial" in data and merged.get("radicado_oficial") != asunto.radicado_oficial:
+                    raise DomainException(detail="El radicado oficial ya está registrado en el expediente", status_code=409)
+                merged["radicado_oficial"] = asunto.radicado_oficial
+            if len(merged.get("radicado_oficial", "").strip()) > 100:
+                raise DomainException(detail="El radicado oficial admite hasta 100 caracteres", status_code=422)
+        return merged
 
     @staticmethod
     def _validate_step_data(step: AsuntoPaso, data: dict[str, Any]) -> None:
@@ -256,7 +268,7 @@ class WorkflowService:
             raise ForbiddenException(detail="Solo el abogado responsable o administrador puede completar el paso")
         asunto, current = await self._get_active_step(asunto_id, paso_codigo, user_id, user_role)
         self._check_version(current, expected_updated_at)
-        data = self._merge_step_data(current, data)
+        data = self._merge_asunto_step_data(asunto, current, data)
         self._validate_step_data(current, data)
         next_step = await self.pasos.get_by_order(asunto_id, current.orden + 1)
         current_task = await self.tareas.get_open_for_step_for_update(

@@ -15,6 +15,7 @@ import type {
   ResponsableAPI,
 } from '@/features/asuntos/api/asuntos';
 import type { User } from '@/types/api';
+import type { RutaCodigo } from '@/types/asunto';
 
 type OpeningTab = 'existing' | 'new';
 
@@ -93,6 +94,9 @@ export function AperturaAsuntoModal({
   const [selectedClientId, setSelectedClientId] = useState('');
   const [responsableId, setResponsableId] = useState('');
   const [openingDate, setOpeningDate] = useState(getLocalDateInputValue);
+  const [titulo, setTitulo] = useState('');
+  const [radicadoOficial, setRadicadoOficial] = useState('');
+  const [rutaCodigo, setRutaCodigo] = useState<RutaCodigo | ''>('');
   const [newClient, setNewClient] = useState<NewClientForm>(emptyClientForm);
   const canAssignSelf = responsables.some(
     (responsable) => responsable.id === usuarioActual.id,
@@ -116,6 +120,9 @@ export function AperturaAsuntoModal({
       initialClientResponsible?.id || defaultResponsableId,
     );
     setOpeningDate(getLocalDateInputValue());
+    setTitulo('');
+    setRadicadoOficial('');
+    setRutaCodigo('');
     setNewClient(emptyClientForm());
   }, [
     isOpen,
@@ -139,9 +146,10 @@ export function AperturaAsuntoModal({
   const selectedClient = clientes.find(
     (cliente) => cliente.id === selectedClientId,
   );
-  const canSubmitExisting = Boolean(selectedClientId && responsableId);
+  const canSubmitExisting = Boolean(titulo.trim() && selectedClientId && responsableId);
   const canSubmitNew = Boolean(
-    newClient.nombre.trim()
+    titulo.trim()
+    && newClient.nombre.trim()
     && newClient.numero_documento.trim()
     && newClient.email.trim()
     && responsableId,
@@ -149,9 +157,16 @@ export function AperturaAsuntoModal({
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
+    if (isLoading) return;
+    const caseData = {
+      titulo: titulo.trim(),
+      radicado_oficial: optionalValue(radicadoOficial),
+      ruta_codigo: rutaCodigo || undefined,
+    };
     if (activeTab === 'existing') {
       if (!canSubmitExisting) return;
       onSubmit({
+        ...caseData,
         cliente_id: selectedClientId,
         abogado_id: responsableId,
         fecha_apertura: openingDate,
@@ -160,6 +175,7 @@ export function AperturaAsuntoModal({
     }
     if (!canSubmitNew) return;
     onSubmit({
+      ...caseData,
       cliente_nuevo: {
         tipo_persona: newClient.tipo_persona,
         tipo_documento: newClient.tipo_documento,
@@ -264,6 +280,28 @@ export function AperturaAsuntoModal({
           </div>
 
           <div className="opening-scroll">
+            <section className="opening-new-client" aria-label="Datos del asunto">
+              <div className="opening-fields-grid">
+                <div className="field opening-field-wide">
+                  <label htmlFor="case-title">Título del asunto *</label>
+                  <input id="case-title" autoFocus required maxLength={255} value={titulo}
+                    onChange={(event) => setTitulo(event.target.value)} />
+                </div>
+                <div className="field">
+                  <label htmlFor="case-official-reference">Radicado oficial</label>
+                  <input id="case-official-reference" maxLength={100} value={radicadoOficial}
+                    onChange={(event) => setRadicadoOficial(event.target.value)} />
+                </div>
+                <div className="field">
+                  <label htmlFor="case-guide">Guía de trabajo</label>
+                  <select id="case-guide" value={rutaCodigo}
+                    onChange={(event) => setRutaCodigo(event.target.value as RutaCodigo | '')}>
+                    <option value="">Sin guía</option>
+                    <option value="insolvencia_persona_natural:v2">Insolvencia de persona natural</option>
+                  </select>
+                </div>
+              </div>
+            </section>
             {activeTab === 'existing' ? (
               <section
                 id="existing-client-panel"
@@ -279,7 +317,6 @@ export function AperturaAsuntoModal({
                     value={searchTerm}
                     onChange={(event) => setSearchTerm(event.target.value)}
                     placeholder="Buscar por nombre, identificación, correo o teléfono"
-                    autoFocus
                   />
                 </label>
 
@@ -568,55 +605,51 @@ export function AperturaAsuntoModal({
                 </div>
               </section>
             )}
+            <section className="opening-assignment" aria-labelledby="case-assignment-title">
+              <div className="opening-section-heading">
+                <div>
+                  <span className="page-eyebrow">Nuevo asunto</span>
+                  <h4 id="case-assignment-title">Asignación inicial</h4>
+                </div>
+              </div>
+              <div className="opening-assignment-grid">
+                <div className="field">
+                  <label htmlFor="case-responsible">Abogado responsable *</label>
+                  <select
+                    id="case-responsible"
+                    required
+                    value={responsableId}
+                    onChange={(event) => setResponsableId(event.target.value)}
+                  >
+                    <option value="">Seleccionar responsable</option>
+                    {responsables.map((responsable) => (
+                      <option key={responsable.id} value={responsable.id}>
+                        {responsable.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="field">
+                  <label htmlFor="case-opening-date">Fecha de apertura *</label>
+                  <input
+                    id="case-opening-date"
+                    type="date"
+                    required
+                    value={openingDate}
+                    onChange={(event) => setOpeningDate(event.target.value)}
+                  />
+                </div>
+              </div>
+              {activeTab === 'existing' && selectedClient && (
+                <div className="opening-selection-summary">
+                  <CircleCheck size={18} aria-hidden="true" />
+                  <span>
+                    El asunto quedará vinculado a <strong>{selectedClient.nombre}</strong>.
+                  </span>
+                </div>
+              )}
+            </section>
           </div>
-
-          <section className="opening-assignment" aria-labelledby="case-assignment-title">
-            <div className="opening-section-heading">
-              <div>
-                <span className="page-eyebrow">Nuevo asunto</span>
-                <h4 id="case-assignment-title">Asignación inicial</h4>
-              </div>
-              <span className="muted small">
-                Paso 1 · Recepción y evaluación inicial
-              </span>
-            </div>
-            <div className="opening-assignment-grid">
-              <div className="field">
-                <label htmlFor="case-responsible">Abogado responsable *</label>
-                <select
-                  id="case-responsible"
-                  required
-                  value={responsableId}
-                  onChange={(event) => setResponsableId(event.target.value)}
-                >
-                  <option value="">Seleccionar responsable</option>
-                  {responsables.map((responsable) => (
-                    <option key={responsable.id} value={responsable.id}>
-                      {responsable.nombre}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="field">
-                <label htmlFor="case-opening-date">Fecha de apertura *</label>
-                <input
-                  id="case-opening-date"
-                  type="date"
-                  required
-                  value={openingDate}
-                  onChange={(event) => setOpeningDate(event.target.value)}
-                />
-              </div>
-            </div>
-            {activeTab === 'existing' && selectedClient && (
-              <div className="opening-selection-summary">
-                <CircleCheck size={18} aria-hidden="true" />
-                <span>
-                  El asunto quedará vinculado a <strong>{selectedClient.nombre}</strong>.
-                </span>
-              </div>
-            )}
-          </section>
 
           {errorMessage && (
             <div className="form-error opening-error" role="alert">

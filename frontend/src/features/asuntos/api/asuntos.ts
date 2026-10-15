@@ -1,6 +1,8 @@
 import { apiClient } from '@/lib/axios';
 import type { AsuntoPortalAPI } from '@/types/portal';
 import type { Novedad } from '@/types/api';
+import type { AsuntoAPI, RutaCodigo } from '@/types/asunto';
+export type { AsuntoAPI } from '@/types/asunto';
 
 export interface EstadoProcesalAPI {
   id: string;
@@ -57,6 +59,9 @@ export interface ResponsableAPI {
 }
 
 export interface AperturaAsuntoPayload {
+  titulo: string;
+  radicado_oficial?: string;
+  ruta_codigo?: RutaCodigo;
   cliente_id?: string;
   cliente_nuevo?: ClienteCreatePayload;
   abogado_id: string;
@@ -83,24 +88,6 @@ export interface AsuntoPasoAPI {
   updated_at?: string;
   completed_at?: string | null;
   completed_by_id?: string | null;
-}
-
-export interface AsuntoAPI {
-  id: string;
-  radicado: string;
-  fecha_apertura: string;
-  etapa_actual: string;
-  siguiente_paso: string;
-  ruta_codigo: string;
-  paso_actual: number;
-  flujo_estado: 'activo' | 'completado';
-  cliente_id: string;
-  abogado_id?: string;
-  estado?: EstadoProcesalAPI;
-  novedades: Novedad[];
-  pasos: AsuntoPasoAPI[];
-  created_at: string;
-  updated_at: string;
 }
 
 export const fetchAsuntos = async (): Promise<AsuntoAPI[]> => {
@@ -135,8 +122,18 @@ export const crearClienteAPI = async (payload: ClienteCreatePayload) => {
   return response.data;
 };
 
-export const crearAsuntoAPI = async (payload: { radicado?: string; cliente_id: string; abogado_id?: string; estado_id?: string; fecha_apertura?: string }) => {
+export const crearAsuntoAPI = async (payload: { titulo: string; codigo_interno?: string; radicado_oficial?: string; ruta_codigo?: RutaCodigo; cliente_id: string; abogado_id?: string; estado_id?: string; fecha_apertura?: string }) => {
   const response = await apiClient.post<AsuntoAPI>('/asuntos', payload);
+  return response.data;
+};
+
+export const fetchAsunto = async (asuntoId: string): Promise<AsuntoAPI> => {
+  const response = await apiClient.get<AsuntoAPI>(`/asuntos/id/${asuntoId}`);
+  return response.data;
+};
+
+export const incorporarGuiaAPI = async (asuntoId: string, rutaCodigo: RutaCodigo) => {
+  const response = await apiClient.post<AsuntoAPI>(`/asuntos/${asuntoId}/guia`, { ruta_codigo: rutaCodigo });
   return response.data;
 };
 
@@ -174,7 +171,7 @@ export const actualizarVisibilidadNovedadAPI = async (
   return response.data;
 };
 
-export const actualizarEstadoAPI = async (asuntoId: string, payload: { estado_id?: string }) => {
+export const actualizarEstadoAPI = async (asuntoId: string, payload: { estado_id?: string | null }) => {
   const response = await apiClient.patch(`/asuntos/${asuntoId}/estado`, payload);
   return response.data;
 };

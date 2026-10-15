@@ -13,7 +13,7 @@ CLIENTE_CARLOS_ID = "00000000-0000-0000-0000-000000000020"
 async def create_case(client, suffix: str):
     response = await client.post(
         "/api/v1/asuntos",
-        json={
+        json={"titulo": "Expediente de prueba", "ruta_codigo": "insolvencia_persona_natural:v2",
             "radicado": f"TEST-FLUJO-{suffix}",
             "cliente_id": CLIENTE_CARLOS_ID,
         },
@@ -51,7 +51,7 @@ async def test_create_case_starts_with_seven_sequential_steps(client):
 async def test_create_case_assigns_an_internal_code_when_not_provided(client):
     response = await client.post(
         "/api/v1/asuntos",
-        json={"cliente_id": CLIENTE_CARLOS_ID},
+        json={"titulo": "Expediente de prueba", "ruta_codigo": "insolvencia_persona_natural:v2", "cliente_id": CLIENTE_CARLOS_ID},
     )
 
     assert response.status_code == 201, response.text
@@ -62,7 +62,7 @@ async def test_create_case_assigns_an_internal_code_when_not_provided(client):
 async def test_create_case_derives_the_initial_next_action_from_the_route(client):
     response = await client.post(
         "/api/v1/asuntos",
-        json={
+        json={"titulo": "Expediente de prueba", "ruta_codigo": "insolvencia_persona_natural:v2",
             "cliente_id": CLIENTE_CARLOS_ID,
             "fecha_apertura": "2026-07-15",
         },
@@ -246,10 +246,10 @@ async def test_workflow_stops_when_viability_is_not_confirmed(client):
 @pytest.mark.asyncio
 async def test_create_case_rejects_duplicate_radicado(client):
     radicado = f"TEST-FLUJO-{uuid.uuid4().hex[:8]}"
-    payload = {"radicado": radicado, "cliente_id": CLIENTE_CARLOS_ID}
+    payload = {"titulo": "Colisión de código", "radicado": radicado, "cliente_id": CLIENTE_CARLOS_ID}
     assert (await client.post("/api/v1/asuntos", json=payload)).status_code == 201
     duplicate = await client.post("/api/v1/asuntos", json=payload)
-    assert duplicate.status_code == 400
+    assert duplicate.status_code == 409
 
 
 @pytest.mark.asyncio

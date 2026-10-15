@@ -82,7 +82,7 @@ async def test_lawyer_cannot_open_or_modify_another_lawyers_case(alejandro_clien
     ).status_code == 404
     response = await alejandro_client.post(
         "/api/v1/asuntos",
-        json={
+        json={"titulo": "Expediente de prueba", "ruta_codigo": "insolvencia_persona_natural:v2",
             "cliente_id": "00000000-0000-0000-0000-000000000020",
             "abogado_id": "00000000-0000-0000-0000-000000000010",
         },

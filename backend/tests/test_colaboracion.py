@@ -29,7 +29,7 @@ async def archive_created_cases(client):
 
 
 async def create_case(client, **extra):
-    response = await client.post("/api/v1/asuntos", json={"cliente_id": CARLOS_ID, **extra})
+    response = await client.post("/api/v1/asuntos", json={"titulo": "Expediente de prueba", "ruta_codigo": "insolvencia_persona_natural:v2", "cliente_id": CARLOS_ID, **extra})
     assert response.status_code == 201, response.text
     case = response.json()
     _created_case_ids.append(case["id"])
