@@ -8,6 +8,7 @@ from app.models.asunto_paso import AsuntoPaso
 from app.models.novedad import Novedad
 from app.models.documento import DocumentoAsunto, TipoDocumental
 from app.models.firma_storage import FirmaStorageConfig
+from app.models.storage import StorageConnection, StorageOperation
 from app.models.auth_challenge import AuthChallenge
 from app.models.auth_rate_limit import AuthRateLimit
 from app.models.tarea import Tarea, TareaEstado, TareaPrioridad, TareaTipo
@@ -25,6 +26,8 @@ __all__ = [
     "DocumentoAsunto",
     "TipoDocumental",
     "FirmaStorageConfig",
+    "StorageConnection",
+    "StorageOperation",
     "AuthChallenge",
     "AuthRateLimit",
     "Tarea",

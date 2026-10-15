@@ -17,6 +17,17 @@ class FirmaStorageRepository(BaseRepository[FirmaStorageConfig]):
         )
         return res.scalars().first()
 
+    async def stage_destination(self, provider: str, connection_id: uuid.UUID | None = None):
+        config = await self.get_config()
+        if config is None:
+            config = FirmaStorageConfig(firma_id=self.firma_id)
+        config.provider = provider
+        config.auth_type = "local" if provider == "local" else "oauth2"
+        config.connection_id = connection_id
+        config.is_active = True
+        self.session.add(config)
+        return config
+
     async def create_or_update_config(self, data: FirmaStorageConfigCreate) -> FirmaStorageConfig:
         config = await self.get_config()
         if not config:
@@ -28,6 +39,8 @@ class FirmaStorageRepository(BaseRepository[FirmaStorageConfig]):
         else:
             for field, val in data.model_dump(exclude_unset=True).items():
                 setattr(config, field, val)
+        if config.provider == "local":
+            config.connection_id = None
         await self.session.commit()
         await self.session.refresh(config)
         return config

@@ -1,13 +1,41 @@
+x-asuntia-environment: &asuntia_environment
+  ENVIRONMENT: production
+  DATABASE_URL: ${DATABASE_URL}
+  JWT_SECRET: ${JWT_SECRET}
+  STORAGE_TOKEN_ENCRYPTION_KEY: ${STORAGE_TOKEN_ENCRYPTION_KEY}
+  ALLOW_ORIGINS: ${ALLOW_ORIGINS}
+  COOKIE_DOMAIN: ${COOKIE_DOMAIN}
+  FRONTEND_URL: ${FRONTEND_URL}
+  SMTP_HOST: ${SMTP_HOST}
+  SMTP_PORT: ${SMTP_PORT}
+  SMTP_USER: ${SMTP_USER:-}
+  SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+  SMTP_SECURITY: ${SMTP_SECURITY:-starttls}
+  EMAILS_FROM_EMAIL: ${EMAILS_FROM_EMAIL}
+  EMAILS_FROM_NAME: ${EMAILS_FROM_NAME:-Asuntia Legal}
+  ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-480}
+  GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+  GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+  GOOGLE_OAUTH_REDIRECT_URI: ${GOOGLE_OAUTH_REDIRECT_URI:-}
+  MICROSOFT_CLIENT_ID: ${MICROSOFT_CLIENT_ID:-}
+  MICROSOFT_CLIENT_SECRET: ${MICROSOFT_CLIENT_SECRET:-}
+  MICROSOFT_OAUTH_REDIRECT_URI: ${MICROSOFT_OAUTH_REDIRECT_URI:-}
+  REDIS_URL: redis://redis:6379/0
+
 services:
+  redis:
+    image: redis:7-alpine
+    restart: always
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
   migrate:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    environment:
-      - ENVIRONMENT=production
-      - DATABASE_URL=${DATABASE_URL}
-      - JWT_SECRET=${JWT_SECRET}
-      - STORAGE_TOKEN_ENCRYPTION_KEY=${STORAGE_TOKEN_ENCRYPTION_KEY}
+    environment: *asuntia_environment
     command: ["alembic", "upgrade", "head"]
     restart: "no"
 
@@ -16,26 +44,9 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     restart: always
-    environment:
-      - ENVIRONMENT=production
-      - DATABASE_URL=${DATABASE_URL}
-      - JWT_SECRET=${JWT_SECRET}
-      - ALLOW_ORIGINS=${ALLOW_ORIGINS}
-      - COOKIE_DOMAIN=${COOKIE_DOMAIN}
-      - ACCESS_TOKEN_EXPIRE_MINUTES=${ACCESS_TOKEN_EXPIRE_MINUTES:-480}
-      - SMTP_HOST=${SMTP_HOST}
-      - SMTP_PORT=${SMTP_PORT}
-      - SMTP_USER=${SMTP_USER}
-      - SMTP_PASSWORD=${SMTP_PASSWORD}
-      - EMAILS_FROM_EMAIL=${EMAILS_FROM_EMAIL}
-      - EMAILS_FROM_NAME=${EMAILS_FROM_NAME:-Asuntia Legal}
-      - FRONTEND_URL=${FRONTEND_URL}
-      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
-      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
-      - GOOGLE_OAUTH_REDIRECT_URI=${GOOGLE_OAUTH_REDIRECT_URI}
-      - STORAGE_TOKEN_ENCRYPTION_KEY=${STORAGE_TOKEN_ENCRYPTION_KEY}
+    environment: *asuntia_environment
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     volumes:
       - asuntia_storage:/app/storage
     healthcheck:
@@ -47,6 +58,21 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+
+  storage-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: always
+    command: ["arq", "app.workers.storage.WorkerSettings"]
+    environment: *asuntia_environment
+    volumes:
+      - asuntia_storage:/app/storage
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
 
   frontend:
     build:

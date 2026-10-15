@@ -430,3 +430,40 @@ rechazo concreto del backend.
 La casilla D02 permanece abierta hasta verificar el proxy ejecutándose. D01, D03
 y D04 conservan sus pendientes de migración/integridad, reconciliación/idempotencia
 y vías cloud autorizadas. No se modificó el esquema ni se añadieron dependencias.
+
+## 12. OneDrive personal por firma (2026-10-15)
+
+Implementación de conexión Microsoft, selección de carpeta existente, vinculación
+sin copiar el archivo, carga asíncrona y lectura autorizada. La instalación y el
+recorrido de aceptación están en [Almacenamiento OneDrive](ALMACENAMIENTO_ONEDRIVE.md).
+
+- Conexiones persistentes por firma y unidad; cambiar el destino no reinterpreta
+  documentos anteriores. Reconectar otra cuenta conserva las referencias existentes.
+- OAuth con PKCE, estado de un solo uso ligado a sesión y tokens cifrados. El HTTP
+  registra comandos; ARQ realiza intercambio, renovación, navegación y transferencias.
+  Redis transporta UUID y PostgreSQL conserva los trabajos pendientes.
+- Cargas con UUID y huella del contenido, reintentos recuperables y comprobación
+  de objeto remoto previo. Se prueban fallos antes de guardar metadatos y después
+  del commit real con confirmación perdida, sin duplicar archivo ni documento.
+- Archivos privados por defecto, comprobación de contenido aprobado y acceso actual
+  antes y después del trabajo. Cambios externos bloquean descarga hasta revisión;
+  revisar vuelve el documento privado y permite publicación mediante la acción existente.
+- Desconexión revoca tokens y lecturas preparadas sin borrar originales ni activar
+  local silenciosamente. La interfaz muestra configuración ausente y worker caído
+  como estados reales, con conservación de formularios y consulta del resultado.
+
+| Verificación | Resultado y límite |
+| --- | --- |
+| Backend completo | 369 pruebas correctas y una omitida por ausencia de Redis nativo; PostgreSQL 16 y migraciones reales. Los módulos OneDrive se vuelven a comprobar tras los últimos ajustes de reintento y paginación. |
+| Permisos y recuperación | Otra firma, cliente ajeno, documento privado, 401/403/404/422, sesión revocada, expiración, retiro de publicación, cambio de destino, desconexión, tokens renovados, confirmación perdida y entrega duplicada de la cola. |
+| Adaptador Graph | Transporte HTTP controlado, límites de contenido, errores sin secretos, rechazo de enlaces externos y descargas sin reenviar el Bearer al host de contenido. |
+| Migración `8a4f24321a7b` | Autogenerada, inspeccionada y aplicada localmente; `alembic check` sin diferencias. Conserva referencias antiguas y bloquea reversión destructiva. |
+| Frontend | 148 pruebas correctas y build TypeScript/Vite correcto; conexión, carpeta, vinculación privada, fallos recuperables y carga con resultado asíncrono. |
+| Navegador | Ajustes con la API real en escritorio y móvil, sin desbordamiento horizontal. Servidor local activo, Microsoft sin configurar y procesador ausente. No se autorizó una cuenta real ni se alteraron expedientes existentes. |
+| Infraestructura | Compose incorpora Redis y worker con configuración/volumen compartidos; YAML validado. CI incorpora Redis real para probar despacho y ejecución ARQ. Docker/proxy no se ejecutaron en este equipo. |
+
+D01–D04 permanecen abiertos: falta aceptación con la cuenta real y el despliegue,
+migración/verificación del archivo local histórico, reconciliación de temporales
+sin trabajo persistido y revisión de vías Google legadas. El soporte de OneDrive
+se incorpora a la entrega sin declarar cerrados esos pendientes. Dependencias
+nuevas de ejecución: ARQ y HTTPX, registradas también en requisitos de producción.

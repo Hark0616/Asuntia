@@ -37,6 +37,10 @@ class DocumentoResponse(PydanticBaseModel):
     subcarpeta: str
     provider: str
     external_file_id: str
+    storage_connection_id: uuid.UUID | None = None
+    nombre_original: str | None = None
+    content_sha256: str | None = None
+    remote_etag: str | None = None
     web_view_url: str
     web_download_url: Optional[str] = None
     mime_type: Optional[str] = None

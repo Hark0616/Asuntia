@@ -1,6 +1,7 @@
 import uuid
+import hashlib
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, status
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Response, status
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,6 +21,9 @@ from app.services.publicacion_service import PublicacionService
 from app.services.document_upload import read_validated_upload
 from app.services.storage.local_storage import LocalStorageService
 from app.services.office_lock import lock_office_actor
+from app.repositories.firma_storage_repository import FirmaStorageRepository
+from app.repositories.storage_repository import StorageOperationRepository
+from app.schemas.storage import StorageOperationResponse
 
 router = APIRouter()
 
@@ -60,14 +64,16 @@ async def list_documentos_asunto(
         return [DocumentoPortalResponse.from_documento(doc) for doc in documentos]
     return documentos
 
-@router.post("/asuntos/{asunto_id}/documentos/upload", response_model=DocumentoResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/asuntos/{asunto_id}/documentos/upload", response_model=DocumentoResponse | StorageOperationResponse, status_code=status.HTTP_201_CREATED)
 async def upload_documento_asunto(
     asunto_id: uuid.UUID,
+    response: Response,
     nombre_funcional: str = Form(..., min_length=1, max_length=255),
     tipo_documental: TipoDocumental = Form(TipoDocumental.OTRO),
     subcarpeta: Optional[str] = Form(None),
     compartido_con_cliente: bool = Form(False),
     file: UploadFile = File(...),
+    operation_id: uuid.UUID | None = Form(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_office_user),
 ):
@@ -78,7 +84,6 @@ async def upload_documento_asunto(
     nombre_funcional = nombre_funcional.strip()
     if not nombre_funcional:
         raise HTTPException(422, "Indica el nombre del documento.")
-    tipo_documental = tipo_documental.value
     asunto_repo = AsuntoRepository(db, current_user.firma_id)
     asunto = await asunto_repo.get_by_id(asunto_id)
     if not asunto or not can_access_asunto(current_user, asunto):
@@ -86,6 +91,17 @@ async def upload_documento_asunto(
 
     if compartido_con_cliente:
         require_publication_permission(current_user)
+
+    config = await FirmaStorageRepository(db, current_user.firma_id).get_config()
+    previous = await StorageOperationRepository(db, current_user.firma_id).get_by_id(operation_id) if operation_id else None
+    if previous or (config and config.provider == "onedrive"):
+        if not operation_id:
+            raise HTTPException(422, "Indica el identificador de la operación de carga.")
+        from app.api.v1.endpoints.storage import remote_upload
+        response.status_code = 202
+        return await remote_upload(asunto_id, operation_id, nombre_funcional, tipo_documental,
+                                   compartido_con_cliente, file, db, current_user)
+    tipo_documental = tipo_documental.value
 
     # No aprovisionar carpetas ni modificar la BD antes de validar el archivo.
     file_bytes, filename, mime_type = await read_validated_upload(file)
@@ -143,6 +159,8 @@ async def upload_documento_asunto(
         "web_view_url": web_view,
         "web_download_url": web_download,
         "mime_type": mime_type,
+        "nombre_original": filename,
+        "content_sha256": hashlib.sha256(file_bytes).hexdigest(),
         "tamano_bytes": size_bytes,
         "compartido_con_cliente": compartido_con_cliente,
         "estado_revision": "recibido"
@@ -245,6 +263,8 @@ async def preview_documento_proxy(
     if current_user.rol == "cliente" and not doc.compartido_con_cliente:
         raise HTTPException(status_code=404, detail="Documento no encontrado")
 
+    if doc.provider == "onedrive":
+        raise HTTPException(409, "Prepara este documento desde Asuntia para consultarlo.")
     if doc.provider != "local":
         raise HTTPException(
             status_code=status.HTTP_501_NOT_IMPLEMENTED,

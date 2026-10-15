@@ -18,7 +18,7 @@ class LocalStorageService(BaseStorageService):
 
     def contained_path(self, value: str | Path) -> Path:
         path = Path(value)
-        if not path.is_absolute() and (PureWindowsPath(value).drive or "\\" in str(value)):
+        if not path.is_absolute() and (PureWindowsPath(value).drive or (os.name != "nt" and "\\" in str(value))):
             raise ValueError("Ruta de almacenamiento inválida")
         path = (path if path.is_absolute() else self.base_path / path).resolve()
         if path == self.base_path or not path.is_relative_to(self.base_path):

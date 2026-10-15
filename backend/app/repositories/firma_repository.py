@@ -21,6 +21,12 @@ class FirmaRepository:
         )
         return result.scalars().first()
 
+    async def list_ids_for_workers(self) -> list[uuid.UUID]:
+        """Solo despacho interno: cada operación se consulta luego en su tenant."""
+        # Incluye firmas retiradas para cancelar sus trabajos y limpiar solamente
+        # temporales vencidos; guard() impide ejecutar acciones remotas de ellas.
+        return list((await self.session.execute(select(Firma.id))).scalars().all())
+
     async def lock_active(self, firma_id: uuid.UUID) -> Firma | None:
         """Serializa cambios de equipo y asignaciones dentro del mismo tenant."""
         result = await self.session.execute(

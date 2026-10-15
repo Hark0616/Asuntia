@@ -14,7 +14,7 @@ class UploadLimitMiddleware:
         path = scope.get("path", "").rstrip("/")
         if (scope["type"] != "http" or scope.get("method") != "POST"
                 or not path.startswith("/api/v1/asuntos/")
-                or not path.endswith("/documentos/upload")):
+                or not path.endswith(("/documentos/upload", "/documentos/onedrive-upload"))):
             return await self.app(scope, receive, send)
 
         detail = "La carga supera el límite de 21 MiB por solicitud."

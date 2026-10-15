@@ -281,11 +281,12 @@ privado que exige el núcleo. Este bloque no amplía la integración de proveedo
 
 ## Decisión de almacenamiento por firma (2026-10-15)
 
-**Requisito del usuario, pendiente de implementación y aceptación:** la primera
+**Implementación incorporada; pendiente de aceptación con la cuenta real:** la primera
 firma ya trabaja en **OneDrive personal**, confirmado por el usuario. Local y
 OneDrive deben resolver el recorrido documental de esta entrega; Google Drive podrá incorporarse mediante otro
-adaptador. La presencia de `BaseStorageService` y código Google no demuestra que
-OneDrive esté disponible: la factoría y los DTO actuales todavía no lo admiten.
+adaptador. OneDrive personal dispone de autorización delegada, conexión persistente,
+selección de carpetas y operaciones mediante ARQ. La guía de instalación y los
+límites de aceptación están en [Almacenamiento OneDrive](ALMACENAMIENTO_ONEDRIVE.md).
 
 - Local significa almacenamiento privado persistente del servidor de Asuntia,
   independiente de la carpeta sincronizada de un PC del equipo.
@@ -319,8 +320,11 @@ decisión. La primera conexión debe usar autorización delegada de la cuenta pe
 existente, con renovación y revocación de credenciales. Elegir una carpeta delimita
 el alcance operativo de Asuntia; no debe presentarse como un permiso de Microsoft
 limitado a esa carpeta sin verificar que la autorización concedida lo sea.
-Falta verificar las autorizaciones reales, titularidad de la carpeta y política
-ante ediciones externas; ninguna cuenta ha sido conectada por documentar este requisito.
+La lectura comprueba el SHA-256 del contenido aprobado. Un cambio externo bloquea
+la descarga; revisar cambios actualiza los metadatos y devuelve el documento a
+privado, para publicarlo de nuevo mediante la acción existente. No se guardan versiones.
+Falta verificar la autorización real y titularidad de la carpeta; ninguna cuenta
+real ha sido conectada durante la implementación.
 
 Referencias técnicas: Microsoft Graph distingue unidad y elemento y soporta
 [OneDrive, OneDrive for Business y bibliotecas SharePoint](https://learn.microsoft.com/en-us/graph/api/resources/onedrive?view=graph-rest-1.0).

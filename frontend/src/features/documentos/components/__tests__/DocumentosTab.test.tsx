@@ -399,6 +399,7 @@ describe('DocumentosTab', () => {
     fireEvent.submit(fileInput.closest('form')!);
     await waitFor(() => expect(uploadDocumentoAPI).toHaveBeenCalledTimes(2));
     const payload = vi.mocked(uploadDocumentoAPI).mock.calls[1][1];
+    expect(payload.get('operation_id')).toBe(vi.mocked(uploadDocumentoAPI).mock.calls[0][1].get('operation_id'));
     expect(payload.get('file')).toBe(file);
     expect(payload.get('nombre_funcional')).toBe('Acta');
     expect(payload.get('tipo_documental')).toBe('acta_audiencia');
@@ -407,5 +408,23 @@ describe('DocumentosTab', () => {
     await user.click(screen.getByRole('button', { name: 'Subir documento' }));
     expect(screen.getByLabelText('Nombre del documento')).toHaveValue('');
     expect(screen.getByLabelText('Compartir con el cliente')).not.toBeChecked();
+  });
+
+  it('espera la confirmación de OneDrive antes de vaciar el formulario', async () => {
+    const user = userEvent.setup();
+    const queryClient = renderDocumentos();
+    const operation = {id: 'upload-job', kind: 'upload', status: 'queued' as const, result: null,
+      error_code: null, error_message: null, expires_at: '2099-01-01T00:00:00Z'};
+    vi.mocked(uploadDocumentoAPI).mockResolvedValue(operation);
+    vi.spyOn(apiClient, 'get').mockResolvedValue({data: operation});
+    await user.click(screen.getByRole('button', {name: 'Subir documento'}));
+    await user.upload(screen.getByLabelText('Archivo'), new File(['contenido'], 'Soporte.pdf', {type: 'application/pdf'}));
+    fireEvent.submit(screen.getByLabelText('Archivo').closest('form')!);
+    expect(await screen.findByText('Guardando archivo en OneDrive…')).toBeInTheDocument();
+    expect(screen.getByLabelText('Nombre del documento')).toHaveValue('Soporte');
+    expect(screen.getByLabelText('Archivo')).toBeDisabled();
+    vi.mocked(apiClient.get).mockResolvedValue({data: {...operation, status: 'completed', result: {documento_id: 'doc-1'}}});
+    await queryClient.invalidateQueries({queryKey: ['storage-operation', 'upload-job']});
+    await waitFor(() => expect(screen.queryByLabelText('Archivo')).not.toBeInTheDocument());
   });
 });

@@ -11,7 +11,7 @@ import pytest_asyncio
 
 
 PREVIOUS = '8d5db36e435d'
-CURRENT = '4286c195fcc2'
+CURRENT = '8a4f24321a7b'
 BACKEND = Path(__file__).resolve().parents[1]
 
 
@@ -116,3 +116,32 @@ async def test_duplicate_legacy_codes_abort_without_partial_schema(migration_db)
         """)
     finally:
         await connection.close()
+
+
+async def test_storage_migration_preserves_legacy_files_and_guards_downgrade(migration_db):
+    ids = await legacy_data(migration_db)
+    await migrate(migration_db, 'upgrade', '4286c195fcc2')
+    connection = await connect(migration_db)
+    firma_id = await connection.fetchval('SELECT firma_id FROM asuntos WHERE id = $1', ids[0])
+    document_id = uuid.uuid4()
+    await connection.execute('''INSERT INTO documentos_asunto
+        (id, firma_id, asunto_id, nombre_funcional, tipo_documental, subcarpeta, provider,
+         external_file_id, web_view_url, compartido_con_cliente, estado_revision, is_active, created_at, updated_at)
+        VALUES ($1,$2,$3,'Legado','anexo','anexo','local','/legacy/private/file.pdf','/private',false,'recibido',true,now(),now())''',
+        document_id, firma_id, ids[0])
+    await connection.close()
+    await migrate(migration_db, 'upgrade', 'head')
+    connection = await connect(migration_db)
+    row = await connection.fetchrow('SELECT * FROM documentos_asunto WHERE id=$1', document_id)
+    assert row['external_file_id'] == '/legacy/private/file.pdf' and row['storage_connection_id'] is None
+    assert row['nombre_original'] is None and row['content_sha256'] is None
+    await connection.execute('''INSERT INTO storage_connections
+        (id, firma_id, provider, drive_id, generation, is_active, created_at, updated_at)
+        VALUES ($1,$2,'onedrive','personal-test',1,true,now(),now())''', uuid.uuid4(), firma_id)
+    await connection.close()
+    result = await migrate(migration_db, 'downgrade', '4286c195fcc2', success=False)
+    assert 'conexiones existentes' in result.stderr
+    connection = await connect(migration_db)
+    assert await connection.fetchval('SELECT version_num FROM alembic_version') == CURRENT
+    assert await connection.fetchval('SELECT count(*) FROM documentos_asunto WHERE id=$1', document_id) == 1
+    await connection.close()

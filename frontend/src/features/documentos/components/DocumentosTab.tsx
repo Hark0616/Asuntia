@@ -5,6 +5,10 @@ import { AlertCircle, ExternalLink, Eye, EyeOff, FileText, Lock, Plus, RefreshCw
 
 import { apiClient } from '@/lib/axios';
 import { Tooltip } from '@/components/ui/Tooltip';
+import { useStorageOperation } from '@/features/firma/api/storage';
+import { OneDriveAccess } from './OneDriveAccess';
+import { OneDriveFiles } from './OneDriveFiles';
+import { TIPO_LABELS } from '../tipos';
 import {
   fetchDocumentosAsunto,
   uploadDocumentoAPI,
@@ -18,17 +22,6 @@ interface DocumentosTabProps {
   isReadOnly?: boolean;
   canManagePublication?: boolean;
 }
-
-const TIPO_LABELS: Record<string, string> = {
-  anexo: 'Anexo del cliente',
-  escrito_solicitud: 'Solicitud',
-  auto_admisorio: 'Auto admisorio',
-  acta_audiencia: 'Acta de audiencia',
-  acta_acuerdo: 'Acta de acuerdo',
-  poder: 'Poder otorgado',
-  comunicacion_juzgado: 'Comunicación del juzgado',
-  otro: 'Documento general',
-};
 
 const SUBCARPETAS = [
   { id: 'anexo', label: '01_Anexos (Insumos cliente)', publicLabel: 'Anexos' },
@@ -50,6 +43,10 @@ export function DocumentosTab({
 }: DocumentosTabProps) {
   const queryClient = useQueryClient();
   const [showUploadForm, setShowUploadForm] = useState(false);
+  const [showOneDrive, setShowOneDrive] = useState(false);
+  const [uploadRequestId, setUploadRequestId] = useState(() => crypto.randomUUID());
+  const [uploadJobId, setUploadJobId] = useState<string | null>(null);
+  const remoteUpload = useStorageOperation(uploadJobId);
   const [nombreFuncional, setNombreFuncional] = useState('');
   const [tipoDocumental, setTipoDocumental] = useState('anexo');
   const [compartido, setCompartido] = useState(false);
@@ -63,7 +60,8 @@ export function DocumentosTab({
   const mutacionCarga = useMutation({
     mutationFn: (formData: FormData) => uploadDocumentoAPI(asuntoId, formData),
   });
-  const uploading = mutacionCarga.isPending;
+  const uploading = mutacionCarga.isPending || Boolean(uploadJobId && !remoteUpload.isError
+    && (!remoteUpload.data || ['queued', 'running'].includes(remoteUpload.data.status)));
 
   useEffect(() => {
     if (previewDoc) previewRef.current?.focus();
@@ -114,6 +112,20 @@ export function DocumentosTab({
   });
   const busy = uploading || mutacionVisibilidad.isPending || mutacionBorrado.isPending;
 
+  const finishUpload = () => {
+    refreshExpediente();
+    setNombreFuncional('');
+    setSelectedFile(null);
+    setCompartido(false);
+    setShowUploadForm(false);
+    setUploadJobId(null);
+    setUploadRequestId(crypto.randomUUID());
+  };
+  useEffect(() => {
+    if (remoteUpload.data?.status === 'completed') finishUpload();
+    if (remoteUpload.data?.status === 'failed') setUploadError(remoteUpload.data.error_message || 'No se pudo completar la carga.');
+  }, [remoteUpload.data]);
+
   const handleUploadSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!selectedFile || !nombreFuncional.trim() || busy) return;
@@ -128,12 +140,12 @@ export function DocumentosTab({
       formData.append('nombre_funcional', nombreFuncional.trim());
       formData.append('tipo_documental', tipoDocumental);
       formData.append('compartido_con_cliente', String(canPublish && compartido));
-      await mutacionCarga.mutateAsync(formData);
-      refreshExpediente();
-      setNombreFuncional('');
-      setSelectedFile(null);
-      setCompartido(false);
-      setShowUploadForm(false);
+      formData.append('operation_id', uploadRequestId);
+      const result = await mutacionCarga.mutateAsync(formData);
+      if ('status' in result) {
+        queryClient.setQueryData(['storage-operation', result.id], result);
+        setUploadJobId(result.id);
+      } else finishUpload();
     } catch (error) {
       const detail = isAxiosError(error) ? error.response?.data?.detail : null;
       setUploadError(typeof detail === 'string' ? detail : 'No fue posible guardar el documento. Inténtalo de nuevo.');
@@ -151,7 +163,8 @@ export function DocumentosTab({
             : 'El tipo documental determina la carpeta del expediente.'}
           />
         </h3>
-        {!isReadOnly && (
+        {!isReadOnly && <div className="storage-actions"><button type="button" className="secondary-button" disabled={busy}
+          onClick={() => setShowOneDrive(!showOneDrive)}>{showOneDrive ? 'Cerrar OneDrive' : 'Vincular desde OneDrive'}</button>
           <button
             className="secondary-button"
             type="button"
@@ -163,8 +176,11 @@ export function DocumentosTab({
           >
             {showUploadForm ? 'Cancelar' : <><Plus size={16} aria-hidden="true" /> Subir documento</>}
           </button>
-        )}
+        </div>}
       </div>
+
+      {!isReadOnly && showOneDrive && <OneDriveFiles asuntoId={asuntoId} canPublish={canPublish}
+        onLinked={() => { setShowOneDrive(false); refreshExpediente(); }} />}
 
       {documentos.length > 0 && (
         <div className="document-search" role="search" aria-label="Documentos del asunto">
@@ -186,19 +202,22 @@ export function DocumentosTab({
       {!isReadOnly && showUploadForm && (
         <form onSubmit={handleUploadSubmit} className="document-upload">
           {uploadError && <p className="document-error" role="alert">{uploadError}</p>}
+          {uploadJobId && uploading && <p role="status">Guardando archivo en OneDrive…</p>}
+          {remoteUpload.isError && <div role="alert"><p>No se pudo consultar el resultado de la carga.</p>
+            <button type="button" className="secondary-button" onClick={() => remoteUpload.refetch()}>Consultar resultado</button></div>}
           <fieldset disabled={busy} className="document-fieldset">
             <div className="form-grid">
               <div className="field full">
                 <label htmlFor="doc-nombre">Nombre del documento</label>
                 <input id="doc-nombre" required maxLength={255} value={nombreFuncional}
-                  onChange={(event) => setNombreFuncional(event.target.value)}
+                  onChange={(event) => {setNombreFuncional(event.target.value); setUploadRequestId(crypto.randomUUID());}}
                   placeholder="Ej. Poder del cliente"
                 />
               </div>
               <div className="field">
                 <label htmlFor="doc-tipo">Tipo documental</label>
                 <select id="doc-tipo" value={tipoDocumental}
-                  onChange={(event) => setTipoDocumental(event.target.value)}>
+                  onChange={(event) => {setTipoDocumental(event.target.value); setUploadRequestId(crypto.randomUUID());}}>
                   {Object.entries(TIPO_LABELS).map(([key, label]) => (
                     <option key={key} value={key}>{label}</option>
                   ))}
@@ -211,6 +230,7 @@ export function DocumentosTab({
                     const file = event.target.files?.[0];
                     setSelectedFile(file || null);
                     setUploadError('');
+                    setUploadRequestId(crypto.randomUUID());
                     if (file) {
                       if (!nombreFuncional) setNombreFuncional(file.name.replace(/\.[^/.]+$/, ''));
                     }
@@ -220,7 +240,7 @@ export function DocumentosTab({
               {canPublish && (
                 <div className="field full row">
                   <input id="doc-shared" type="checkbox" checked={compartido}
-                    onChange={(event) => setCompartido(event.target.checked)}
+                    onChange={(event) => {setCompartido(event.target.checked); setUploadRequestId(crypto.randomUUID());}}
                   />
                   <label htmlFor="doc-shared">Compartir con el cliente</label>
                 </div>
@@ -310,7 +330,10 @@ export function DocumentosTab({
                         </div>
                       </div>
                       <div className="document-actions">
-                        {doc.provider === 'local' && doc.mime_type
+                        {doc.provider === 'onedrive' ? <OneDriveAccess id={doc.id} canRefresh={canPublish}
+                          onRefresh={() => {setPreviewDoc(null); refreshExpediente();}}
+                          onPreview={(url, button) => {previewTriggerRef.current = button; setPreviewDoc({url, nombre: doc.nombre_funcional});}}
+                        /> : doc.provider === 'local' && doc.mime_type
                           && INLINE_MIME_TYPES.has(doc.mime_type.toLowerCase()) ? (
                           <button className="secondary-button" type="button"
                             onClick={(event) => {

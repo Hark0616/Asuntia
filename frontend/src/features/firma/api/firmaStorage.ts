@@ -3,7 +3,8 @@ import { apiClient } from '@/lib/axios';
 export interface FirmaStorageConfig {
   id: string;
   firma_id: string;
-  provider: 'local' | 'google_drive';
+  provider: 'local' | 'google_drive' | 'onedrive';
+  connection_id?: string | null;
   auth_type: 'local' | 'oauth2';
   root_folder_id?: string;
   root_folder_name?: string;

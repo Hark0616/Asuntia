@@ -34,6 +34,10 @@ class DocumentoAsunto(BaseModel):
     tamano_bytes = Column(BigInteger, nullable=True)
     compartido_con_cliente = Column(Boolean, nullable=False, default=False)
     estado_revision = Column(String(50), nullable=False, default="recibido")
+    storage_connection_id = Column(UUID(as_uuid=True), ForeignKey("storage_connections.id"), nullable=True, index=True)
+    nombre_original = Column(String(255), nullable=True)
+    content_sha256 = Column(String(64), nullable=True)
+    remote_etag = Column(String(255), nullable=True)
 
     # Relación con Asunto
     asunto = relationship("Asunto", back_populates="documentos")

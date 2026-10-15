@@ -11,6 +11,12 @@ class UserRepository(BaseRepository[User]):
     def __init__(self, session, firma_id: uuid.UUID):
         super().__init__(User, session, firma_id)
 
+    async def get_active_identity(self, user_id: uuid.UUID) -> User | None:
+        result = await self.session.execute(select(User).where(
+            User.id == user_id, User.firma_id == self.firma_id, User.is_active.is_(True))
+            .execution_options(populate_existing=True))
+        return result.scalars().first()
+
     async def get_office_by_email(self, email: str) -> Optional[User]:
         stmt = (
             select(User)

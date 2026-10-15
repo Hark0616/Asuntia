@@ -35,6 +35,8 @@ async def set_storage_config(
     """
     Actualiza la configuración de almacenamiento de la firma (Google Drive, OneDrive, Local).
     """
+    if payload.provider == "onedrive":
+        raise HTTPException(409, "Conecta OneDrive y selecciona su carpeta desde Almacenamiento.")
     repo = FirmaStorageRepository(db, current_user.firma_id)
     config = await repo.create_or_update_config(payload)
     return config

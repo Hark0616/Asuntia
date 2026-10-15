@@ -15,6 +15,7 @@ class DocumentoRepository(BaseRepository[DocumentoAsunto]):
             .where(DocumentoAsunto.firma_id == self.firma_id)
             .where(DocumentoAsunto.is_active == True)
             .with_for_update(of=DocumentoAsunto)
+            .execution_options(populate_existing=True)
         )
         result = await self.session.execute(stmt)
         return result.scalars().first()
@@ -27,6 +28,13 @@ class DocumentoRepository(BaseRepository[DocumentoAsunto]):
         documento.is_active = False
         documento.compartido_con_cliente = False
         self.session.add(documento)
+
+    async def find_remote(self, asunto_id: uuid.UUID, connection_id: uuid.UUID, item_id: str):
+        result = await self.session.execute(select(DocumentoAsunto).where(
+            DocumentoAsunto.firma_id == self.firma_id, DocumentoAsunto.is_active.is_(True),
+            DocumentoAsunto.asunto_id == asunto_id, DocumentoAsunto.storage_connection_id == connection_id,
+            DocumentoAsunto.external_file_id == item_id))
+        return result.scalars().first()
 
     async def stage_create(
         self,

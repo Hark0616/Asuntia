@@ -16,5 +16,6 @@ class FirmaStorageConfig(BaseModel):
     root_folder_name = Column(String(255), nullable=True, default="Asuntia_Expedientes")
     is_active = Column(Boolean, nullable=False, default=True)
     last_verified_at = Column(DateTime(timezone=True), nullable=True)
+    connection_id = Column(UUID(as_uuid=True), ForeignKey("storage_connections.id"), nullable=True)
 
     firma = relationship("Firma", backref="storage_config")

@@ -1,4 +1,5 @@
 import { apiClient } from '@/lib/axios';
+import type { StorageOperation } from '@/types/storage';
 
 /** Proyección de un documento compartido, sin metadatos de almacenamiento internos. */
 export interface DocumentoPortalAPI {
@@ -23,6 +24,10 @@ export interface DocumentoAPI {
   subcarpeta: string;
   provider: string;
   external_file_id: string;
+  storage_connection_id?: string | null;
+  nombre_original?: string | null;
+  content_sha256?: string | null;
+  remote_etag?: string | null;
   web_view_url: string;
   web_download_url?: string;
   mime_type?: string;
@@ -43,8 +48,8 @@ export const fetchDocumentosAsunto = async (asuntoId: string, soloCompartidos: b
 export const uploadDocumentoAPI = async (
   asuntoId: string,
   formData: FormData
-): Promise<DocumentoAPI> => {
-  const response = await apiClient.post<DocumentoAPI>(`/asuntos/${asuntoId}/documentos/upload`, formData, {
+): Promise<DocumentoAPI | StorageOperation> => {
+  const response = await apiClient.post<DocumentoAPI | StorageOperation>(`/asuntos/${asuntoId}/documentos/upload`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   });
   return response.data;

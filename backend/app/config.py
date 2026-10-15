@@ -41,6 +41,10 @@ class Settings(BaseSettings):
     STORAGE_TOKEN_ENCRYPTION_KEY: str = ""
     # Ruta estable incluso al arrancar uvicorn desde otro directorio.
     LOCAL_STORAGE_PATH: str = str(Path(__file__).resolve().parents[1] / "storage")
+    MICROSOFT_CLIENT_ID: str = ""
+    MICROSOFT_CLIENT_SECRET: str = ""
+    MICROSOFT_OAUTH_REDIRECT_URI: str = "http://127.0.0.1:8000/api/v1/storage/onedrive/callback"
+    REDIS_URL: str = "redis://127.0.0.1:6379/0"
 
     # CORS
     ALLOW_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173"
@@ -66,6 +70,17 @@ class Settings(BaseSettings):
             raise ValueError("FRONTEND_URL debe ser una URL HTTP(S) de confianza sin credenciales, query ni fragmento")
         return value.rstrip("/")
 
+    @field_validator("MICROSOFT_OAUTH_REDIRECT_URI")
+    @classmethod
+    def validate_microsoft_redirect(cls, value):
+        if not value:
+            return value
+        parsed = urlsplit(value)
+        if (parsed.scheme not in {"http", "https"} or not parsed.hostname or parsed.username or parsed.password
+                or parsed.query or parsed.fragment or any(character.isspace() for character in value)):
+            raise ValueError("MICROSOFT_OAUTH_REDIRECT_URI debe ser una URL HTTP(S) sin credenciales, query ni fragmento")
+        return value
+
     @model_validator(mode="after")
     def validate_production_secrets(self):
         if bool(self.SMTP_USER) != bool(self.SMTP_PASSWORD):
@@ -83,6 +98,11 @@ class Settings(BaseSettings):
             raise ValueError("SMTP_SECURITY debe usar starttls o ssl en producción")
         if self.ENVIRONMENT == "production" and not self.FRONTEND_URL.startswith("https://"):
             raise ValueError("FRONTEND_URL debe usar HTTPS en producción")
+        if self.ENVIRONMENT == "production" and bool(self.MICROSOFT_CLIENT_ID) != bool(self.MICROSOFT_CLIENT_SECRET):
+            raise ValueError("Configura juntos MICROSOFT_CLIENT_ID y MICROSOFT_CLIENT_SECRET")
+        if (self.ENVIRONMENT == "production" and self.MICROSOFT_CLIENT_ID
+                and not self.MICROSOFT_OAUTH_REDIRECT_URI.startswith("https://")):
+            raise ValueError("MICROSOFT_OAUTH_REDIRECT_URI debe usar HTTPS en producción")
         return self
 
     @property
@@ -92,7 +112,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
-        extra="ignore"
+        extra="ignore",
+        hide_input_in_errors=True,
     )
 
 settings = Settings()
