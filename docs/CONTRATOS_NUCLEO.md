@@ -236,3 +236,45 @@ Los envíos masivos siguen reservados a workers. C06 permanece parcial hasta
 configurar y verificar un proveedor real y su operación. Las pruebas comprueban
 entrega SMTP en un servidor local controlado, TLS previo al login, reintentos y
 logs sin secretos; no prueban recepción en bandejas de producción.
+
+## Carga documental acotada
+
+Cada archivo admite hasta 20 MiB y la solicitud multipart completa hasta 21 MiB.
+El límite HTTP cuenta los bytes recibidos, incluso sin `Content-Length` o con una
+longitud falsa, antes de que multipart termine de escribir el spool. Un exceso
+responde 413; una interrupción cierra los temporales del parser. Nginx configura
+el mismo máximo de solicitud y 30 segundos de inactividad del cuerpo. La ejecución
+real del proxy permanece dentro de la aceptación pendiente del despliegue H05.
+
+La incorporación lee bloques de hasta 64 KiB, rechaza archivos vacíos y comprueba
+extensión, MIME y marcadores del contenedor antes de aprovisionar carpetas o
+escribir metadatos. Se admiten PDF, PNG, JPEG, GIF, WEBP, DOCX, XLSX y TXT UTF-8
+sin controles binarios. Un MIME ausente/genérico puede normalizarse al formato comprobado; uno
+específico incompatible se rechaza. Office requiere contenedor OOXML reconocible,
+con máximo de 2000 entradas y 100 MiB declarados sin compresión; se rechazan
+entradas cifradas, rutas inseguras, VBA, ActiveX y objetos incrustados reconocibles.
+HTML, SVG, ejecutables, Office legado/con macros y otros contenedores no están
+habilitados en este recorrido. Esta comprobación no
+es un antivirus ni una validación estructural completa.
+
+PDF y Office pueden contener acciones y adjuntos: se sirven como descarga, también
+los históricos, hasta disponer de inspección asíncrona. Imágenes y texto conservan
+previsualización en iframe restringido. Las respuestas autenticadas llevan
+`nosniff`, CSP sandbox, política sin referencia y `Cache-Control: private, no-store`.
+La interfaz muestra los rechazos de la API y conserva el archivo y los campos para
+corregir o reintentar; valida también el tamaño antes de enviar.
+
+El almacenamiento local usa una raíz estable (`LOCAL_STORAGE_PATH`, por defecto
+`backend/storage`), comprueba contención tras resolver rutas y no utiliza el nombre
+recibido como clave física. Rechaza rutas, controles y nombres reservados. Las
+nuevas carpetas incorporan firma y UUID del expediente; cada archivo tiene nombre
+aleatorio. La escritura corre en un thread, usa temporal privado y renombre al
+terminar, y retira el temporal si falla. Los metadatos de un archivo ausente generan
+error en vez de un documento ficticio. La carpeta del expediente, el documento y
+su evento se confirman juntos en BD, sin commit intermedio al crear carpetas.
+
+D01 y D03 siguen pendientes: aún existen referencias absolutas históricas, falta
+conservar nombre original e integridad como metadatos y falta reconciliar fallos
+entre almacenamiento y commit, con reintentos idempotentes. D04 sigue abierto por
+las vías cloud heredadas; sus enlaces no tienen todavía el contrato de acceso
+privado que exige el núcleo. Este bloque no amplía la integración de proveedores.

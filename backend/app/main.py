@@ -1,6 +1,7 @@
 from fastapi import FastAPI, status
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
+from app.core.upload_limit import UploadLimitMiddleware
 
 app = FastAPI(
     title="Asuntia API",
@@ -9,6 +10,8 @@ app = FastAPI(
     docs_url="/docs" if settings.ENVIRONMENT != "production" else None,
     redoc_url="/redoc" if settings.ENVIRONMENT != "production" else None,
 )
+
+app.add_middleware(UploadLimitMiddleware)
 
 # Configuración CORS estricta
 app.add_middleware(

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { isAxiosError } from 'axios';
 import { AlertCircle, ExternalLink, Eye, EyeOff, FileText, Lock, Plus, RefreshCw, Trash2, Upload } from 'lucide-react';
 
 import { apiClient } from '@/lib/axios';
@@ -37,8 +38,10 @@ const SUBCARPETAS = [
 ];
 
 const INLINE_MIME_TYPES = new Set([
-  'application/pdf', 'image/png', 'image/jpeg', 'image/gif', 'image/webp', 'text/plain',
+  'image/png', 'image/jpeg', 'image/gif', 'image/webp', 'text/plain',
 ]);
+const MAX_DOCUMENT_BYTES = 20 * 1024 * 1024;
+const DOCUMENT_ACCEPT = '.pdf,.png,.jpg,.jpeg,.gif,.webp,.txt,.docx,.xlsx';
 
 export function DocumentosTab({
   asuntoId,
@@ -51,13 +54,16 @@ export function DocumentosTab({
   const [tipoDocumental, setTipoDocumental] = useState('anexo');
   const [compartido, setCompartido] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [previewDoc, setPreviewDoc] = useState<{ url: string; nombre: string } | null>(null);
   const [busqueda, setBusqueda] = useState('');
   const previewRef = useRef<HTMLDivElement>(null);
   const previewTriggerRef = useRef<HTMLButtonElement | null>(null);
   const canPublish = !isReadOnly && canManagePublication;
+  const mutacionCarga = useMutation({
+    mutationFn: (formData: FormData) => uploadDocumentoAPI(asuntoId, formData),
+  });
+  const uploading = mutacionCarga.isPending;
 
   useEffect(() => {
     if (previewDoc) previewRef.current?.focus();
@@ -111,24 +117,26 @@ export function DocumentosTab({
   const handleUploadSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!selectedFile || !nombreFuncional.trim() || busy) return;
-    setUploading(true);
     setUploadError('');
+    if (!selectedFile.size || selectedFile.size > MAX_DOCUMENT_BYTES) {
+      setUploadError(selectedFile.size ? 'El archivo supera el límite de 20 MiB.' : 'El archivo está vacío.');
+      return;
+    }
     try {
       const formData = new FormData();
       formData.append('file', selectedFile);
       formData.append('nombre_funcional', nombreFuncional.trim());
       formData.append('tipo_documental', tipoDocumental);
       formData.append('compartido_con_cliente', String(canPublish && compartido));
-      await uploadDocumentoAPI(asuntoId, formData);
+      await mutacionCarga.mutateAsync(formData);
       refreshExpediente();
       setNombreFuncional('');
       setSelectedFile(null);
       setCompartido(false);
       setShowUploadForm(false);
-    } catch {
-      setUploadError('No fue posible guardar el documento. Inténtalo de nuevo.');
-    } finally {
-      setUploading(false);
+    } catch (error) {
+      const detail = isAxiosError(error) ? error.response?.data?.detail : null;
+      setUploadError(typeof detail === 'string' ? detail : 'No fue posible guardar el documento. Inténtalo de nuevo.');
     }
   };
 
@@ -182,7 +190,7 @@ export function DocumentosTab({
             <div className="form-grid">
               <div className="field full">
                 <label htmlFor="doc-nombre">Nombre del documento</label>
-                <input id="doc-nombre" required value={nombreFuncional}
+                <input id="doc-nombre" required maxLength={255} value={nombreFuncional}
                   onChange={(event) => setNombreFuncional(event.target.value)}
                   placeholder="Ej. Poder del cliente"
                 />
@@ -197,12 +205,13 @@ export function DocumentosTab({
                 </select>
               </div>
               <div className="field">
-                <label htmlFor="doc-file">Archivo</label>
-                <input id="doc-file" type="file" required
+                <div className="row"><label htmlFor="doc-file">Archivo</label><Tooltip content="PDF, PNG, JPG, GIF, WEBP, TXT, DOCX o XLSX. Máximo 20 MiB. PDF y Office se descargan." /></div>
+                <input id="doc-file" type="file" required accept={DOCUMENT_ACCEPT}
                   onChange={(event) => {
                     const file = event.target.files?.[0];
+                    setSelectedFile(file || null);
+                    setUploadError('');
                     if (file) {
-                      setSelectedFile(file);
                       if (!nombreFuncional) setNombreFuncional(file.name.replace(/\.[^/.]+$/, ''));
                     }
                   }}
@@ -249,7 +258,8 @@ export function DocumentosTab({
               Cerrar previsualización
             </button>
           </div>
-          <iframe src={previewDoc.url} title={`Previsualización de ${previewDoc.nombre}`} />
+          <iframe src={previewDoc.url} sandbox="" referrerPolicy="no-referrer"
+            title={`Previsualización de ${previewDoc.nombre}`} />
         </div>
       )}
 

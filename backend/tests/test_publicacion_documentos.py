@@ -256,7 +256,7 @@ async def test_shared_local_document_uses_authorized_preview_url_without_storage
     preview = await carlos_client.get(public_document["web_view_url"])
     assert preview.status_code == 200
     assert preview.content == content
-    assert preview.headers["content-disposition"].startswith("inline;")
+    assert preview.headers["content-disposition"].startswith("attachment;")
     assert preview.headers["x-content-type-options"] == "nosniff"
     assert (await elena_client.get(public_document["web_view_url"])).status_code == 404
     assert (await elena_client.get(f"/api/v1/asuntos/{case['id']}/documentos")).status_code == 404
@@ -265,9 +265,9 @@ async def test_shared_local_document_uses_authorized_preview_url_without_storage
 @pytest.mark.asyncio
 @pytest.mark.parametrize("filename,mime_type,disposition", [
     ("soporte.txt", "text/plain", "inline"),
-    ("pagina.html", "text/html", "attachment"),
-    ("grafico.svg", "image/svg+xml", "attachment"),
-    ("archivo.bin", "application/octet-stream", "attachment"),
+    ("pagina.html", "text/html", None),
+    ("grafico.svg", "image/svg+xml", None),
+    ("archivo.bin", "application/octet-stream", None),
 ])
 async def test_preview_downloads_active_or_unknown_content_without_mime_sniffing(
     client, carlos_client, filename, mime_type, disposition
@@ -279,6 +279,9 @@ async def test_preview_downloads_active_or_unknown_content_without_mime_sniffing
         data={"nombre_funcional": 'Soporte "revisión"', "compartido_con_cliente": "true"},
         files={"file": (filename, content, mime_type)},
     )
+    if disposition is None:
+        assert uploaded.status_code == 415, uploaded.text
+        return
     assert uploaded.status_code == 201, uploaded.text
     document_id = uploaded.json()["id"]
     response = await carlos_client.get(f"/api/v1/documentos/{document_id}/preview")

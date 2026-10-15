@@ -14,6 +14,18 @@ from app.config import settings
 from app.api.v1.endpoints import auth as auth_endpoints
 
 
+@pytest.fixture(scope="session")
+def isolated_storage_root(tmp_path_factory):
+    return tmp_path_factory.mktemp("asuntia-private-storage")
+
+
+@pytest.fixture(autouse=True)
+def storage_test_root(monkeypatch, isolated_storage_root):
+    # La BD de pruebas comparte expedientes durante la sesión, al igual que su
+    # raíz temporal. Nunca escribir documentos sintéticos en el storage real.
+    monkeypatch.setattr(settings, "LOCAL_STORAGE_PATH", str(isolated_storage_root))
+
+
 @pytest.fixture(autouse=True)
 def auth_test_budgets(monkeypatch):
     # Los recorridos de negocio reutilizan identidades seed; las pruebas de abuso

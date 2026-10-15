@@ -280,9 +280,10 @@ describe('DocumentosTab', () => {
     expect(screen.queryByText('Mostrando los últimos documentos disponibles.')).not.toBeInTheDocument();
   });
 
-  it('el preview local respeta la baseURL autenticada y cloud abre el enlace externo', async () => {
+  it('el preview de imagen respeta la baseURL autenticada y restringe el iframe', async () => {
     const user = userEvent.setup();
     apiClient.defaults.baseURL = 'https://api.example.com/api/v1';
+    mockedFetchDocumentos.mockResolvedValue([{ ...localDoc, mime_type: 'image/png' }, cloudDoc]);
     renderDocumentos({ isReadOnly: true });
     await screen.findByText('Poder del cliente');
 
@@ -290,6 +291,8 @@ describe('DocumentosTab', () => {
     await user.click(trigger);
     const preview = screen.getByTitle('Previsualización de Poder del cliente');
     expect(preview).toHaveAttribute('src', 'https://api.example.com/api/v1/documentos/doc-1/preview');
+    expect(preview).toHaveAttribute('sandbox', '');
+    expect(preview).toHaveAttribute('referrerpolicy', 'no-referrer');
     const previewRegion = screen.getByRole('region', { name: 'Previsualización de Poder del cliente' });
     expect(previewRegion).toHaveFocus();
     const nativePreview = within(previewRegion).getByRole('link', { name: 'Abrir documento' });
@@ -306,7 +309,7 @@ describe('DocumentosTab', () => {
     expect(trigger).toHaveFocus();
   });
 
-  it.each(['application/octet-stream', 'text/html', 'image/svg+xml', null, undefined])(
+  it.each(['application/pdf', 'application/octet-stream', 'text/html', 'image/svg+xml', null, undefined])(
     'ofrece descarga local sin iframe para MIME %s', async (mimeType) => {
       apiClient.defaults.baseURL = 'https://api.example.com/api/v1';
       mockedFetchDocumentos.mockResolvedValue([{ ...localDoc, mime_type: mimeType }]);
@@ -319,6 +322,32 @@ describe('DocumentosTab', () => {
       expect(screen.queryByTitle('Previsualización de Poder del cliente')).not.toBeInTheDocument();
     },
   );
+
+  it.each([0, 20 * 1024 * 1024 + 1])('rechaza tamaño %s sin enviar la carga y conserva el nombre', async (size) => {
+    const user = userEvent.setup();
+    renderDocumentos();
+    await user.click(screen.getByRole('button', { name: 'Subir documento' }));
+    const file = new File(['x'], 'Soporte.pdf', { type: 'application/pdf' });
+    Object.defineProperty(file, 'size', { value: size });
+    await user.upload(screen.getByLabelText('Archivo'), file);
+    fireEvent.submit(screen.getByLabelText('Archivo').closest('form')!);
+    expect(await screen.findByRole('alert')).toHaveTextContent(size ? 'El archivo supera el límite de 20 MiB.' : 'El archivo está vacío.');
+    expect(uploadDocumentoAPI).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Nombre del documento')).toHaveValue('Soporte');
+  });
+
+  it('presenta el rechazo de la API y permite corregir sin perder datos', async () => {
+    const user = userEvent.setup();
+    vi.mocked(uploadDocumentoAPI).mockRejectedValueOnce({
+      isAxiosError: true, response: { status: 415, data: { detail: 'El contenido no corresponde al formato del archivo.' } },
+    });
+    renderDocumentos();
+    await user.click(screen.getByRole('button', { name: 'Subir documento' }));
+    await user.upload(screen.getByLabelText('Archivo'), new File(['texto'], 'Soporte.pdf', { type: 'application/pdf' }));
+    fireEvent.submit(screen.getByLabelText('Archivo').closest('form')!);
+    expect(await screen.findByRole('alert')).toHaveTextContent('El contenido no corresponde al formato del archivo.');
+    expect(screen.getByLabelText('Nombre del documento')).toHaveValue('Soporte');
+  });
 
   it('fallar publicación conserva el documento y el formulario abierto', async () => {
     const user = userEvent.setup();

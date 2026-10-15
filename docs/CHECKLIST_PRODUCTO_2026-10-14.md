@@ -381,3 +381,35 @@ No se añadieron dependencias. La instalación debe aplicar Alembic antes de eje
 la nueva API y configurar SMTP seguro y `FRONTEND_URL` HTTPS en producción; los
 valores están documentados en `.env.example`. C05, la operación de correo en C06
 y los demás bloques abiertos conservan sus criterios pendientes.
+
+## 11. Avance documental: cargas acotadas (2026-10-15)
+
+**D02 implementado en la API y la interfaz; pendiente de aceptación del proxy real.**
+El archivo tiene máximo de 20 MiB y el cuerpo multipart de 21 MiB, contado sobre
+el tráfico real sin depender de `Content-Length`. Nginx tiene el mismo máximo de
+solicitud y timeout de cuerpo. La lectura se limita a bloques de 64 KiB y se
+validan tamaño, nombre, extensión, MIME y marcadores del contenedor antes de
+escribir. PDF, imágenes raster, TXT, DOCX y XLSX tienen política explícita; PDF y
+Office se descargan. Se rechazan contenedores Office cifrados, entradas inseguras,
+VBA, ActiveX y objetos incrustados reconocibles; se limita también su directorio
+y tamaño declarado descomprimido. Otros formatos activos/desconocidos se rechazan. La inspección
+estructural completa y antivirus no forman parte de esta comprobación.
+
+La raíz local deja de depender del directorio de arranque; las rutas se contienen
+y los nombres físicos son aleatorios. Una escritura fallida retira su temporal,
+un archivo inexistente deja de producir metadatos ficticios y se elimina el commit
+intermedio de carpetas. Se revalida el acceso de oficina y al asunto antes de la
+escritura. La descarga usa cookies y respuestas privadas sin caché; la vista de
+imágenes/texto usa sandbox. El formulario conserva datos al fallar y muestra el
+rechazo concreto del backend.
+
+| Verificación | Resultado y límite |
+| --- | --- |
+| Backend completo | 322 pruebas correctas en 188,53 s, sobre PostgreSQL 16 e incluidas las migraciones. La suite incorpora 38 casos de carga, transporte y almacenamiento. Tras ajustar permisos de creación del archivo se vuelven a comprobar los módulos afectados. |
+| Cargas y almacenamiento | Archivo vacío, exceso y límite exacto, MIME/extensión falsos, truncado, nombre/ruta maliciosos, acceso 401/403/404, campos 422, desconexión con cierre del spool, cuerpo sin longitud o con longitud falsa, renombre fallido y archivo ausente. |
+| Frontend | 136 pruebas correctas y `npm run build` correcto; rechazos locales/API conservan campos y evidencia, PDF/Office ofrecen descarga e iframe de imagen restringido. |
+| Navegador | Formulario y ayuda revisados en escritorio y a 390 px; sin desbordamiento horizontal del documento. No se incorporaron archivos a expedientes existentes durante esta revisión. |
+
+La casilla D02 permanece abierta hasta verificar el proxy ejecutándose. D01, D03
+y D04 conservan sus pendientes de migración/integridad, reconciliación/idempotencia
+y vías cloud autorizadas. No se modificó el esquema ni se añadieron dependencias.

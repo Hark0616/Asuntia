@@ -1,5 +1,6 @@
 from typing import List, Literal
 from urllib.parse import urlsplit
+from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field, field_validator, model_validator
 
@@ -38,6 +39,8 @@ class Settings(BaseSettings):
         "http://127.0.0.1:8000/api/v1/storage/oauth-callback"
     )
     STORAGE_TOKEN_ENCRYPTION_KEY: str = ""
+    # Ruta estable incluso al arrancar uvicorn desde otro directorio.
+    LOCAL_STORAGE_PATH: str = str(Path(__file__).resolve().parents[1] / "storage")
 
     # CORS
     ALLOW_ORIGINS: str = "http://localhost:5173,http://127.0.0.1:5173"
