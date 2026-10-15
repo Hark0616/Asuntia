@@ -86,8 +86,8 @@ P0 no significa que todos los hallazgos sean vulnerabilidades demostradas. Inclu
 
 ### B. Dominio e integridad
 
-- [ ] **B01 · P0 · Desacoplar el expediente de insolvencia.** Por qué: es el contenedor general del trabajo. Terminado al abrir y operar un asunto sin ruta; añadir una guía compatible cuando se necesite; conservar los asuntos existentes mediante migración y pruebas de compatibilidad. Depende de A02.
-- [ ] **B02 · P0 · Identificar inequívocamente el asunto.** Por qué: código interno y radicado oficial tienen propósitos distintos. Terminado con título propio, código único por firma garantizado en BD, radicado oficial opcional según el caso y manejo de colisiones concurrentes; migrar valores existentes sin inventar radicados.
+- [x] **B01 · P0 · Desacoplar el expediente de insolvencia.** Por qué: es el contenedor general del trabajo. Terminado al abrir y operar un asunto sin ruta; añadir una guía compatible cuando se necesite; conservar los asuntos existentes mediante migración y pruebas de compatibilidad. Depende de A02.
+- [x] **B02 · P0 · Identificar inequívocamente el asunto.** Por qué: código interno y radicado oficial tienen propósitos distintos. Terminado con título propio, código único por firma garantizado en BD, radicado oficial opcional según el caso y manejo de colisiones concurrentes; migrar valores existentes sin inventar radicados.
 - [ ] **B03 · P0 · Unificar estados y derivaciones.** Por qué: etapa, siguiente paso y tareas pueden divergir si se capturan por separado. Terminado con una fuente por dato, reglas explícitas de actualización y pruebas de que cambiar la fuente actualiza todas las vistas sin doble captura.
 - [ ] **B04 · P0 · Establecer transacciones por caso de uso.** Por qué: abrir, asignar o actualizar no debe dejar resultados parciales. Terminado al eliminar confirmaciones implícitas que rompan la operación, mantener SQL en repositorios y probar rollback con fallos intermedios. Preservar la apertura atómica de cliente y asunto que ya existe.
 - [ ] **B05 · P0 · Reforzar relaciones entre firmas.** Por qué: filtrar una tabla no valida automáticamente todos sus identificadores relacionados. Terminado con validaciones y restricciones pertinentes para padres, responsables, clientes y documentos; pruebas negativas cruzadas por cada operación, incluyendo recursos archivados y consultas personalizadas.
@@ -189,3 +189,44 @@ Los cambios de este hito son documentales: ninguna casilla funcional se da por i
 La delimitación transaccional sigue el criterio de confirmar una operación completa o revertirla ante un error; el límite se decide por caso de uso manteniendo las consultas en repositorios. Referencia: [SQLAlchemy: Session Basics](https://docs.sqlalchemy.org/en/20/orm/session_basics.html).
 
 Los controles de carga propuestos combinan autorización, límites, validación de contenido y nombres/ubicaciones controlados por la aplicación. Su implementación deberá cubrir las vías de lectura además de la subida. Referencia: [OWASP: File Upload Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html).
+
+
+## 7. Primera implementación: expediente general
+
+**Cambio:** [17cafb5](https://github.com/Hark0616/Asuntia/commit/17cafb5).
+**Contratos y permisos afectados:** [CONTRATOS_NUCLEO.md](CONTRATOS_NUCLEO.md).
+
+- **B01 cerrado:** apertura sin guía ni tareas automáticas de insolvencia; guía
+  opcional en la apertura o incorporada después desde el expediente. No se permite
+  reemplazar una guía existente. Las rutas y actuaciones históricas se conservan.
+- **B02 cerrado:** título obligatorio, código interno único por firma en PostgreSQL
+  (incluye archivados), radicado oficial opcional y separado, alias legado sin
+  duplicar columnas, conflictos 409 y reintento de colisiones de códigos generados.
+  La radicación de la guía alimenta la referencia canónica sin exigir recapturarla.
+- **B04 parcial:** apertura y alta opcional del cliente/cuenta/guía/tarea con commit
+  en servicio y rollback probado ante fallos intermedios. Las confirmaciones de los
+  demás casos de uso siguen pendientes de revisión.
+- **H01 parcial:** detalle por UUID y acceso por URL independientes de las listas,
+  incluido un expediente fuera de los primeros 100 y un cliente fuera del directorio
+  cargado. Búsqueda, filtros, paginación, totales y medición de consultas siguen abiertos.
+- **A02/A03, B05/B07 y H02/H03 parciales:** contratos y pruebas de las operaciones
+  afectadas. No se declaran cerrados sus criterios completos.
+
+### Verificación de esta entrega
+
+| Evidencia | Resultado y límite |
+| --- | --- |
+| Backend completo, `pytest -q` | 193 pruebas correctas, 316,64 s. Después se añadieron dos casos de integración y se ajustó la validación de la referencia oficial. |
+| Backend afectado, `pytest tests/test_expediente_general.py tests/test_workflow.py tests/test_colaboracion.py -q` | 66 pruebas correctas sobre la versión final, incluidas las dos nuevas; 73,85 s. |
+| Frontend, Vitest con Node 24.19.0 y `--maxWorkers=2` | 99 pruebas correctas. Node 20.11 del sistema no puede iniciar jsdom actual; la compatibilidad/reproducibilidad general de H04 sigue pendiente. |
+| `npm run build` | Correcto: TypeScript y Vite. |
+| Alembic real en bases desechables | Tres pruebas: cadena vacía, actualización de datos históricos (incluidos archivados y referencia oficial), y aborto transaccional ante códigos duplicados. |
+| Migración local `alembic upgrade head` y `alembic check` | Correctos; sin diferencias entre esquema y modelos. Revisión autogenerada e inspeccionada `f112d368f6d4`. |
+| Navegador local | Apertura desde formulario con cliente existente, sin guía, y recarga de su URL con título/código conservados. Formulario revisado en escritorio y viewport móvil de 390 px; no equivale a prueba en teléfono físico ni con usuarios finales. |
+
+La migración aborta si hay códigos históricos duplicados por firma para que se
+resuelvan expresamente antes de reintentar; no los renombra. El downgrade se bloquea
+si ya existen asuntos sin guía, porque la versión anterior no puede representarlos.
+Para recuperar esa versión se necesita una copia compatible, no inventar rutas de
+insolvencia. El siguiente bloque del expediente es completar H01 con listas y
+búsquedas de servidor antes de cerrar el recorrido E01.
