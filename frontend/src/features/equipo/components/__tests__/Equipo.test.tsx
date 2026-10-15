@@ -89,6 +89,15 @@ describe('Gestión de equipo', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
     expect(await screen.findByText('Alejandro')).toBeInTheDocument();
   });
+
+  it('recarga el equipo para recuperar invitaciones cuyo resultado no llegó', async () => {
+    show(<GestionEquipo currentUserId="admin" />);
+    expect(await screen.findByText('Alejandro')).toBeInTheDocument();
+    vi.mocked(consultarEquipo).mockResolvedValue([admin, { ...worker, estado: 'invitado' }]);
+    fireEvent.click(screen.getByRole('button', { name: 'Actualizar' }));
+    expect(await screen.findByRole('button', { name: 'Generar enlace' })).toBeInTheDocument();
+    expect(screen.getByText('Abogado · Invitación pendiente')).toBeInTheDocument();
+  });
 });
 
 describe('Activación del miembro', () => {

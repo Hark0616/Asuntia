@@ -98,9 +98,9 @@ P0 no significa que todos los hallazgos sean vulnerabilidades demostradas. Inclu
 ### C. Identidad, equipo y acceso
 
 - [x] **C01 · P0 · Resolver la firma sin constantes de demostración.** Por qué: una instalación real necesita contexto inequívoco. Terminado con resolución/configuración de firma en el ingreso y pruebas de firma desconocida, inactiva o ajena; ninguna operación normal exige usar `demo`.
-- [ ] **C02 · P0 · Completar el ciclo de vida del equipo.** Por qué: el jefe debe incorporar, asignar y retirar acceso sin modificar seeds o BD a mano. Terminado con alta o invitación, activación, cambio de rol, desactivación y reasignación explícita del trabajo; impedir que una baja deje el control de la firma inaccesible.
+- [x] **C02 · P0 · Completar el ciclo de vida del equipo.** Por qué: el jefe debe incorporar, asignar y retirar acceso sin modificar seeds o BD a mano. Terminado con alta o invitación, activación, cambio de rol, desactivación y reasignación explícita del trabajo; impedir que una baja deje el control de la firma inaccesible.
 - [ ] **C03 · P0 · Fortalecer autenticación y recuperación.** Por qué: el acceso debe resistir abuso y errores cotidianos. Terminado con límites de intentos/solicitudes, OTP consumido atómicamente una vez, expiración coherente, recuperación de contraseña y errores que no revelen cuentas; pruebas de solicitudes concurrentes, caducadas y reutilizadas.
-- [ ] **C04 · P0 · Completar la vida de la sesión.** Por qué: cerrar sesión, cambiar permisos o desactivar un usuario debe tener efectos comprobables. Terminado con política de revocación y expiración, revalidación de firma/usuario, limpieza de caché al salir y recuperación clara ante 401 sin publicar ni reenviar una acción automáticamente.
+- [x] **C04 · P0 · Completar la vida de la sesión.** Por qué: cerrar sesión, cambiar permisos o desactivar un usuario debe tener efectos comprobables. Terminado con política de revocación y expiración, revalidación de firma/usuario, limpieza de caché al salir y recuperación clara ante 401 sin publicar ni reenviar una acción automáticamente.
 - [ ] **C05 · P0 · Verificar cookies, origen y secretos en despliegue.** Por qué: las propiedades locales no prueban el acceso seguro en dominios reales. Terminado con HTTPS, dominio compartido, cookies seguras, CORS explícito, defensa CSRF/origen verificada y configuración que rechace valores inseguros; incluir pruebas de solicitudes desde orígenes no autorizados.
 - [ ] **C06 · P0 · Hacer confiable el envío de acceso por correo.** Por qué: un OTP generado pero no entregado no completa el recorrido. Terminado con proveedor transaccional configurado, transporte seguro, timeout, fallos observables, reintentos acotados y mensajes de expiración derivados de la misma configuración. Sacar I/O bloqueante del ciclo async y llevar envíos masivos a cola; validar entrega en un entorno controlado, sin prometer recepción garantizada.
 
@@ -282,3 +282,52 @@ H04 permanece abierto por su alcance de dependencias y análisis de vulnerabilid
 La apertura con búsqueda de clientes fuera del directorio cargado, el ciclo del
 equipo, almacenamiento, publicación, citas y verificación operativa mantienen
 sus criterios pendientes en el checklist.
+
+## 9. Equipo y ciclo de sesión
+
+**Cambios:** [58435b3](https://github.com/Hark0616/Asuntia/commit/58435b3)
+(backend de invitaciones, roles y bajas) y
+[289c4ad](https://github.com/Hark0616/Asuntia/commit/289c4ad)
+(interfaz de equipo y recuperación de sesión).
+
+- **C02 cerrado:** Ajustes → Equipo permite invitar, activar, cambiar rol,
+  cancelar invitaciones, retirar acceso y reincorporar conservando la identidad.
+  El administrador comparte el enlace generado; no se envía correo automáticamente.
+  El enlace vence en 24 horas, se guarda como HMAC y solo puede consumirse una vez.
+  La contraseña se crea en la activación y no se muestra a administración.
+- La baja exige reemplazo cuando hay trabajo y transfiere clientes, asuntos y
+  tareas abiertas en una transacción. Conserva tareas terminadas, autores y
+  delegaciones a otros miembros. El paso a auxiliar transfiere el trabajo activo;
+  el paso a abogado transfiere sus tareas de asuntos ajenos. No se permite retirar
+  al último administrador activo
+  ni modificar el propio acceso. Las pantallas obsoletas reciben 409.
+- Los comandos que asignan trabajo y los cambios del equipo comparten un bloqueo
+  por firma para evitar asignaciones a un usuario que está siendo retirado. Las
+  pruebas incluyen apertura y baja simultáneas y dos administradores que intentan
+  retirarse mutuamente. Un fallo al confirmar revierte la baja y la transferencia.
+- **C04 cerrado:** JWT con revisión del usuario, expiración configurada y
+  revalidación de firma, usuario y rol. Cerrar sesión revoca todos los tokens de
+  la identidad; reincorporar o devolver el rol anterior no restaura tokens viejos.
+  Un 401 protegido limpia caché, descarta respuestas anteriores y vuelve al ingreso
+  sin repetir acciones. Los fallos de conexión al cerrar sesión se muestran como
+  fallos. La política y el cambio de formato de cookies están en
+  `docs/CONTRATOS_NUCLEO.md`.
+- La consulta puede actualizarse para recuperar el alta cuyo resultado se perdió
+  y generar otro enlace desde la identidad existente, sin crear duplicados.
+
+### Evidencia de aceptación
+
+| Verificación | Resultado y límite |
+| --- | --- |
+| Backend completo, `pytest -q` | 253 pruebas correctas en 346,95 s, incluidas migraciones reales. |
+| Equipo | 19 pruebas nuevas: alta/activación/ingreso, secretos, vencimiento, renovación/cancelación, duplicados concurrentes, autorización, validaciones, versiones, límites administrativos, revocación, transferencias, concurrencia y rollback. |
+| Frontend completo con Node 24 | 124 pruebas correctas sobre la versión final; build TypeScript/Vite correcto. |
+| Sesión | Cookie revocada incluso al reproducirla, otras sesiones invalidadas al cerrar, expiración, ausencia de revisión, 401 global y respuesta tardía de sesión anterior. |
+| Navegador local | Navegación desde menú, carga real, formulario de reasignación, ancho móvil de 390 px sin desbordamiento. Cierre en otra pestaña, recuperación al consultar y nuevo ingreso sin repetir la acción anterior. La activación con contraseña se verifica mediante pruebas de API e interfaz. |
+| GitHub Actions | [Ejecución de 289c4ad](https://github.com/Hark0616/Asuntia/actions/runs/38668242460) correcta en frontend y backend con PostgreSQL independiente. |
+
+No se añadió una tabla ni dependencia: se reutiliza `AuthChallenge` y la revisión
+existente del usuario. No se necesita migración para esta entrega. B08 continúa
+abierto: revocar sesiones y conservar autores no sustituye una bitácora de cambios.
+C03, C05 y C06 conservan sus pendientes de recuperación, límites de abuso,
+verificación en dominios reales y entrega de correo.

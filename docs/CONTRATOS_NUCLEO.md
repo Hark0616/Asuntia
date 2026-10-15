@@ -152,7 +152,7 @@ al formulario correspondiente con un mensaje breve. Los errores de contraseña,
 OTP y activación permanecen en su formulario. Cada petición lleva una generación
 local de sesión: al salir, expirar o ingresar de nuevo, se descartan las respuestas
 anteriores para impedir que repueblen la caché o naveguen a datos del usuario
-anterior. No se almacenan tokens en JavaScript y no se reintentan mutaciones.
+anterior. El JWT permanece en la cookie HttpOnly y no se reintentan mutaciones.
 Iniciar sesión de nuevo tampoco reenvía la operación fallida: el usuario revisa
 su resultado antes de decidir si corresponde repetirla.
 

@@ -95,9 +95,12 @@ export function GestionEquipo({ currentUserId }: { currentUserId: string }) {
   return <section className="panel team-panel" aria-labelledby="team-title">
     <div className="section-title">
       <h3 id="team-title"><UsersRound size={18} /> Equipo</h3>
-      <button className="primary-button" onClick={() => { setAdding(true); setEditing(null); }} disabled={adding}>
-        <Plus size={16} /> Invitar miembro
-      </button>
+      <div className="team-actions">
+        <button className="secondary-button" onClick={() => query.refetch()} disabled={query.isFetching}>Actualizar</button>
+        <button className="primary-button" onClick={() => { setAdding(true); setEditing(null); }} disabled={adding}>
+          <Plus size={16} /> Invitar miembro
+        </button>
+      </div>
     </div>
     {invitation && <div className="team-invitation" role="region" aria-label="Enlace de invitación">
       <strong>Invitación para {invitation.miembro.nombre}</strong>
