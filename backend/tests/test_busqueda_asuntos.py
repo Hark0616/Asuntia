@@ -171,6 +171,8 @@ async def test_cross_tenant_related_names_and_ids_are_not_exposed(dataset, db_se
     assert row['estado_id'] is None and row['estado_nombre'] is None
     filtered = await client.get(PATH, params={'q': case.codigo_interno, 'estado_id': str(state.id)})
     assert filtered.json()['total'] == 0
+    filtered_responsible = await client.get(PATH, params={'q': case.codigo_interno, 'responsable_id': str(lawyer.id)})
+    assert filtered_responsible.json()['total'] == 0
 
 
 async def test_archiving_between_pages_updates_total_without_fictional_results(dataset, db_session, client):

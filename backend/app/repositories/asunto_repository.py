@@ -63,7 +63,7 @@ class AsuntoRepository(BaseRepository[Asunto]):
         if cliente_id is not None:
             filtered = filtered.where(Asunto.cliente_id == cliente_id)
         if responsable_id is not None:
-            filtered = filtered.where(Asunto.abogado_id == responsable_id)
+            filtered = filtered.where(Asunto.abogado_id == responsable_id, User.id.is_not(None))
         if estado_id is not None:
             filtered = filtered.where(Asunto.estado_id == estado_id, EstadoProcesal.id.is_not(None))
         if sin_responsable:

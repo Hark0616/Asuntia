@@ -97,7 +97,7 @@ P0 no significa que todos los hallazgos sean vulnerabilidades demostradas. Inclu
 
 ### C. Identidad, equipo y acceso
 
-- [ ] **C01 · P0 · Resolver la firma sin constantes de demostración.** Por qué: una instalación real necesita contexto inequívoco. Terminado con resolución/configuración de firma en el ingreso y pruebas de firma desconocida, inactiva o ajena; ninguna operación normal exige usar `demo`.
+- [x] **C01 · P0 · Resolver la firma sin constantes de demostración.** Por qué: una instalación real necesita contexto inequívoco. Terminado con resolución/configuración de firma en el ingreso y pruebas de firma desconocida, inactiva o ajena; ninguna operación normal exige usar `demo`.
 - [ ] **C02 · P0 · Completar el ciclo de vida del equipo.** Por qué: el jefe debe incorporar, asignar y retirar acceso sin modificar seeds o BD a mano. Terminado con alta o invitación, activación, cambio de rol, desactivación y reasignación explícita del trabajo; impedir que una baja deje el control de la firma inaccesible.
 - [ ] **C03 · P0 · Fortalecer autenticación y recuperación.** Por qué: el acceso debe resistir abuso y errores cotidianos. Terminado con límites de intentos/solicitudes, OTP consumido atómicamente una vez, expiración coherente, recuperación de contraseña y errores que no revelen cuentas; pruebas de solicitudes concurrentes, caducadas y reutilizadas.
 - [ ] **C04 · P0 · Completar la vida de la sesión.** Por qué: cerrar sesión, cambiar permisos o desactivar un usuario debe tener efectos comprobables. Terminado con política de revocación y expiración, revalidación de firma/usuario, limpieza de caché al salir y recuperación clara ante 401 sin publicar ni reenviar una acción automáticamente.
@@ -139,7 +139,7 @@ P0 no significa que todos los hallazgos sean vulnerabilidades demostradas. Inclu
 
 ### H. Rendimiento, pruebas y operación
 
-- [ ] **H01 · P0 · Separar consultas de lista y detalle.** Por qué: el límite actual y las relaciones cargadas penalizan corrección y rendimiento. Terminado con detalle por ID independiente de listas, búsqueda/filtros/paginación en servidor, orden estable y totales correctos; probar más de 100 asuntos, acceso directo y cambios entre páginas, midiendo consultas para evitar N+1 o carga de historias completas innecesaria.
+- [x] **H01 · P0 · Separar consultas de lista y detalle.** Por qué: el límite actual y las relaciones cargadas penalizan corrección y rendimiento. Terminado con detalle por ID independiente de listas, búsqueda/filtros/paginación en servidor, orden estable y totales correctos; probar más de 100 asuntos, acceso directo y cambios entre páginas, midiendo consultas para evitar N+1 o carga de historias completas innecesaria.
 - [ ] **H02 · P0 · Probar migraciones y datos existentes.** Por qué: `create_all` no ejecuta Alembic. Terminado con pruebas sobre BD vacía y sobre un estado anterior con datos representativos; validar backfill, restricciones, integridad y procedimiento de recuperación ante fallo. Cada cambio de modelo sincroniza Pydantic y TypeScript y usa revisión autogenerada inspeccionada.
 - [ ] **H03 · P0 · Automatizar las puertas de calidad.** Por qué: una ejecución local no protege los siguientes cambios. Terminado con CI que ejecute build, pruebas frontend/backend y migraciones; añadir pruebas de navegador de apertura/asignación, actualización/publicación, carga/descarga y citas por rol; incluir accesos denegados y fallos relevantes. No exigir un porcentaje arbitrario de cobertura como sustituto de estos recorridos.
 - [ ] **H04 · P0 · Hacer reproducible la instalación.** Por qué: rangos de dependencias y entornos distintos pueden producir resultados distintos. Terminado con dependencias resueltas de forma reproducible, inventario compatible, análisis de vulnerabilidades y una fuente de mantenimiento que sincronice pyproject/requirements requeridos; instalación limpia comprobada, sin secretos ni paquetes instalados solo localmente.
@@ -230,3 +230,55 @@ si ya existen asuntos sin guía, porque la versión anterior no puede representa
 Para recuperar esa versión se necesita una copia compatible, no inventar rutas de
 insolvencia. El siguiente bloque del expediente es completar H01 con listas y
 búsquedas de servidor antes de cerrar el recorrido E01.
+
+
+## 8. Búsqueda completa y contexto real de firma
+
+**Cambios:** [93370c2](https://github.com/Hark0616/Asuntia/commit/93370c2)
+(búsqueda y directorio ligeros),
+[f216727](https://github.com/Hark0616/Asuntia/commit/f216727)
+(interfaz de búsqueda e ingreso por firma) y
+[75b574a](https://github.com/Hark0616/Asuntia/commit/75b574a)
+(verificaciones automáticas).
+
+- **H01 cerrado:** búsqueda de resúmenes con filtros de servidor, paginación,
+  orden estable y total completo de la consulta autorizada. La consulta de página
+  y total ejecuta una sola sentencia; no carga historias, documentos ni tareas.
+  El directorio cuenta asuntos sin cargar expedientes. La interfaz usa este
+  contrato tanto en la lista global como en los asuntos del cliente, obtiene el
+  detalle por UUID y conserva filtros/página al abrir y volver. El endpoint de
+  lista anterior se conserva por compatibilidad, sin usarse en la interfaz.
+- **C01 cerrado:** firma explícita en los tres comandos de ingreso; captura
+  compartida, enlace `?firma=identificador` y configuración opcional
+  `VITE_FIRMA_SLUG`. No existe fallback implícito a `demo`. Pruebas de acceso
+  exitoso a una firma nueva, firma desconocida, inactiva o ajena y OTP que no puede
+  usarse en otra firma. Desactivar la firma corta sus sesiones existentes.
+- **C04 parcial:** cada petición autenticada vuelve a validar la firma, además
+  del usuario/rol. La revocación individual, recuperación global ante 401 y las
+  restantes condiciones siguen abiertas.
+- **G01/G05 parciales:** filtros en URL y lista separada por función; se retiró de
+  `App.tsx` la descarga y reconstrucción de todos los detalles. La navegación
+  completa, posición de scroll y la división restante siguen pendientes.
+- **H03 parcial:** CI real para build, pruebas frontend/backend y migraciones en
+  PostgreSQL 16. Faltan los recorridos automatizados de navegador por rol.
+
+### Evidencia de aceptación
+
+| Verificación | Resultado y límite |
+| --- | --- |
+| Backend completo con ambos contratos, `pytest -q` | 232 pruebas correctas, 336,43 s, incluida la cadena real Alembic. |
+| Búsqueda afectada tras endurecer el filtro por responsable | 20 pruebas correctas, 11,99 s. |
+| Frontend completo con Node 24 | 111 pruebas correctas; build TypeScript/Vite correcto. |
+| Volumen y paginación | 121 asuntos del mismo conjunto recorridos sin omisiones ni duplicados; orden determinista, detalle del último resultado y total correcto en páginas vacías. |
+| Aislamiento y relaciones | Abogado limitado a sus asuntos, filtros de otra firma o padre archivado sin resultados, nombres e IDs relacionados de otra firma excluidos, 401/403/422 y búsquedas literales con comodines. |
+| Consultas medidas | Una sentencia para búsqueda de 1 y de 100 filas; una para directorio con totales. Sin consultas a pasos, novedades, tareas ni documentos en esas listas. |
+| Estados y navegación | Pruebas de filtros, historial, volver desde detalle, fallo/reintento, página que queda vacía tras archivar y lista del mismo cliente independiente de la consulta global. |
+| Navegador local | Búsqueda por código, apertura y regreso con filtros, ancho móvil de 390 px sin desbordamiento horizontal; ingreso con firma explícita y conservación entre formularios. |
+| GitHub Actions | [Ejecución de f216727](https://github.com/Hark0616/Asuntia/actions/runs/38665697855) correcta en ambos jobs, incluida instalación limpia con `npm ci` y PostgreSQL independiente. |
+
+No se requiere migración para esta entrega: no cambia el modelo persistido. La
+instalación declara la versión compatible de Node y el workflow fija Node 24;
+H04 permanece abierto por su alcance de dependencias y análisis de vulnerabilidades.
+La apertura con búsqueda de clientes fuera del directorio cargado, el ciclo del
+equipo, almacenamiento, publicación, citas y verificación operativa mantienen
+sus criterios pendientes en el checklist.

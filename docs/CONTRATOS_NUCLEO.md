@@ -68,3 +68,39 @@ guía opcional, colisiones, rollback y accesos están en
 pasos y tareas existentes; los títulos históricos se derivan de la ruta conocida
 o del código cuando no existe un título previo. Ante códigos históricos repetidos
 en una firma, aborta con diagnóstico para evitar renombrarlos silenciosamente.
+
+## Búsqueda y acceso por firma
+
+`GET /asuntos/busqueda` recibe `pagina`, `por_pagina` (1–100), `q`, `cliente_id`,
+`responsable_id`, `estado_id` y `sin_responsable`. Devuelve `items`, `total`,
+`pagina` y `por_pagina`; el total y la página provienen de una misma consulta e
+instantánea PostgreSQL. El orden es `created_at DESC, id DESC`. Las páginas se
+actualizan con los datos actuales: al archivar o crear asuntos puede cambiar su
+contenido y el usuario puede regresar a la primera página. No son una exportación
+congelada ni un mecanismo para reintentar comandos de escritura.
+
+Los resúmenes solo contienen identidad, cliente, responsable y estado; nunca
+descargan pasos, tareas, documentos o novedades. El abogado siempre consulta su
+alcance, aunque solicite un filtro de otro responsable. Las relaciones visibles
+se restringen a la misma firma y a registros activos. La lista histórica sin
+paginación se conserva por compatibilidad; la interfaz de oficina usa la búsqueda
+y obtiene el detalle únicamente por UUID. El directorio de clientes cuenta asuntos
+sin cargar sus historias y respeta el alcance del abogado.
+
+La lista guarda filtros y página en la URL. Abrir un resultado y volver conserva
+esa consulta. La lista de otros asuntos del mismo cliente tiene su propia página
+(`asuntos_pagina`) y no altera los filtros de la consulta global. Una solicitud
+fallida no se presenta como una lista vacía ni muestra resultados de otra página.
+
+El ingreso requiere `firma_slug` explícito en contraseña, solicitud OTP y verificación
+OTP. La captura es compartida por ambos formularios; puede iniciarse desde
+`?firma=identificador` o `VITE_FIRMA_SLUG`, sin valor implícito de demostración.
+La configuración no concede permisos: el backend valida firma activa, usuario y
+credenciales. Cada petición autenticada vuelve a validar la firma; una baja de la
+firma invalida también sus sesiones existentes. La revocación individual de tokens,
+la recuperación de contraseña y la gestión del equipo continúan en C02–C04.
+
+La evidencia adicional está en `backend/tests/test_busqueda_asuntos.py`,
+`backend/tests/test_firma_acceso.py` y las pruebas de `ListaExpedientes`, acceso y
+navegación del frontend. `.github/workflows/quality.yml` ejecuta build, pruebas de
+ambas aplicaciones y migraciones reales en PostgreSQL 16 desde cada push o PR.
