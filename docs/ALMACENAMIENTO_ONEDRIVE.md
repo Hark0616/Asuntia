@@ -7,6 +7,23 @@ legado no equivale a un proveedor aceptado con estas garantías.
 
 ## Configuración del servidor
 
+**Prerrequisito de Asuntia:** disponer de un directorio (tenant) propio de Microsoft
+Entra y de una identidad con permiso para registrar aplicaciones. Una cuenta
+personal de OneDrive, por sí sola, no proporciona ese acceso administrativo.
+Microsoft explica cómo [usar o crear el directorio de desarrollo](https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-create-new-tenant).
+
+El registro pertenece al operador de Asuntia y se configura una vez por entorno.
+Cada firma solo autoriza su OneDrive personal desde Asuntia; no tiene que entrar
+al portal administrativo ni crear un directorio para conectar sus archivos.
+
+Si el portal muestra «Selected user account does not exist in tenant 'Microsoft
+Services'», comprobar en Azure **Cuenta → Switch directory** si existe un directorio
+propio accesible. Ese mensaje no prueba que la contraseña sea incorrecta ni que
+OneDrive personal sea incompatible. Si no hay un directorio accesible, completar
+primero el alta de Azure/Entra del operador o usar otro directorio autorizado.
+Un alta que solicite términos, tarjeta o datos de facturación debe completarla
+el titular; no crear recursos facturables para resolver este paso.
+
 1. Registrar una aplicación para **cuentas Microsoft personales** en Microsoft
    Entra. Usar plataforma **Web**: el backend intercambia el código y conserva
    el secreto. No registrar este callback como SPA ni habilitar flujo implícito.
