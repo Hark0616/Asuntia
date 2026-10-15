@@ -40,6 +40,8 @@ import { Tooltip } from '@/components/ui/Tooltip';
 import { AperturaAsuntoModal } from '@/components/ui/AperturaAsuntoModal';
 import { DocumentosTab } from '@/features/documentos/components/DocumentosTab';
 import { ConfiguracionAlmacenamiento } from '@/features/firma/components/ConfiguracionAlmacenamiento';
+import { GestionEquipo } from '@/features/equipo/components/GestionEquipo';
+import { ActivarEquipo } from '@/features/equipo/components/ActivarEquipo';
 import { FlujoAsunto } from '@/features/asuntos/components/FlujoAsunto';
 import { ActividadExpediente } from '@/features/asuntos/components/ActividadExpediente';
 import { ResponsableAsignacion } from '@/features/asuntos/components/ResponsableAsignacion';
@@ -49,6 +51,7 @@ import { TareasAsunto } from '@/features/tareas/components/TareasAsunto';
 import { PortalCliente } from '@/features/portal-cliente/components/PortalCliente';
 import { ListaExpedientes } from '@/features/asuntos/components/ListaExpedientes';
 import { formatAsuntosCount } from '@/lib/formatAsuntos';
+import { advanceSessionGeneration, SESSION_EXPIRED_EVENT } from '@/lib/session';
 
 export default function App() {
   const queryClient = useQueryClient();
@@ -56,6 +59,8 @@ export default function App() {
   const navigate = useNavigate();
   
   const [usuarioAutenticado, setUsuarioAutenticado] = useState<User | null | undefined>(undefined);
+  const [sessionExpired, setSessionExpired] = useState(false);
+  const [logoutError, setLogoutError] = useState(false);
   const [view, setView] = useState<'cliente' | 'firma'>('firma');
   const [firmaSlug, setFirmaSlug] = useState(() => firmaInicial(location.search, import.meta.env.VITE_FIRMA_SLUG));
   const [casoIdSeleccionado, setCasoIdSeleccionado] = useState<string>('');
@@ -67,6 +72,8 @@ export default function App() {
   );
   const seccionFirma = location.pathname === '/oficina/ajustes/almacenamiento'
     ? 'config_almacenamiento'
+    : location.pathname === '/oficina/ajustes/equipo'
+      ? 'config_equipo'
     : location.pathname === '/oficina/asuntos' || asuntoRouteMatch
       ? 'expedientes'
       : 'trabajo';
@@ -76,7 +83,7 @@ export default function App() {
     || Boolean(asuntoRouteMatch)
     || (
       usuarioAutenticado?.rol === 'administrador'
-      && location.pathname === '/oficina/ajustes/almacenamiento'
+      && ['/oficina/ajustes/almacenamiento', '/oficina/ajustes/equipo'].includes(location.pathname)
     )
   );
 
@@ -95,8 +102,25 @@ export default function App() {
     }
   }, [sessionUser, sessionLoading]);
 
+  React.useEffect(() => {
+    const expire = () => {
+      if (!usuarioAutenticado) return;
+      advanceSessionGeneration();
+      queryClient.cancelQueries();
+      queryClient.clear();
+      setUsuarioAutenticado(null);
+      setView(usuarioAutenticado.rol === 'cliente' ? 'cliente' : 'firma');
+      setSessionExpired(true);
+      setLogoutError(false);
+      setAperturaAbierta(false);
+      navigate('/', { replace: true });
+    };
+    window.addEventListener(SESSION_EXPIRED_EVENT, expire);
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, expire);
+  }, [usuarioAutenticado, queryClient, navigate]);
+
   // Consultas API protegidas por la sesión y el rol.
-  const authenticated = Boolean(usuarioAutenticado);
+  const authenticated = Boolean(usuarioAutenticado) && location.pathname !== '/activar-equipo';
   const officeUser = authenticated && usuarioAutenticado?.rol !== 'cliente';
   const asuntoIdRuta = asuntoRouteMatch?.params.asuntoId;
   const detalleQuery = useQuery({
@@ -261,6 +285,11 @@ export default function App() {
 
 
   const handleAuthenticated = (user: User) => {
+    advanceSessionGeneration();
+    queryClient.cancelQueries();
+    queryClient.clear();
+    setSessionExpired(false);
+    setLogoutError(false);
     queryClient.setQueryData(['auth', 'me'], user);
     setUsuarioAutenticado(user);
     setView(user.rol === 'cliente' ? 'cliente' : 'firma');
@@ -270,13 +299,23 @@ export default function App() {
   const handleLogout = async () => {
     try {
       await logoutAPI();
-    } finally {
+      advanceSessionGeneration();
+      queryClient.cancelQueries();
       queryClient.clear();
       setUsuarioAutenticado(null);
+      setSessionExpired(false);
+      setLogoutError(false);
+      setAperturaAbierta(false);
       setView('firma');
       navigate('/');
+    } catch {
+      setLogoutError(true);
     }
   };
+
+  if (location.pathname === '/activar-equipo') {
+    return <ActivarEquipo search={location.search} hash={location.hash} />;
+  }
 
   if (usuarioAutenticado === undefined) {
     return (
@@ -310,6 +349,7 @@ export default function App() {
           </div>
         </header>
 
+        {sessionExpired && <p className="form-error session-notice" role="alert">Tu sesión venció o cambió tu acceso. Inicia sesión de nuevo.</p>}
         {view === 'cliente' ? (
           <ClienteOTPLogin onSuccess={handleAuthenticated} firmaSlug={firmaSlug} onFirmaChange={setFirmaSlug} />
         ) : (
@@ -371,7 +411,7 @@ export default function App() {
             <span>
               {view === 'cliente'
                 ? 'Portal del cliente'
-                : seccionFirma === 'config_almacenamiento'
+                : seccionFirma.startsWith('config_')
                   ? 'Ajustes'
                   : seccionFirma === 'trabajo'
                     ? 'Mi trabajo'
@@ -385,11 +425,13 @@ export default function App() {
           onLogout={handleLogout}
           onOpenSettings={
             usuarioAutenticado.rol === 'administrador' && view === 'firma'
-              ? () => navigate('/oficina/ajustes/almacenamiento')
+              ? () => navigate('/oficina/ajustes/equipo')
               : undefined
           }
         />
       </header>
+
+      {logoutError && <p className="form-error session-notice" role="alert">No se pudo cerrar la sesión. Reintenta desde tu menú.</p>}
 
       {/* VISTA CLIENTE */}
       {view === 'cliente' && (
@@ -460,7 +502,7 @@ export default function App() {
                 </NavLink>
               </nav>
 
-              {seccionFirma === 'config_almacenamiento' ? (
+              {seccionFirma.startsWith('config_') ? (
                 <>
                   <div className="sidebar-divider" />
                   <div className="settings-sidebar-heading">
@@ -471,10 +513,13 @@ export default function App() {
                     </div>
                   </div>
                   <nav className="settings-nav" aria-label="Ajustes de la firma">
-                    <button type="button" className="active">
+                    <NavLink to="/oficina/ajustes/equipo" className={({ isActive }) => isActive ? 'active' : ''}>
+                      <UsersRound size={16} /> Equipo
+                    </NavLink>
+                    <NavLink to="/oficina/ajustes/almacenamiento" className={({ isActive }) => isActive ? 'active' : ''}>
                       <HardDrive size={16} />
                       Almacenamiento
-                    </button>
+                    </NavLink>
                   </nav>
                   <button
                     className="secondary-button settings-back"
@@ -533,7 +578,7 @@ export default function App() {
           </aside>
 
           <section className="main">
-            {seccionFirma === 'config_almacenamiento' ? (
+            {seccionFirma.startsWith('config_') ? (
               <div className="settings-content">
                 <div className="toolbar settings-toolbar">
                   <div>
@@ -541,7 +586,7 @@ export default function App() {
                     <span className="muted">Configuración disponible solo para administradores.</span>
                   </div>
                 </div>
-                <ConfiguracionAlmacenamiento />
+                {seccionFirma === 'config_equipo' ? <GestionEquipo currentUserId={usuarioAutenticado.id} /> : <ConfiguracionAlmacenamiento />}
               </div>
             ) : seccionFirma === 'trabajo' ? (
               <MiTrabajo

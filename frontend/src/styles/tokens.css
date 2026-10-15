@@ -49,5 +49,6 @@
   --portal-date-width: 11rem;
   --document-preview-height: 28rem;
   --control-min-height: 2.75rem;
+  --activation-max-width: 30rem;
   --color-danger-subtle: #fbf0f0;
 }

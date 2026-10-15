@@ -1465,7 +1465,7 @@ button {
   display: grid;
 }
 
-.settings-nav button {
+.settings-nav button, .settings-nav a {
   width: 100%;
   color: var(--text);
   border: 0;
@@ -1475,9 +1475,12 @@ button {
   gap: var(--space-2);
   padding: var(--space-3);
   display: flex;
+  text-decoration: none;
 }
 
-.settings-nav button.active {
+.session-notice { margin: var(--space-4); text-align: center; }
+
+.settings-nav button.active, .settings-nav a.active {
   color: var(--brand-dark);
   background: var(--panel-soft);
   font-weight: 650;

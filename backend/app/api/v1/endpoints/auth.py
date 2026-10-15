@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.core.deps import get_current_user
+from app.core.deps import access_token_cookie, get_current_user
 from app.core.db import get_db
 from app.schemas.auth import OTPRequest, OTPVerify, LoginRequest, SessionResponse, UserResponse
 from app.core.mail import send_otp_email
@@ -98,7 +98,9 @@ async def get_me(current_user: User = Depends(get_current_user)):
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
-async def logout(response: Response):
+async def logout(response: Response, access_token: str | None = Depends(access_token_cookie),
+                 db: AsyncSession = Depends(get_db)):
+    await AuthService(db).revoke_sessions(access_token)
     response.delete_cookie(
         key="access_token",
         httponly=True,

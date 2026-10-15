@@ -1,13 +1,14 @@
 import hashlib
 import hmac
 import secrets
+import uuid
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.core.exceptions import UnauthorizedException
-from app.core.security import verify_password
+from app.core.security import decode_access_token, verify_password
 from app.models.firma import Firma
 from app.models.user import User
 from app.repositories.auth_challenge_repository import AuthChallengeRepository
@@ -24,6 +25,23 @@ class AuthService:
 
     def __init__(self, session: AsyncSession):
         self.session = session
+
+    async def revoke_sessions(self, access_token: str | None) -> None:
+        """Cerrar sesión revoca todos los tokens vigentes de esta identidad."""
+        payload = decode_access_token(access_token) if access_token else None
+        if not payload:
+            return
+        try:
+            user_id, firma_id = uuid.UUID(payload["sub"]), uuid.UUID(payload["firma_id"])
+        except (KeyError, TypeError, ValueError):
+            return
+        if not await FirmaRepository(self.session).lock_active(firma_id):
+            return
+        user = await UserRepository(self.session, firma_id).get_by_id(user_id)
+        if (user and user.rol == payload.get("rol")
+                and user.updated_at.isoformat() == payload.get("user_revision")):
+            user.updated_at = datetime.now(timezone.utc)
+            await self.session.commit()
 
     async def resolve_firma(self, firma_slug: str) -> Firma:
         firma = await FirmaRepository(self.session).get_by_subdominio(firma_slug)

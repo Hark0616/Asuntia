@@ -139,6 +139,27 @@ con la revisión actual. Cambiar rol, retirar acceso o reincorporar invalida los
 tokens anteriores incluso si el rol vuelve a ser el mismo. Este sello revoca
 sesiones; no sustituye el historial de auditoría pendiente en B08.
 
+## Cierre, expiración y recuperación de sesión
+
+El JWT vence según `ACCESS_TOKEN_EXPIRE_MINUTES`; no se renueva silenciosamente.
+`POST /auth/logout` invalida todos los tokens vigentes de esa identidad y elimina
+su cookie. Si la cookie ya es inválida o no existe, el cierre sigue siendo 204.
+Si falla el cierre por conexión, la interfaz informa el fallo y permite reintentar;
+no confirma que el servidor haya cerrado la sesión.
+
+Un 401 de un recurso protegido cancela las consultas, limpia la caché y vuelve
+al formulario correspondiente con un mensaje breve. Los errores de contraseña,
+OTP y activación permanecen en su formulario. Cada petición lleva una generación
+local de sesión: al salir, expirar o ingresar de nuevo, se descartan las respuestas
+anteriores para impedir que repueblen la caché o naveguen a datos del usuario
+anterior. No se almacenan tokens en JavaScript y no se reintentan mutaciones.
+Iniciar sesión de nuevo tampoco reenvía la operación fallida: el usuario revisa
+su resultado antes de decidir si corresponde repetirla.
+
+El despliegue de esta revisión exige volver a ingresar: las cookies antiguas sin
+`user_revision` ya no autorizan acciones. La revocación se valida en cada petición;
+una vista ya abierta detecta cambios externos cuando vuelve a consultar la API.
+
 La evidencia adicional está en `backend/tests/test_busqueda_asuntos.py`,
 `backend/tests/test_firma_acceso.py` y las pruebas de `ListaExpedientes`, acceso y
 navegación del frontend. `.github/workflows/quality.yml` ejecuta build, pruebas de

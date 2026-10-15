@@ -1,4 +1,10 @@
 import pytest
+from datetime import timedelta
+
+from httpx import ASGITransport, AsyncClient
+
+from app.core.security import create_access_token, decode_access_token
+from app.main import app
 
 @pytest.mark.asyncio
 async def test_request_otp_success(client):
@@ -107,6 +113,32 @@ async def test_me_and_logout(client):
     assert logout.status_code == 204
     after_logout = await client.get("/api/v1/auth/me")
     assert after_logout.status_code == 401
+
+
+async def test_logout_revokes_replayed_cookie_and_other_sessions(client):
+    original_cookie = client.cookies.get("access_token")
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as other:
+        assert (await other.post("/api/v1/auth/login", json={"firma_slug": "demo",
+            "email": "daniela.torres@asuntia.com", "password": "admin123"})).status_code == 200
+        assert (await other.get("/api/v1/auth/me")).status_code == 200
+        assert (await client.post("/api/v1/auth/logout")).status_code == 204
+        assert (await other.get("/api/v1/auth/me")).status_code == 401
+        assert (await client.get("/api/v1/auth/me", headers={"Cookie": f"access_token={original_cookie}"})).status_code == 401
+
+
+async def test_expired_missing_revision_and_invalid_tokens(client, anonymous_client):
+    claims = decode_access_token(client.cookies.get("access_token"))
+    expired = create_access_token(claims, expires_delta=timedelta(seconds=-1))
+    without_revision = create_access_token({key: value for key, value in claims.items() if key != "user_revision"})
+    for token in (expired, without_revision, "invalid.jwt.cookie"):
+        headers = {"Cookie": f"access_token={token}"}
+        assert (await anonymous_client.get("/api/v1/auth/me", headers=headers)).status_code == 401
+        # Salir es idempotente incluso si la cookie ya no autoriza acciones.
+        response = await anonymous_client.post("/api/v1/auth/logout", headers=headers)
+        assert response.status_code == 204
+        assert "Max-Age=0" in response.headers["set-cookie"]
+    assert (await client.get("/api/v1/auth/me")).status_code == 200
+    assert (await anonymous_client.post("/api/v1/auth/logout")).status_code == 204
 
 @pytest.mark.asyncio
 async def test_verify_otp_malformed_code(client):

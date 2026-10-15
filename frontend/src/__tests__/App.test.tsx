@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -17,7 +17,8 @@ import {
   fetchEstadosAPI,
   fetchResponsablesAPI,
 } from '@/features/asuntos/api/asuntos';
-import { fetchCurrentUserAPI } from '@/features/auth/api/auth';
+import { fetchCurrentUserAPI, logoutAPI } from '@/features/auth/api/auth';
+import { SESSION_EXPIRED_EVENT } from '@/lib/session';
 import type { User } from '@/types/api';
 import type { AsuntoPortalAPI } from '@/types/portal';
 
@@ -122,6 +123,44 @@ beforeEach(() => {
 });
 
 describe('App: proyección autorizada y recuperación', () => {
+  it('limpia datos privados ante revocación sin repetir acciones', async () => {
+    prepareOffice();
+    const query = renderApp('/oficina/asuntos/asunto-1');
+    expect(await screen.findByRole('heading', { name: 'Expediente de prueba' })).toBeInTheDocument();
+    query.setQueryData(['privado', 'otra-firma'], { documento: 'reservado' });
+    vi.mocked(fetchCurrentUserAPI).mockRejectedValue({ response: { status: 401 } });
+    act(() => window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT)));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Tu sesión venció o cambió tu acceso');
+    expect(screen.getByLabelText('Correo Institucional')).toBeInTheDocument();
+    expect(query.getQueryData(['privado', 'otra-firma'])).toBeUndefined();
+    expect(query.getQueryData(['asuntos', 'detalle', 'asunto-1'])).toBeUndefined();
+    expect(crearNovedadAPI).not.toHaveBeenCalled();
+    expect(actualizarEstadoAPI).not.toHaveBeenCalled();
+  });
+
+  it('no presenta un fallo de cierre como una sesión cerrada', async () => {
+    prepareOffice();
+    vi.mocked(logoutAPI).mockRejectedValue(new Error('sin conexión'));
+    const query = renderApp('/oficina/asuntos/asunto-1');
+    const user = userEvent.setup();
+    expect(await screen.findByRole('heading', { name: 'Expediente de prueba' })).toBeInTheDocument();
+    query.setQueryData(['privado'], 'conservado');
+    await user.click(screen.getByRole('button', { name: /Ana Cliente/ }));
+    await user.click(screen.getByRole('menuitem', { name: 'Cerrar sesión' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo cerrar la sesión');
+    expect(screen.getByRole('heading', { name: 'Expediente de prueba' })).toBeInTheDocument();
+    expect(query.getQueryData(['privado'])).toBe('conservado');
+    expect(logoutAPI).toHaveBeenCalledTimes(1);
+  });
+
+  it('abre activación pública aunque exista una sesión de oficina', async () => {
+    prepareOffice();
+    renderApp('/activar-equipo?firma=real#invitacion=00000000-0000-0000-0000-000000000099&token=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
+    expect(await screen.findByRole('heading', { name: 'Activar acceso a Asuntia' })).toBeInTheDocument();
+    expect(fetchClientesAPI).not.toHaveBeenCalled();
+    expect(fetchAsunto).not.toHaveBeenCalled();
+  });
+
   it('conserva la firma del enlace al cambiar entre ingreso de oficina y cliente', async () => {
     const user = userEvent.setup();
     vi.mocked(fetchCurrentUserAPI).mockRejectedValue({ response: { status: 401 } });
