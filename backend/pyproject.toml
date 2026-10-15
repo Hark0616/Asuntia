@@ -25,6 +25,7 @@ dependencies = [
     "itsdangerous>=2.2.0",
     "httpx>=0.28.0",
     "arq>=0.28.0,<0.29",
+    "tzdata>=2026.5",
 ]
 
 [project.optional-dependencies]

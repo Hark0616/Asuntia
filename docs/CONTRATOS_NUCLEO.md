@@ -22,6 +22,56 @@ sí solo A02 ni A03.
 Ejemplo: «Revisión de contrato de arrendamiento», código `AS-2026-A1B2C3`,
 sin radicado oficial y sin guía. Tiene tareas, documentos y actividad normales.
 
+## Citas del expediente (2026-10-15)
+
+`Cita` es la fuente de reuniones y audiencias. Un asunto admite varias; la guía
+selecciona `cita_id` y la agenda consulta el mismo registro. Completar la selección
+conserva una instantánea histórica; reprogramar no reescribe actuaciones terminadas.
+La confirmación de realización y el resultado jurídico permanecen en la guía.
+
+- Administración y secretaría pueden organizar citas de los asuntos activos de
+  su firma; el abogado solo de los expedientes a su cargo. El portal no recibe
+  citas, participantes, resúmenes preparatorios ni enlaces de reunión.
+- Responsable y participantes deben ser miembros activos de la misma firma. Un
+  abogado participante debe ser titular del expediente. Participar no concede
+  permisos de acceso. Las identidades se conservan en el historial; no se envían
+  invitaciones ni recordatorios automáticamente.
+- Inicio y fin son instantes con offset; se guardan en UTC junto con una zona IANA
+  válida. Las nuevas citas duran más de cero y hasta 24 horas. Se pueden registrar
+  fechas pasadas; no se calcula ningún término jurídico. La interfaz captura en
+  Bogotá o en la zona original de la cita y rechaza horas locales inexistentes o
+  ambiguas; una edición de texto conserva segundos y precisión originales.
+- `POST /citas` recibe un UUID de operación estable. Repetir actor, asunto y datos
+  recupera el registro; reutilizarlo con otros datos produce 409. La interfaz
+  conserva el UUID al reintentar y lo cambia si cambia la solicitud. `PUT /citas/{id}`
+  y `POST /citas/{id}/cancelar` exigen `expected_updated_at`. Una pantalla obsoleta
+  conserva su captura y debe recargar expresamente. Una cita cancelada no se edita
+  ni se elimina; conserva el motivo y el historial.
+- Cita e historial se guardan juntos, bajo bloqueo de firma, actor, asunto y cita.
+  Cada cambio registra autor, fecha y valores anteriores/posteriores. No existen
+  comandos públicos para modificar o borrar ese historial. No sustituye la
+  bitácora general pendiente en B08. Una audiencia usada por la guía conserva su
+  tipo. Transferir un asunto o retirar acceso del equipo transfiere sus citas
+  futuras/en curso, preservando las terminadas y las delegaciones ajenas.
+- La agenda personal incluye responsabilidad y participación; la de equipo está
+  autorizada para administración y secretaría. Se consulta por intervalos de hasta
+  92 días, con inicio inclusivo y final exclusivo, incluyendo citas que solapan la
+  ventana. Cancelar o archivar retira la cita de la agenda, conservando sus datos.
+
+La migración `38d4ada7f314`, autogenerada y extendida para los datos, incorpora
+audiencias existentes mediante un UUID determinista por paso, sin volver a proyectar
+su JSON en la agenda. Conserva la captura original y la fecha civil legada se
+interpreta en Bogotá si no tenía offset. Una duración desconocida queda nula hasta
+su confirmación, sin inventar una hora de finalización. Los pasos pendientes pasan
+a seleccionar la cita; los completados conservan sus campos históricos. Una fecha
+ilegible o un responsable inconsistente aborta toda la migración para su revisión;
+una reversión con citas existentes se bloquea para preservar sus registros.
+
+F01–F04 siguen abiertos hasta completar calendario/lista con filtros por persona y
+asunto, aceptación de límites temporales en todas las vistas y revisión humana de
+agenda/guía. La sustitución de una audiencia ya referenciada por un paso completado
+requiere un flujo explícito; cancelar su cita no reescribe esa actuación.
+
 ## Guía opcional
 
 Una apertura sin `ruta_codigo` no crea pasos ni tareas automáticas de insolvencia.

@@ -17,10 +17,11 @@ import './MiTrabajo.css';
 
 interface MiTrabajoProps {
   isAdmin: boolean;
+  isAuxiliar?: boolean;
 }
 
-export function MiTrabajo({ isAdmin }: MiTrabajoProps) {
-  const [alcance, setAlcance] = useState<AlcanceTrabajo>('mio');
+export function MiTrabajo({ isAdmin, isAuxiliar = false }: MiTrabajoProps) {
+  const [alcance, setAlcance] = useState<AlcanceTrabajo>(isAuxiliar ? 'equipo' : 'mio');
   const [vista, setVista] = useState<'pendientes' | 'agenda'>('pendientes');
   const {
     data,
@@ -29,14 +30,14 @@ export function MiTrabajo({ isAdmin }: MiTrabajoProps) {
     isFetching,
     refetch,
   } = useQuery({
-    queryKey: ['tareas', 'mi-trabajo', alcance],
-    queryFn: () => fetchMiTrabajo(alcance),
+    queryKey: ['tareas', 'mi-trabajo', isAdmin ? alcance : 'mio'],
+    queryFn: () => fetchMiTrabajo(isAdmin ? alcance : 'mio'),
     staleTime: 30_000,
     refetchOnWindowFocus: true,
     enabled: vista === 'pendientes',
   });
   const total = data?.total || 0;
-  const totalLabel = alcance === 'equipo'
+  const totalLabel = isAdmin && alcance === 'equipo'
     ? total === 1
       ? '1 pendiente del equipo.'
       : `${total} pendientes del equipo.`
@@ -67,7 +68,7 @@ export function MiTrabajo({ isAdmin }: MiTrabajoProps) {
         <button className={vista === 'agenda' ? 'active' : ''} type="button" aria-pressed={vista === 'agenda'} onClick={() => setVista('agenda')}>Agenda</button>
       </div>
 
-      {isAdmin && (
+      {(isAdmin || (isAuxiliar && vista === 'agenda')) && (
         <div className="scope-tabs" role="group" aria-label="Alcance del trabajo">
           <button
             className={alcance === 'mio' ? 'active' : ''}

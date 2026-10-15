@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import DomainException
-from app.repositories.agenda_repository import AgendaRepository
+from app.repositories.cita_repository import CitaRepository
 from app.repositories.tarea_repository import TareaRepository
 from app.schemas.tarea import AgendaItemResponse, AgendaResponse
 
@@ -14,7 +14,7 @@ class AgendaService:
 
     def __init__(self, session: AsyncSession, firma_id: uuid.UUID):
         self.tareas = TareaRepository(session, firma_id)
-        self.audiencias = AgendaRepository(session, firma_id)
+        self.citas = CitaRepository(session, firma_id)
 
     async def list(self, user_id: uuid.UUID, desde: datetime | None,
                    hasta: datetime | None, *, include_team: bool, limit: int,
@@ -27,24 +27,17 @@ class AgendaService:
         tareas = await self.tareas.scheduled_tasks(
             user_id, desde, hasta, include_team=include_team,
             restrict_cases_to_responsable=restrict_cases_to_responsable)
-        pasos = await self.audiencias.scheduled_hearings(user_id, desde, hasta, include_team=include_team)
+        citas = await self.citas.scheduled(user_id, desde, hasta, include_team=include_team,
+                                          restrict_cases=restrict_cases_to_responsable)
         items = [AgendaItemResponse(
             id=f"tarea:{tarea.id}", origen="tarea", titulo=tarea.titulo,
             fecha=tarea.vence_en, asunto=tarea.asunto, responsable=tarea.responsable,
         ) for tarea in tareas]
-        for paso in pasos:
-            try:
-                fecha = datetime.fromisoformat(paso.datos["fecha_hora"])
-            except (KeyError, TypeError, ValueError):
-                continue
-            if fecha.tzinfo is None:
-                # Fechas operativas legadas en Colombia (UTC−5, sin horario de verano).
-                fecha = fecha.replace(tzinfo=timezone(timedelta(hours=-5)))
-            asunto = paso.asunto
-            if desde <= fecha < hasta and asunto.abogado and asunto.abogado.is_active:
-                items.append(AgendaItemResponse(
-                    id=f"audiencia:{paso.id}", origen="audiencia", titulo="Audiencia registrada",
-                    fecha=fecha, asunto=asunto, responsable=asunto.abogado,
-                ))
+        for cita in citas:
+            items.append(AgendaItemResponse(
+                id=f"cita:{cita.id}", origen="cita", titulo=cita.titulo,
+                fecha=cita.inicio, fin=cita.fin, zona_horaria=cita.zona_horaria,
+                cita_id=cita.id, asunto=cita.asunto, responsable=cita.responsable,
+            ))
         items.sort(key=lambda item: (item.fecha, item.id))
         return AgendaResponse(items=items[:limit], total=len(items))

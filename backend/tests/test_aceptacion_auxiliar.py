@@ -296,10 +296,10 @@ async def test_auxiliary_cannot_manage_team_assignment_or_other_peoples_tasks(cl
         )
         assert response.status_code == 403, response.text
 
-    for endpoint in ["/api/v1/equipo/gestion", "/api/v1/tareas/mi-trabajo?alcance=equipo",
-                     "/api/v1/tareas/agenda?alcance=equipo"]:
+    for endpoint in ["/api/v1/equipo/gestion", "/api/v1/tareas/mi-trabajo?alcance=equipo"]:
         response = await sandra_client.get(endpoint)
         assert response.status_code == 403, response.text
+    assert (await sandra_client.get('/api/v1/tareas/agenda?alcance=equipo')).status_code == 200
     create_task = await sandra_client.post(
         "/api/v1/tareas", json={"asunto_id": case["id"], "titulo": "Delegación no permitida",
                                "instruccion": "Probar límite de rol.", "responsable_id": SANDRA_ID},

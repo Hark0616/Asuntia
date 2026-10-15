@@ -12,6 +12,7 @@ from app.repositories.user_repository import UserRepository
 from app.schemas.equipo import MiembroEquipoResponse
 from app.services.auth_service import AuthService
 from app.services.office_lock import lock_office_actor
+from app.services.cita_service import CitaService
 
 
 class EquipoService:
@@ -69,10 +70,13 @@ class EquipoService:
             raise DomainException(detail="El miembro ya tiene acceso activo", status_code=409)
         return await self._invitation(user, actor)
 
-    async def _transfer_work(self, user_id, target, *, all_work):
+    async def _transfer_work(self, user_id, target, *, all_work, actor_id):
         repo = EquipoRepository(self.session, self.firma_id)
         cases, clients, tasks = await repo.get_work_for_transfer(user_id, all_work=all_work)
-        if (cases or clients or tasks) and target is None:
+        citas_service = CitaService(self.session, self.firma_id)
+        citas = [cita for cita in await citas_service.citas.pending_for_user(user_id)
+                 if all_work or cita.asunto.abogado_id != user_id]
+        if (cases or clients or tasks or citas) and target is None:
             raise DomainException(detail="Selecciona quién recibirá el trabajo pendiente", status_code=409)
         if target is None:
             return
@@ -83,6 +87,11 @@ class EquipoService:
                 raise DomainException(
                     detail="Hay tareas de otros asuntos. Selecciona un administrador para recibirlas",
                     status_code=409)
+        for cita in citas:
+            future_owner = target.id if cita.asunto_id in case_ids else cita.asunto.abogado_id
+            if target.rol == "abogado" and future_owner != target.id:
+                raise DomainException(detail="Hay citas de otros asuntos. Selecciona un administrador para recibirlas", status_code=409)
+            citas_service.stage_transfer(cita, user_id, target.id, actor_id)
         repo.stage_transfer(cases, clients, tasks, target.id)
 
     async def change(self, user_id, payload, actor, *, deactivate=False):
@@ -102,9 +111,9 @@ class EquipoService:
             if not target or target.id == user.id:
                 raise NotFoundException(detail="Responsable de destino no encontrado")
         if deactivate or new_role == "auxiliar":
-            await self._transfer_work(user.id, target, all_work=True)
+            await self._transfer_work(user.id, target, all_work=True, actor_id=actor.id)
         elif new_role == "abogado":
-            await self._transfer_work(user.id, target, all_work=False)
+            await self._transfer_work(user.id, target, all_work=False, actor_id=actor.id)
         user.rol = new_role
         if deactivate:
             user.is_active = False

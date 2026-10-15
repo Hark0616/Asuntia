@@ -67,7 +67,7 @@ conservación de referencias tras archivar. No se cambiaron modelos ni dependenc
 | Prioridad | Pendiente e implicación | Evidencia / checklist |
 | --- | --- | --- |
 | Implementado después de esta revisión | Edición de perfiles por administración/secretaría y de título/radicado/fecha del asunto por administración o abogado titular. Incluye conflictos, permisos, sincronización y revocación de acceso cuando cambia correo/identificación. | [Entrega 15 del checklist](CHECKLIST_PRODUCTO_2026-10-14.md#15-corrección-de-clientes-y-asuntos-2026-10-15); E01 y contratos de identidad. |
-| Antes del uso diario | Citas independientes: varias reuniones/audiencias, reprogramación, cancelación y participantes. La agenda actual deriva tareas y audiencia del flujo. | `services/agenda_service.py`, `repositories/agenda_repository.py`; F01–F04. |
+| Implementado después de esta revisión; agenda parcial | Citas independientes: reuniones/audiencias múltiples, participantes, reprogramación, cancelación e historial. La agenda consulta las citas y la guía referencia su audiencia. Secretaría puede consultar la agenda del equipo. Faltan calendario y filtros por persona/asunto. | [Entrega 16 del checklist](CHECKLIST_PRODUCTO_2026-10-14.md#16-citas-independientes-y-agenda-canónica-2026-10-15); F01–F04. |
 | Antes de información real | Bitácora protegida de asignaciones, publicaciones y cambios sensibles. La actividad del expediente y los autores conservados no la sustituyen. | B08 y E02/E04. |
 | Antes de información real | Publicación privada por defecto en todas las capas y revisión completa de concurrencia. Las nuevas pruebas demuestran defaults privados de las rutas actuales, pero el modelo `Novedad` conserva `default=True`. No se demostró una filtración en esos recorridos. | `models/novedad.py`, `schemas/novedad.py`; E04/B07. |
 | Antes de usar archivos externos legados | Los vínculos Google heredados conservan URL del proveedor; retirar el registro de Asuntia no garantiza revocar una URL externa ya obtenida. | `schemas/documento.py:from_documento`, `DocumentosTab.tsx`; D04. |
@@ -77,7 +77,7 @@ conservación de referencias tras archivar. No se cambiaron modelos ni dependenc
 | Aceptación final | Recorridos completos con personas de los cuatro perfiles, móvil/teclado y fallos de conexión; restauración accesible de lo archivado aún sin comando público. | G03–G06, B06/H03. |
 
 La corrección de datos existentes ya está incorporada. Siguientes pendientes:
-completar citas y su agenda, cerrar auditoría/publicación y ejecutar aceptación de despliegue y
+completar calendario y filtros de agenda, cerrar auditoría/publicación y ejecutar aceptación de despliegue y
 recuperación. La conexión cloud se retoma cuando el usuario lo decida.
 
 ## Verificación de esta entrega

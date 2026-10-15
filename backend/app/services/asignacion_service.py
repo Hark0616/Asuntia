@@ -7,6 +7,7 @@ from app.models.asunto import Asunto
 from app.models.cliente import Cliente
 from app.models.user import User
 from app.services.office_lock import lock_office_actor
+from app.services.cita_service import CitaService
 from app.repositories.asunto_repository import AsuntoRepository
 from app.repositories.cliente_repository import ClienteRepository
 from app.repositories.tarea_repository import TareaRepository
@@ -66,6 +67,10 @@ class AsignacionService:
         previous_responsable_id = (
             previous.id if previous and previous.rol in {"administrador", "abogado"} else None
         )
+        citas = CitaService(self.session, self.firma_id)
+        for cita in await citas.citas.pending_for_user(previous_responsable_id) if previous_responsable_id else []:
+            if cita.asunto_id == asunto_id:
+                citas.stage_transfer(cita, previous_responsable_id, responsable_id, actor.id)
         asunto_repo.stage_responsible(asunto, responsable_id)
         await TareaRepository(
             self.session, self.firma_id

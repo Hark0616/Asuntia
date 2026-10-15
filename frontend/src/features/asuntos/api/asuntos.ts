@@ -72,7 +72,7 @@ export interface AperturaAsuntoPayload {
 export interface PasoCampoAPI {
   clave: string;
   etiqueta: string;
-  tipo: 'text' | 'textarea' | 'date' | 'datetime' | 'url' | 'select' | 'boolean';
+  tipo: 'text' | 'textarea' | 'date' | 'datetime' | 'url' | 'select' | 'boolean' | 'cita';
   requerido: boolean;
   opciones: Array<{ valor: string; etiqueta: string }>;
 }

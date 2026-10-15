@@ -125,6 +125,12 @@ async def test_workflow_validates_data_and_prevents_skipping(client):
 @pytest.mark.asyncio
 async def test_workflow_can_complete_all_steps(client):
     asunto = await create_case(client, uuid.uuid4().hex[:8])
+    cita = await client.post('/api/v1/citas', json={
+        'asunto_id': asunto['id'], 'operacion_id': str(uuid.uuid4()), 'tipo': 'audiencia',
+        'titulo': 'Audiencia inicial', 'inicio': '2026-08-05T09:00:00-05:00', 'fin': '2026-08-05T10:00:00-05:00',
+        'responsable_id': asunto['abogado_id'], 'enlace': 'https://meet.google.com/demo',
+    })
+    assert cita.status_code == 201, cita.text
     endpoint = f"/api/v1/asuntos/{asunto['id']}/flujo/avanzar"
     steps = [
         (
@@ -154,9 +160,7 @@ async def test_workflow_can_complete_all_steps(client):
         (
             "agendar_audiencia",
             {
-                "fecha_hora": "2026-08-05T09:00",
-                "modalidad": "virtual",
-                "enlace_o_lugar": "https://meet.google.com/demo",
+                "cita_id": cita.json()['id'],
             },
         ),
         ("audiencia_agendada", {"audiencia_realizada": True}),

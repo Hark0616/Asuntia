@@ -12,6 +12,7 @@ from app.repositories.asunto_repository import AsuntoRepository
 from app.repositories.novedad_repository import NovedadRepository
 from app.repositories.paso_repository import PasoRepository
 from app.repositories.tarea_repository import TareaRepository
+from app.repositories.cita_repository import CitaRepository
 from app.services.office_lock import lock_office_actor
 
 
@@ -57,14 +58,9 @@ RUTA_INSOLVENCIA_PERSONA_NATURAL: list[dict[str, Any]] = [
         "orden": 4,
         "codigo": "agendar_audiencia",
         "titulo": "Agendar audiencia",
-        "descripcion": "Define fecha, hora y medio de la audiencia.",
+        "descripcion": "Selecciona una audiencia registrada en las citas del expediente.",
         "campos": [
-            {"clave": "fecha_hora", "etiqueta": "Fecha y hora", "tipo": "datetime", "requerido": True},
-            {"clave": "modalidad", "etiqueta": "Modalidad", "tipo": "select", "requerido": True, "opciones": [
-                {"valor": "virtual", "etiqueta": "Virtual"},
-                {"valor": "presencial", "etiqueta": "Presencial"},
-            ]},
-            {"clave": "enlace_o_lugar", "etiqueta": "Enlace o lugar", "tipo": "text", "requerido": True},
+            {"clave": "cita_id", "etiqueta": "Audiencia del expediente", "tipo": "cita", "requerido": True},
         ],
     },
     {
@@ -166,6 +162,11 @@ class WorkflowService:
                         valid_url = False
                     if not valid_url:
                         raise DomainException(detail=f"Enlace inválido para '{field['etiqueta']}'")
+                if kind == "cita":
+                    try:
+                        value = str(uuid.UUID(value))
+                    except ValueError:
+                        raise DomainException(detail="Selecciona una audiencia válida", status_code=422)
             merged[key] = value
         return merged
 
@@ -201,7 +202,18 @@ class WorkflowService:
     ) -> Asunto:
         asunto, current = await self._get_active_step(asunto_id, paso_codigo, user_id, user_role)
         self._check_version(current, expected_updated_at)
-        return await self.pasos.save_draft(current, self._merge_asunto_step_data(asunto, current, data))
+        merged = self._merge_asunto_step_data(asunto, current, data)
+        await self._validate_cita(asunto, current, merged)
+        return await self.pasos.save_draft(current, merged)
+
+    async def _validate_cita(self, asunto, step, data):
+        if step.codigo != "agendar_audiencia" or not data.get("cita_id"):
+            return
+        cita = await CitaRepository(self.session, self.firma_id).get_detail(uuid.UUID(data["cita_id"]), lock=True)
+        if not cita or cita.asunto_id != asunto.id:
+            raise NotFoundException(detail="Audiencia no encontrada en este asunto")
+        if cita.tipo != "audiencia" or cita.estado != "programada":
+            raise DomainException(detail="Selecciona una audiencia programada", status_code=409)
 
     @staticmethod
     def _merge_asunto_step_data(asunto: Asunto, step: AsuntoPaso, data: dict[str, Any]) -> dict[str, Any]:
@@ -218,7 +230,9 @@ class WorkflowService:
     @staticmethod
     def _validate_step_data(step: AsuntoPaso, data: dict[str, Any]) -> None:
         # También valida capturas previas antes de convertirlas en un paso completado.
-        WorkflowService._merge_step_data(step, data)
+        # La captura histórica migrada y las instantáneas del servidor no son campos editables.
+        WorkflowService._merge_step_data(step, {key: value for key, value in data.items()
+                                               if key in {field["clave"] for field in step.campos}})
         for field in step.campos:
             key = field["clave"]
             value = data.get(key)
@@ -274,6 +288,11 @@ class WorkflowService:
         self._check_version(current, expected_updated_at)
         data = self._merge_asunto_step_data(asunto, current, data)
         self._validate_step_data(current, data)
+        await self._validate_cita(asunto, current, data)
+        if current.codigo == "agendar_audiencia":
+            from app.services.cita_service import CitaService
+            cita = await CitaRepository(self.session, self.firma_id).get_detail(uuid.UUID(data["cita_id"]))
+            data["cita_snapshot"] = CitaService.snapshot(cita)
         next_step = await self.pasos.get_by_order(asunto_id, current.orden + 1)
         current_task = await self.tareas.get_open_for_step_for_update(
             asunto_id, current.id

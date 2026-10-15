@@ -62,9 +62,12 @@ class TareaUpdate(BaseModel):
 
 class AgendaItemResponse(BaseSchemaResponse):
     id: str
-    origen: Literal["tarea", "audiencia"]
+    origen: Literal["tarea", "cita"]
     titulo: str
     fecha: datetime
+    fin: datetime | None = None
+    zona_horaria: str | None = None
+    cita_id: uuid.UUID | None = None
     asunto: TareaAsuntoResumen
     responsable: TareaPersonaResumen
 

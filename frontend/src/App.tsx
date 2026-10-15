@@ -52,6 +52,7 @@ import { TareasAsunto } from '@/features/tareas/components/TareasAsunto';
 import { PortalCliente } from '@/features/portal-cliente/components/PortalCliente';
 import { ListaExpedientes } from '@/features/asuntos/components/ListaExpedientes';
 import { EditarAsunto } from '@/features/asuntos/components/EditarAsunto';
+import { CitasAsunto } from '@/features/citas/components/CitasAsunto';
 import { EditarCliente, ClienteSeleccionado } from '@/features/clientes/components/EditarCliente';
 import { formatAsuntosCount } from '@/lib/formatAsuntos';
 import { advanceSessionGeneration, SESSION_EXPIRED_EVENT } from '@/lib/session';
@@ -247,6 +248,7 @@ export default function App() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['asuntos'] });
       queryClient.invalidateQueries({ queryKey: ['tareas'] });
+      queryClient.invalidateQueries({ queryKey: ['citas'] });
     },
   });
 
@@ -607,6 +609,7 @@ export default function App() {
               </div>
             ) : seccionFirma === 'trabajo' ? (
               <MiTrabajo
+                isAuxiliar={usuarioAutenticado.rol === 'auxiliar'}
                 isAdmin={usuarioAutenticado.rol === 'administrador'}
               />
             ) : asuntoIdRuta && detalleQuery.isLoading ? (
@@ -766,6 +769,7 @@ export default function App() {
                       </section>
 
                       {casoActivo.rutaCodigo && casoActivo.flujoEstado ? <FlujoAsunto
+                        asuntoId={casoActivo.id}
                         key={`flujo-${casoActivo.id}`}
                         pasos={casoActivo.pasos}
                         flujoEstado={casoActivo.flujoEstado}
@@ -811,6 +815,7 @@ export default function App() {
                         userId={usuarioAutenticado.id}
                         canManage={puedeDecidirCaso}
                       />
+                      <CitasAsunto key={`citas-${casoActivo.id}`} asuntoId={casoActivo.id} abogadoId={casoActivo.abogadoId} />
                       <DocumentosTab
                         key={`documentos-${casoActivo.id}`}
                         asuntoId={casoActivo.id}

@@ -8,7 +8,7 @@ from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 class PasoCampoResponse(BaseModel):
     clave: str
     etiqueta: str
-    tipo: Literal["text", "textarea", "date", "datetime", "url", "select", "boolean"]
+    tipo: Literal["text", "textarea", "date", "datetime", "url", "select", "boolean", "cita"]
     requerido: bool = True
     opciones: list[dict[str, str]] = Field(default_factory=list)
 

@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 from app.api.v1.endpoints import (
     asuntos,
+    citas,
     auth,
     clientes,
     documentos,
@@ -27,4 +28,5 @@ api_router.include_router(oauth_storage.router, prefix="/storage", tags=["OAuth2
 api_router.include_router(documentos.router, tags=["Gestión Documental"])
 api_router.include_router(storage.router, tags=["Almacenamiento conectado"])
 api_router.include_router(tareas.router, prefix="/tareas", tags=["Trabajo"])
+api_router.include_router(citas.router, prefix="/citas", tags=["Citas"])
 api_router.include_router(portal.router, prefix="/portal", tags=["Portal del cliente"])

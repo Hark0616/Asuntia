@@ -31,7 +31,7 @@ export function AgendaTrabajo({ alcance }: { alcance: AlcanceTrabajo }) {
     <div className="agenda-window">
       <div className="field"><label htmlFor="agenda-from">Desde</label><input id="agenda-from" type="date" value={desde} onChange={(event) => setDesde(event.target.value)} /></div>
       <div className="field"><label htmlFor="agenda-to">Hasta</label><input id="agenda-to" type="date" value={hasta} onChange={(event) => setHasta(event.target.value)} /></div>
-      <Tooltip content="Vencimientos de tareas abiertas y audiencias registradas en el expediente. El intervalo admite hasta 92 días; las fechas se introducen en hora local." />
+      <Tooltip content="Vencimientos de tareas abiertas y citas programadas. El intervalo admite hasta 92 días; el filtro usa la hora de tu equipo y cada cita conserva su zona. Las citas canceladas se consultan en el expediente." />
       <button className="secondary-button" type="button" disabled={!valid || query.isFetching} onClick={() => query.refetch()}>{query.isFetching ? 'Actualizando…' : 'Actualizar agenda'}</button>
     </div>
     {!valid && <p className="form-error" role="alert">Elige un intervalo de hasta 92 días, con la fecha final igual o posterior al inicio.</p>}
@@ -44,13 +44,13 @@ export function AgendaTrabajo({ alcance }: { alcance: AlcanceTrabajo }) {
     {valid && query.data && query.data.items.length > 0 && <>
       <p className="muted small" role="status">{query.data.total} {query.data.total === 1 ? 'fecha' : 'fechas'}{query.data.total > query.data.items.length ? ` · mostrando ${query.data.items.length}` : ''}</p>
       <div className="panel work-list">{query.data.items.map((item) => <Link key={item.id} className="work-item"
-        to={`/oficina/asuntos/${item.asunto.id}${item.origen === 'audiencia' ? '#paso-activo' : '#tareas-expediente'}`}
+        to={`/oficina/asuntos/${item.asunto.id}${item.origen === 'cita' ? `#cita-${item.cita_id}` : '#tareas-expediente'}`}
         aria-label={`Abrir ${item.asunto.radicado}: ${item.titulo}`}>
         <CalendarClock size={18} aria-hidden="true" />
         <span className="work-item-body">
           <span className="work-item-context"><strong>{item.asunto.cliente.nombre}</strong><span>{item.asunto.radicado}</span></span>
           <strong className="work-item-title">{item.titulo}</strong>
-          <span className="muted small">{item.origen === 'audiencia' ? 'Audiencia' : 'Vencimiento de tarea'} · {fechaTrabajo(item.fecha)}</span>
+          <span className="muted small">{item.origen === 'cita' ? 'Cita' : 'Vencimiento de tarea'} · {fechaTrabajo(item.fecha)}</span>
           <span className="muted small">Responsable · {item.responsable.nombre}</span>
         </span>
         <span className="work-item-action">Abrir<ArrowRight size={16} aria-hidden="true" /></span>

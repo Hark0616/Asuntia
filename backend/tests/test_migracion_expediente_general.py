@@ -11,7 +11,7 @@ import pytest_asyncio
 
 
 PREVIOUS = '8d5db36e435d'
-CURRENT = '8a4f24321a7b'
+CURRENT = '38d4ada7f314'
 BACKEND = Path(__file__).resolve().parents[1]
 
 
@@ -145,3 +145,60 @@ async def test_storage_migration_preserves_legacy_files_and_guards_downgrade(mig
     assert await connection.fetchval('SELECT version_num FROM alembic_version') == CURRENT
     assert await connection.fetchval('SELECT count(*) FROM documentos_asunto WHERE id=$1', document_id) == 1
     await connection.close()
+
+
+async def test_citas_migrate_once_preserve_original_data_and_unknown_duration(migration_db):
+    ids = await legacy_data(migration_db)
+    await migrate(migration_db, 'upgrade', '8a4f24321a7b')
+    connection = await connect(migration_db)
+    # La migración antigua solo generaba guía para asuntos activos: añade un
+    # paso histórico al expediente archivado para demostrar su conservación.
+    await connection.execute('''INSERT INTO asunto_pasos
+        (id,firma_id,asunto_id,orden,codigo,titulo,descripcion,estado,campos,datos,is_active,created_at,updated_at,created_by_id)
+        SELECT $1,firma_id,$2,orden,codigo,titulo,descripcion,estado,campos,datos,is_active,created_at,updated_at,created_by_id
+        FROM asunto_pasos WHERE asunto_id=$3 AND codigo='agendar_audiencia' ''', uuid.uuid4(),ids[1],ids[0])
+    for index, case_id in enumerate(ids):
+        await connection.execute('''UPDATE asunto_pasos SET datos=$1::jsonb, estado=$2
+            WHERE asunto_id=$3 AND codigo='agendar_audiencia' ''',
+            '{"fecha_hora":"2026-10-30T09:30:00","modalidad":"virtual","enlace_o_lugar":"https://meet.example.com/test"}',
+            'completado' if index == 0 else 'bloqueado',case_id)
+    await connection.close()
+    await migrate(migration_db,'upgrade','head')
+    await migrate(migration_db,'upgrade','head')
+    await migrate(migration_db,'check')
+    connection = await connect(migration_db)
+    try:
+        assert await connection.fetchval('SELECT count(*) FROM citas') == 2
+        assert await connection.fetchval('SELECT count(*) FROM cita_cambios') == 2
+        for case_id in ids:
+            row = await connection.fetchrow('SELECT * FROM citas WHERE asunto_id=$1',case_id)
+            assert row['inicio'].isoformat() == '2026-10-30T14:30:00+00:00'
+            assert row['fin'] is None and row['enlace'] == 'https://meet.example.com/test'
+            step = await connection.fetchrow("SELECT * FROM asunto_pasos WHERE asunto_id=$1 AND codigo='agendar_audiencia'",case_id)
+            import json
+            saved = json.loads(step['datos'])
+            assert saved['cita_id'] == str(row['id']) and saved['fecha_hora'] == '2026-10-30T09:30:00'
+            if case_id == ids[1]:
+                assert json.loads(step['campos'])[0]['tipo'] == 'cita'
+    finally:
+        await connection.close()
+    result = await migrate(migration_db,'downgrade','8a4f24321a7b',success=False)
+    assert 'citas existentes' in result.stderr
+
+
+async def test_citas_invalid_legacy_date_aborts_transaction_without_losing_capture(migration_db):
+    ids = await legacy_data(migration_db)
+    await migrate(migration_db,'upgrade','8a4f24321a7b')
+    connection = await connect(migration_db)
+    await connection.execute('''UPDATE asunto_pasos SET datos='{"fecha_hora":"fecha inválida"}'::jsonb
+        WHERE asunto_id=$1 AND codigo='agendar_audiencia' ''',ids[0])
+    await connection.close()
+    result = await migrate(migration_db,'upgrade','head',success=False)
+    assert 'fecha inválida' in result.stderr
+    connection = await connect(migration_db)
+    try:
+        assert await connection.fetchval('SELECT version_num FROM alembic_version') == '8a4f24321a7b'
+        assert not await connection.fetchval("SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_name='citas')")
+        assert 'fecha inválida' in await connection.fetchval("SELECT datos::text FROM asunto_pasos WHERE asunto_id=$1 AND codigo='agendar_audiencia'",ids[0])
+    finally:
+        await connection.close()

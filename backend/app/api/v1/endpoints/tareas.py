@@ -56,8 +56,10 @@ async def get_agenda(alcance: Literal["mio", "equipo"] = "mio",
                      limit: int = Query(default=100, ge=1, le=100),
                      db: AsyncSession = Depends(get_db),
                      current_user: User = Depends(require_office_user)):
-    """Fechas operativas derivadas de tareas y audiencias, sin cálculo de términos."""
-    include_team = require_team_scope(current_user, alcance)
+    """Fechas operativas de tareas y citas, sin cálculo de términos."""
+    if alcance == "equipo" and current_user.rol not in {"administrador", "auxiliar"}:
+        raise ForbiddenException(detail="No puedes consultar la agenda del equipo")
+    include_team = alcance == "equipo"
     return await AgendaService(db, current_user.firma_id).list(
         current_user.id, desde, hasta, include_team=include_team, limit=limit,
         restrict_cases_to_responsable=current_user.rol == "abogado")

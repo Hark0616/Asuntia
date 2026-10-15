@@ -14,14 +14,14 @@ vi.mock('../../api/tareas', () => ({
 
 const mockedFetchMiTrabajo = vi.mocked(fetchMiTrabajo);
 
-function renderWork(isAdmin = true) {
+function renderWork(isAdmin = true, isAuxiliar = false) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, retryDelay: 0 } },
   });
   render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter>
-        <MiTrabajo isAdmin={isAdmin} />
+        <MiTrabajo isAdmin={isAdmin} isAuxiliar={isAuxiliar} />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -34,6 +34,15 @@ beforeEach(() => {
 });
 
 describe('MiTrabajo', () => {
+  it('secretaría abre agenda de equipo y vuelve a su bandeja personal', async () => {
+    const user = userEvent.setup(); renderWork(false, true);
+    await user.click(screen.getByRole('button', {name:'Agenda'}));
+    await waitFor(() => expect(fetchAgenda).toHaveBeenCalledWith('equipo',expect.any(String),expect.any(String)));
+    await user.click(screen.getByRole('button',{name:'Pendientes'}));
+    await screen.findByText('0 pendientes asignados a ti.');
+    expect(fetchMiTrabajo).toHaveBeenLastCalledWith('mio');
+    expect(screen.queryByRole('button',{name:'Equipo'})).not.toBeInTheDocument();
+  });
   it('muestra trabajo real y abre el expediente seleccionado', async () => {
     const user = userEvent.setup();
     mockedFetchMiTrabajo.mockResolvedValue({
@@ -97,13 +106,13 @@ describe('MiTrabajo', () => {
     const asunto = { id: 'asunto-1', radicado: 'AS-1', etapa_actual: 'Audiencia', cliente: { id: 'cliente-1', nombre: 'Ana' } };
     const responsable = { id: 'aux-1', nombre: 'Auxiliar' };
     vi.mocked(fetchAgenda).mockResolvedValue({ total: 2, items: [
-      { id: 'audiencia-1', origen: 'audiencia', titulo: 'Audiencia registrada', fecha: '2026-10-10T12:00:00Z', asunto, responsable },
+      { id: 'cita:audiencia-1', cita_id: 'audiencia-1', origen: 'cita', titulo: 'Audiencia registrada', fecha: '2026-10-10T12:00:00Z', asunto, responsable },
       { id: 'task-1', origen: 'tarea', titulo: 'Preparar soportes', fecha: '2026-10-09T12:00:00Z', asunto, responsable },
     ] });
     renderWork();
     await user.click(screen.getByRole('button', { name: 'Agenda' }));
     expect(await screen.findByText('Audiencia registrada')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Abrir AS-1: Audiencia registrada/ })).toHaveAttribute('href', '/oficina/asuntos/asunto-1#paso-activo');
+    expect(screen.getByRole('link', { name: /Abrir AS-1: Audiencia registrada/ })).toHaveAttribute('href', '/oficina/asuntos/asunto-1#cita-audiencia-1');
     expect(screen.getByRole('link', { name: /Abrir AS-1: Preparar soportes/ })).toHaveAttribute('href', '/oficina/asuntos/asunto-1#tareas-expediente');
     await user.click(screen.getByRole('button', { name: 'Equipo' }));
     await waitFor(() => expect(fetchAgenda).toHaveBeenLastCalledWith('equipo', expect.stringMatching(/Z$/), expect.stringMatching(/Z$/)));

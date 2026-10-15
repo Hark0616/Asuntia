@@ -52,6 +52,7 @@ vi.mock('@/features/auth/api/auth', async importOriginal => ({
 vi.mock('@/features/documentos/components/DocumentosTab', () => ({
   DocumentosTab: () => <div>Documentos del expediente</div>,
 }));
+vi.mock('@/features/citas/components/CitasAsunto', () => ({ CitasAsunto: () => <div>Citas del expediente</div> }));
 vi.mock('@/features/tareas/components/TareasAsunto', () => ({
   TareasAsunto: () => <section id="tareas-expediente" tabIndex={-1} aria-label="Tareas del expediente">Tareas del expediente</section>,
 }));

@@ -552,3 +552,40 @@ de despliegue/respaldos. No hay nuevos modelos, migraciones ni dependencias.
 | Backend completo | 458 pruebas correctas y una omitida en 367,29 s por Redis local ausente. Se añaden 48 casos de edición; incluyen roles, 401/403/404/409/422, nulos, duplicados activos/archivados, concurrencia, rollback, sesión/OTP y conservación de actuaciones. |
 | Frontend | 160 pruebas correctas y build TypeScript/Vite correcto. Doce pruebas nuevas cubren edición, campos vacíos, caché, permisos, conflicto, recarga explícita, doble envío, consulta fallida y cierre/foco, incluida apertura con caché mientras la consulta sigue pendiente. |
 | Navegador con API real | Corrección y lectura posterior del nombre/teléfono del cliente y título/radicado del asunto sobre datos sintéticos propios. Código interno intacto, descarte con Escape, foco restaurado y formularios en escritorio/390 px sin desbordamiento horizontal del diálogo. Ayuda dentro de la capa modal y consola sin errores. Los registros de esta revisión se archivaron; no equivale a aceptación humana ni lector de pantalla. |
+
+## 16. Citas independientes y agenda canónica (2026-10-15)
+
+Avance de F01–F04: varias reuniones y audiencias por expediente, con inicio/fin,
+zona horaria, responsable, participantes, lugar/enlace HTTPS y resumen preparatorio.
+Administración y secretaría organizan dentro de su firma; el abogado opera sus
+asuntos. El portal conserva su proyección actual y no recibe estas capturas internas.
+
+La guía selecciona una audiencia registrada, sin capturar otra fecha. Se migran las
+audiencias existentes y se conserva el JSON original como historia. La agenda deja
+de proyectar ese JSON, evitando duplicados. Una duración histórica desconocida
+permanece por confirmar. La migración aborta ante fechas ilegibles o responsables
+inconsistentes y bloquea la reversión destructiva con citas existentes.
+
+Crear permite recuperar una solicitud repetida; reprogramar/cancelar requiere
+revisión y conserva historial con autor/fecha/valores. Una cita cancelada sigue
+visible en el expediente y sale de la agenda. Se consideran los solapamientos de
+ventana y se transfieren citas futuras/en curso al cambiar responsables o dar bajas.
+Secretaría accede a agenda de equipo sin ampliar los permisos de su bandeja de tareas.
+
+El formulario conserva datos y revisión al fallar, confirma el descarte y contiene
+el foco. Las fechas se capturan en la zona indicada, aunque el dispositivo tenga
+otra; editar texto conserva la precisión original. Una hora local inexistente o
+ambigua por cambio estacional se rechaza. Se añade `tzdata`, declarada en ambos
+manifiestos del backend, para disponer de zonas IANA también en Windows.
+
+| Verificación | Resultado y límite |
+| --- | --- |
+| Backend completo | 487 pruebas correctas y una omitida por Redis local ausente. Detectó dos ajustes en pruebas: el permiso nuevo de secretaría y un fixture sin audiencia en el asunto archivado. Se corrigieron; verificación final de los 42 casos de citas, secretaría y migraciones correcta en 108,46 s. Los 46 casos iniciales de citas, guía y agenda también pasaron. |
+| Migraciones | `alembic revision --autogenerate`, actualización local y `alembic check` sin diferencias. Pruebas sobre bases vacías e históricas: instantes, datos originales, asunto archivado, repetición sin duplicar, reversión protegida y rollback ante una fecha ilegible. |
+| Frontend | 170 pruebas correctas con dos workers y build TypeScript/Vite correcto. Se cubren captura/reintento con UUID estable, participantes, versión obsoleta y recarga, cancelación, doble envío, descarte/foco, guía, zona y cambio de mes/año/horario estacional; también separación de agenda de equipo y tareas personales de secretaría. |
+| Navegador / API real | Creación, reapertura y cancelación con motivo e historial sobre un expediente sintético propio. Formulario en escritorio y a 390 px sin desbordamiento horizontal del diálogo; duración y participantes recuperados. Cita cancelada y asunto/cliente de revisión archivados mediante borrado lógico. No equivale a aceptación humana o lector de pantalla. |
+
+F01–F04 conservan sus casillas abiertas. Continúan calendario y filtros por persona
+y expediente, sustitución explícita de una audiencia ya referenciada por un paso
+completado y aceptación humana de los recorridos. Después siguen auditoría general,
+defaults de publicación y preparación/recuperación del despliegue. No se retoma Azure.

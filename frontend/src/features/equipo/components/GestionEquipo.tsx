@@ -85,7 +85,7 @@ export function GestionEquipo({ currentUserId }: { currentUserId: string }) {
   const [invitation, setInvitation] = useState<InvitacionEquipo | null>(null);
   const [copyStatus, setCopyStatus] = useState('');
   const refresh = () => {
-    for (const key of ['equipo', 'asuntos', 'clientes', 'tareas']) client.invalidateQueries({ queryKey: [key] });
+    for (const key of ['equipo', 'asuntos', 'clientes', 'tareas', 'citas']) client.invalidateQueries({ queryKey: [key] });
   };
   const created = (value: InvitacionEquipo) => {
     setInvitation(value); setCopyStatus(''); setAdding(false); refresh();

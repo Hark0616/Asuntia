@@ -4,8 +4,10 @@ import { ArrowRight, Check, ChevronDown, LockKeyhole, Save } from 'lucide-react'
 import type { AsuntoAPI, AsuntoPasoAPI } from '@/features/asuntos/api/asuntos';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { fechaISO, fechaLocalInput, fechaRegistroISO } from '@/features/tareas/fechas';
+import { SeleccionarCita } from '@/features/citas/components/CitasAsunto';
 
 interface FlujoAsuntoProps {
+  asuntoId?: string;
   pasos: AsuntoPasoAPI[];
   flujoEstado: 'activo' | 'completado';
   radicadoOficial?: string | null;
@@ -28,6 +30,7 @@ function todayInBogota() {
 }
 
 export function FlujoAsunto({
+  asuntoId,
   pasos,
   flujoEstado,
   radicadoOficial,
@@ -79,7 +82,7 @@ export function FlujoAsunto({
     setDatos((current) => ({ ...current, [key]: value }));
   };
 
-  const datosParaGuardar = () => Object.fromEntries(Object.entries(datos).map(([key, value]) => {
+  const datosParaGuardar = () => Object.fromEntries(Object.entries(datos).filter(([key]) => pasoActivo?.campos.some(campo => campo.clave === key)).map(([key, value]) => {
     const campo = pasoActivo?.campos.find((item) => item.clave === key);
     if (campo?.tipo === 'datetime' && typeof value === 'string' && value) {
       return [key, fechaRegistroISO(value)];
@@ -197,7 +200,8 @@ export function FlujoAsunto({
                       </label>
                     )}
 
-                    {campo.tipo === 'textarea' ? (
+                    {campo.tipo === 'cita' ? <SeleccionarCita asuntoId={asuntoId} id={`workflow-${campo.clave}`} required={campo.requerido}
+                      value={String(datos[campo.clave] || '')} onChange={value => updateField(campo.clave, value)} /> : campo.tipo === 'textarea' ? (
                       <textarea
                         id={`workflow-${campo.clave}`}
                         required={campo.requerido}
