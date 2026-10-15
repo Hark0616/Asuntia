@@ -1,7 +1,7 @@
 import { apiClient } from '@/lib/axios';
 import type { AsuntoPortalAPI } from '@/types/portal';
 import type { Novedad } from '@/types/api';
-import type { AsuntoAPI, AsuntosFiltros, AsuntosPaginaAPI, RutaCodigo } from '@/types/asunto';
+import type { AsuntoAPI, AsuntoDatosUpdatePayload, AsuntosFiltros, AsuntosPaginaAPI, RutaCodigo } from '@/types/asunto';
 export type { AsuntoAPI } from '@/types/asunto';
 
 export interface EstadoProcesalAPI {
@@ -19,20 +19,21 @@ export interface ClienteAPI {
   nombre: string;
   cedula: string;
   email: string;
-  telefono?: string;
-  fecha_expedicion?: string;
-  direccion?: string;
-  direccion_notificacion?: string;
-  ciudad?: string;
-  departamento?: string;
+  telefono?: string | null;
+  fecha_expedicion?: string | null;
+  direccion?: string | null;
+  direccion_notificacion?: string | null;
+  ciudad?: string | null;
+  departamento?: string | null;
   canal_preferido: 'email' | 'telefono' | 'whatsapp';
-  observaciones?: string;
+  observaciones?: string | null;
   portal_user_id?: string;
   responsable_id?: string;
   portal_habilitado: boolean;
   asuntos_count: number;
   rol: string;
   created_at: string;
+  updated_at: string;
 }
 
 export interface ClienteCreatePayload {
@@ -135,6 +136,10 @@ export const crearAsuntoAPI = async (payload: { titulo: string; codigo_interno?:
 export const fetchAsunto = async (asuntoId: string): Promise<AsuntoAPI> => {
   const response = await apiClient.get<AsuntoAPI>(`/asuntos/id/${asuntoId}`);
   return response.data;
+};
+
+export const actualizarDatosAsuntoAPI = async (asuntoId: string, payload: AsuntoDatosUpdatePayload): Promise<AsuntoAPI> => {
+  return (await apiClient.patch<AsuntoAPI>(`/asuntos/${asuntoId}/datos`, payload)).data;
 };
 
 export const incorporarGuiaAPI = async (asuntoId: string, rutaCodigo: RutaCodigo) => {

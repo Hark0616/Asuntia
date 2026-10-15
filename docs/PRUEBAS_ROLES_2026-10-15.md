@@ -66,7 +66,7 @@ conservación de referencias tras archivar. No se cambiaron modelos ni dependenc
 
 | Prioridad | Pendiente e implicación | Evidencia / checklist |
 | --- | --- | --- |
-| Antes del uso diario | Editar datos de un cliente existente. Hoy un correo, teléfono o documento capturado mal no tiene corrección mediante la plataforma. También falta una edición general del título/radicado del asunto. | `api/v1/endpoints/clientes.py` y `asuntos.py`; E01 y contratos de identidad. |
+| Implementado después de esta revisión | Edición de perfiles por administración/secretaría y de título/radicado/fecha del asunto por administración o abogado titular. Incluye conflictos, permisos, sincronización y revocación de acceso cuando cambia correo/identificación. | [Entrega 15 del checklist](CHECKLIST_PRODUCTO_2026-10-14.md#15-corrección-de-clientes-y-asuntos-2026-10-15); E01 y contratos de identidad. |
 | Antes del uso diario | Citas independientes: varias reuniones/audiencias, reprogramación, cancelación y participantes. La agenda actual deriva tareas y audiencia del flujo. | `services/agenda_service.py`, `repositories/agenda_repository.py`; F01–F04. |
 | Antes de información real | Bitácora protegida de asignaciones, publicaciones y cambios sensibles. La actividad del expediente y los autores conservados no la sustituyen. | B08 y E02/E04. |
 | Antes de información real | Publicación privada por defecto en todas las capas y revisión completa de concurrencia. Las nuevas pruebas demuestran defaults privados de las rutas actuales, pero el modelo `Novedad` conserva `default=True`. No se demostró una filtración en esos recorridos. | `models/novedad.py`, `schemas/novedad.py`; E04/B07. |
@@ -76,8 +76,8 @@ conservación de referencias tras archivar. No se cambiaron modelos ni dependenc
 | Antes de producción | Aceptar correo real y supervisar fallos; readiness de BD/almacenamiento y alertas operativas. `/health` solo confirma que responde el proceso. | C06, H07. |
 | Aceptación final | Recorridos completos con personas de los cuatro perfiles, móvil/teclado y fallos de conexión; restauración accesible de lo archivado aún sin comando público. | G03–G06, B06/H03. |
 
-Orden propuesto: corregir captura de datos existentes, completar citas y su
-agenda, cerrar auditoría/publicación y ejecutar aceptación de despliegue y
+La corrección de datos existentes ya está incorporada. Siguientes pendientes:
+completar citas y su agenda, cerrar auditoría/publicación y ejecutar aceptación de despliegue y
 recuperación. La conexión cloud se retoma cuando el usuario lo decida.
 
 ## Verificación de esta entrega

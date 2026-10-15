@@ -5,14 +5,14 @@ from secrets import token_hex
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import DomainException, NotFoundException
+from app.core.exceptions import DomainException, NotFoundException, UnauthorizedException
 from app.models.asunto import Asunto
 from app.models.user import User
 from app.repositories.asunto_repository import AsuntoRepository
 from app.repositories.cliente_repository import ClienteRepository
 from app.repositories.estado_repository import EstadoRepository
 from app.repositories.user_repository import UserRepository
-from app.schemas.asunto import AperturaAsuntoCreate, AsuntoCreate, AsuntoResponse
+from app.schemas.asunto import AperturaAsuntoCreate, AsuntoCreate, AsuntoDatosUpdate, AsuntoResponse
 from app.services.cliente_service import ClienteService
 from app.services.workflow_service import initial_workflow_steps
 from app.services.office_lock import lock_office_actor
@@ -25,6 +25,31 @@ class AsuntoService:
         self.session = session
         self.firma_id = firma_id
         self.asuntos = AsuntoRepository(session, firma_id)
+
+    async def edit_data(self, asunto_id: uuid.UUID, payload: AsuntoDatosUpdate, actor: User) -> Asunto:
+        revision = actor.updated_at
+        try:
+            current = await lock_office_actor(self.session, self.firma_id, actor.id, actor.rol)
+            if current.updated_at != revision:
+                raise UnauthorizedException(detail="Sesión inválida o expirada")
+            asunto = await self.asuntos.get_by_id_for_update(asunto_id)
+            if (asunto is None or asunto.cliente.firma_id != self.firma_id or not asunto.cliente.is_active
+                    or (actor.rol == "abogado" and asunto.abogado_id != actor.id)):
+                raise NotFoundException(detail="Asunto no encontrado")
+            if asunto.updated_at != payload.expected_updated_at:
+                raise DomainException(detail="El asunto cambió. Recarga sus datos antes de guardar", status_code=409)
+            changes = payload.model_dump(exclude_unset=True, exclude={"expected_updated_at"})
+            changes = {key: value for key, value in changes.items() if getattr(asunto, key) != value}
+            if changes:
+                self.asuntos.stage_edit_data(asunto, changes)
+                await self.session.flush()
+            updated = await self.asuntos.get_by_id(asunto_id)
+            AsuntoResponse.model_validate(updated)
+            await self.session.commit()
+            return updated
+        except Exception:
+            await self.session.rollback()
+            raise
 
     async def resolve_responsible(self, actor: User, requested: uuid.UUID | None) -> uuid.UUID:
         if actor.rol == "abogado" and requested not in {None, actor.id}:

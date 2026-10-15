@@ -1,7 +1,8 @@
 import uuid
+from datetime import datetime, timezone
 from typing import Any, Optional
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 
 from app.models.user import User
 from app.repositories.base import BaseRepository
@@ -10,6 +11,19 @@ from app.repositories.base import BaseRepository
 class UserRepository(BaseRepository[User]):
     def __init__(self, session, firma_id: uuid.UUID):
         super().__init__(User, session, firma_id)
+
+    async def get_portal_identity_for_update(self, user_id: uuid.UUID) -> User | None:
+        """Incluye identidades retiradas para sincronizar el perfil sin reactivarlas."""
+        result = await self.session.execute(select(User).where(
+            User.id == user_id, User.firma_id == self.firma_id, User.rol == "cliente",
+        ).with_for_update(of=User).execution_options(populate_existing=True))
+        return result.scalars().first()
+
+    async def stage_sync_portal(self, user: User, changes: dict[str, Any], *, revoke: bool) -> None:
+        # Una corrección de contacto no invalida la sesión; correo/documento sí.
+        await self.session.execute(update(User).where(
+            User.id == user.id, User.firma_id == self.firma_id, User.rol == "cliente",
+        ).values(**changes, updated_at=datetime.now(timezone.utc) if revoke else User.updated_at))
 
     async def get_active_identity(self, user_id: uuid.UUID) -> User | None:
         result = await self.session.execute(select(User).where(

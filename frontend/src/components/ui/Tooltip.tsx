@@ -131,7 +131,9 @@ export function Tooltip({ content }: TooltipProps) {
         >
           {content}
         </span>,
-        document.body,
+        // Un diálogo modal pertenece a la capa superior del navegador.
+        // Su ayuda debe permanecer dentro para ser visible y accesible.
+        triggerRef.current?.closest('dialog[open]') || document.body,
       )}
     </span>
   );

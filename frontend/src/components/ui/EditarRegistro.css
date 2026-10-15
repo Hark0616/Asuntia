@@ -1,0 +1,26 @@
+.registro-dialog {
+  width: min(var(--editor-max-width), calc(100% - var(--space-8)));
+  max-height: calc(100dvh - var(--space-8));
+  overflow: auto;
+  padding: var(--space-6);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  color: var(--text);
+  background: var(--panel);
+}
+.registro-dialog::backdrop { background: var(--overlay-backdrop); }
+.registro-dialog button { min-height: var(--control-min-height); }
+.registro-dialog-heading button { min-width: var(--control-min-height); }
+.registro-campos .field > .row { min-height: var(--control-min-height); }
+.registro-dialog-heading, .registro-acciones { display: flex; align-items: center; gap: var(--space-3); justify-content: space-between; }
+.registro-dialog-heading { margin-bottom: var(--space-6); }
+.registro-dialog-heading h2 { margin: 0; font-size: var(--font-size-subheading); }
+.registro-campos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); border: 0; padding: 0; margin: 0; min-width: 0; }
+.registro-campos input, .registro-campos select, .registro-campos textarea { width: 100%; min-width: 0; min-height: var(--control-min-height); font-size: var(--font-size-body); }
+.registro-campo-completo { grid-column: 1 / -1; }
+.registro-acciones { justify-content: flex-end; flex-wrap: wrap; margin-top: var(--space-6); }
+.cliente-seleccionado { margin-bottom: var(--space-4); }
+@media (max-width: 600px) {
+  .registro-dialog { padding: var(--space-4); }
+  .registro-campos { grid-template-columns: minmax(0, 1fr); }
+}

@@ -64,6 +64,50 @@ El recorrido de administración se verifica en `test_aceptacion_administracion.p
 El detalle por UUID aplica los mismos filtros de firma, archivo y rol que la
 consulta histórica por código. El portal nunca serializa el DTO interno.
 
+## Corrección de datos existentes (2026-10-15)
+
+`GET /clientes/{id}` recupera un perfil activo de la firma, independientemente de
+la página del directorio. Para abogados, el conteo incluye solo sus asuntos.
+`PATCH /clientes/{id}` permite a administración y auxiliares corregir el perfil
+compartido: identificación, nombre, contacto, direcciones y datos administrativos.
+El abogado conserva consulta del directorio; su acceso a un expediente no concede
+edición del perfil que otros profesionales pueden compartir.
+
+`PATCH /asuntos/{id}/datos` permite a administración y al abogado titular corregir
+título, radicado oficial y fecha civil de apertura. No admite cambiar código
+interno, cliente, responsable, guía o estado mediante ese comando. Las relaciones
+con firma y cliente activo se validan antes de guardar. El código y UUID conservan
+su identidad y enlaces existentes.
+
+Ambos comandos exigen `expected_updated_at` con zona horaria, bloquean el recurso
+y rechazan una captura obsoleta con 409. Campos desconocidos, obligatorios nulos
+y valores inválidos producen 422. Los opcionales admiten null para retirarlos.
+No se guarda una corrección parcial ante un conflicto, duplicado o fallo del commit.
+El documento normalizado sigue siendo único en la firma, incluidos los archivados.
+
+El perfil es la fuente de captura: los datos que usa la identidad del portal se
+sincronizan en la misma transacción. Cambiar correo o identificación normalizada
+revoca códigos pendientes y sesiones anteriores; una corrección de formato del
+mismo documento, nombre o teléfono no cierra sesiones. La edición conserva la
+identidad del portal y no activa cuentas retiradas ni crea acceso para un perfil
+que no lo tenía. Activar/desactivar ese acceso no forma parte de este comando.
+
+Corregir el radicado actual actualiza los borradores de radicación pendientes y
+su revisión; las actuaciones completadas conservan sus datos históricos. No se
+publica una novedad por corregir estos datos. La bitácora protegida de B08 sigue
+pendiente y no se sustituye por `updated_at`.
+
+La interfaz ofrece edición desde el expediente y desde el cliente seleccionado,
+aun sin asuntos. Consulta la revisión al abrir, conserva la captura tras un fallo
+y pide confirmar antes de descartarla o recargar datos actuales. El diálogo nativo
+retiene el foco y lo devuelve al botón de entrada. Los borradores solo viven en
+memoria; el aviso ante cerrar/recargar la pestaña no sustituye la protección de
+toda la navegación SPA, todavía pendiente en G04.
+
+Las pruebas de API están en `backend/tests/test_edicion_datos.py`; la interfaz
+reutiliza `EditarRegistro` y tiene pruebas de permisos, conflictos, reintentos,
+campos opcionales, doble envío, caché y foco. No se modifica el esquema de BD.
+
 ## Evidencia
 
 Los contratos de API viven en `backend/app/schemas/asunto.py` y los tipos de

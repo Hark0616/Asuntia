@@ -19,6 +19,7 @@ import {
 } from '@/features/asuntos/api/asuntos';
 import { fetchCurrentUserAPI, logoutAPI, restablecerPasswordAPI } from '@/features/auth/api/auth';
 import { SESSION_EXPIRED_EVENT } from '@/lib/session';
+import { fetchClienteAPI } from '@/features/clientes/api/clientes';
 import type { User } from '@/types/api';
 import type { AsuntoPortalAPI } from '@/types/portal';
 
@@ -26,6 +27,7 @@ vi.mock('@/features/asuntos/api/asuntos', () => ({
   fetchAsuntos: vi.fn(),
   buscarAsuntosAPI: vi.fn(),
   fetchAsunto: vi.fn(),
+  actualizarDatosAsuntoAPI: vi.fn(),
   incorporarGuiaAPI: vi.fn(),
   fetchAsuntosPortalAPI: vi.fn(),
   fetchClientesAPI: vi.fn(),
@@ -40,6 +42,7 @@ vi.mock('@/features/asuntos/api/asuntos', () => ({
   asignarResponsableClienteAPI: vi.fn(),
   asignarResponsableAsuntoAPI: vi.fn(),
 }));
+vi.mock('@/features/clientes/api/clientes', () => ({ fetchClienteAPI: vi.fn(), actualizarClienteAPI: vi.fn() }));
 vi.mock('@/features/auth/api/auth', async importOriginal => ({
   ...await importOriginal<typeof import('@/features/auth/api/auth')>(),
   fetchCurrentUserAPI: vi.fn(),
@@ -96,7 +99,7 @@ function prepareOffice(role: 'administrador' | 'auxiliar' | 'abogado' = 'adminis
     id: 'cliente-1', tipo_persona: 'natural', tipo_documento: 'CC',
     numero_documento: '123456', cedula: '123456', nombre: 'Ana Cliente',
     email: 'cliente@example.com', canal_preferido: 'email', portal_habilitado: true,
-    asuntos_count: 1, rol: 'cliente', created_at: '2026-08-01T12:00:00Z',
+    asuntos_count: 1, rol: 'cliente', created_at: '2026-08-01T12:00:00Z', updated_at: '2026-08-01T12:00:00Z',
   }]);
   const asunto = {
     id: 'asunto-1', radicado: 'AS-2026-001', fecha_apertura: '2026-08-01',
@@ -122,9 +125,33 @@ beforeEach(() => {
   vi.mocked(fetchClientesAPI).mockResolvedValue([]);
   vi.mocked(fetchEstadosAPI).mockResolvedValue([]);
   vi.mocked(fetchResponsablesAPI).mockResolvedValue([]);
+  vi.mocked(fetchClienteAPI).mockResolvedValue({
+    id: 'cliente-1', tipo_persona: 'natural', tipo_documento: 'CC', nombre: 'Ana Cliente',
+    numero_documento: '123456', cedula: '123456', email: 'cliente@example.com', canal_preferido: 'email',
+    portal_habilitado: true, asuntos_count: 1, rol: 'cliente', created_at: '2026-08-01T12:00:00Z', updated_at: '2026-08-01T12:00:00Z',
+  });
 });
 
 describe('App: proyección autorizada y recuperación', () => {
+  it('permite editar el perfil sin asuntos desde el directorio', async () => {
+    prepareOffice(); renderApp('/oficina/asuntos?cliente_id=cliente-1');
+    expect(await screen.findByRole('button', { name: 'Editar cliente' })).toBeInTheDocument();
+    expect(fetchClienteAPI).toHaveBeenCalledWith('cliente-1');
+  });
+
+  it('la secretaria corrige clientes y no recibe edición profesional del asunto', async () => {
+    prepareOffice('auxiliar'); renderApp('/oficina/asuntos/asunto-1');
+    expect(await screen.findByRole('button', { name: 'Editar cliente' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Editar asunto' })).not.toBeInTheDocument();
+  });
+
+  it('el abogado responsable edita el asunto y no el perfil compartido', async () => {
+    const caseData = prepareOffice('abogado');
+    vi.mocked(fetchAsunto).mockResolvedValue({ ...caseData, abogado_id: clientUser.id });
+    renderApp('/oficina/asuntos/asunto-1');
+    expect(await screen.findByRole('button', { name: 'Editar asunto' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Editar cliente' })).not.toBeInTheDocument();
+  });
   it.each([
     ['recuperar-acceso', 'challenge', 'Nueva contraseña', 'Recuperar acceso'],
     ['activar-equipo', 'invitacion', 'Contraseña', 'Activar acceso a Asuntia'],

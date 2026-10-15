@@ -11,6 +11,7 @@ from app.schemas.asunto import (
     AsuntoIncorporarGuia,
     AsuntoResponse,
     AsuntoCreate,
+    AsuntoDatosUpdate,
     AsuntoUpdateEstado,
     AsuntosPaginaResponse,
 )
@@ -25,6 +26,13 @@ from app.services.asunto_service import AsuntoService
 from app.services.asignacion_service import AsignacionService
 
 router = APIRouter()
+
+
+@router.patch("/{asunto_id}/datos", response_model=AsuntoResponse)
+async def edit_asunto_data(asunto_id: uuid.UUID, payload: AsuntoDatosUpdate,
+                           db: AsyncSession = Depends(get_db),
+                           current_user: User = Depends(require_roles("administrador", "abogado"))):
+    return await AsuntoService(db, current_user.firma_id).edit_data(asunto_id, payload, current_user)
 
 
 @router.get("/busqueda", response_model=AsuntosPaginaResponse)

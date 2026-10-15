@@ -15,6 +15,21 @@ class AsuntoRepository(BaseRepository[Asunto]):
     def __init__(self, session, firma_id: uuid.UUID):
         super().__init__(Asunto, session, firma_id)
 
+    def stage_edit_data(self, asunto: Asunto, changes: dict[str, Any]) -> None:
+        for field, value in changes.items():
+            setattr(asunto, field, value)
+        if "radicado_oficial" in changes:
+            # Los borradores siguen al dato canónico; las actuaciones completadas son históricas.
+            for paso in asunto.pasos:
+                if (paso.firma_id == self.firma_id and paso.is_active
+                        and paso.codigo == "radicacion" and paso.estado != "completado"):
+                    datos = {key: value for key, value in paso.datos.items() if key != "radicado_oficial"}
+                    if asunto.radicado_oficial:
+                        datos["radicado_oficial"] = asunto.radicado_oficial
+                    paso.datos = datos
+                    self.session.add(paso)
+        self.session.add(asunto)
+
     def _load_options(self, solo_publicas: bool = False):
         criteria = (Novedad.firma_id == self.firma_id) & (Novedad.is_active == True)
         if solo_publicas:

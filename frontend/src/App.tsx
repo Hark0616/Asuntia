@@ -51,6 +51,8 @@ import { MiTrabajo } from '@/features/tareas/components/MiTrabajo';
 import { TareasAsunto } from '@/features/tareas/components/TareasAsunto';
 import { PortalCliente } from '@/features/portal-cliente/components/PortalCliente';
 import { ListaExpedientes } from '@/features/asuntos/components/ListaExpedientes';
+import { EditarAsunto } from '@/features/asuntos/components/EditarAsunto';
+import { EditarCliente, ClienteSeleccionado } from '@/features/clientes/components/EditarCliente';
 import { formatAsuntosCount } from '@/lib/formatAsuntos';
 import { advanceSessionGeneration, SESSION_EXPIRED_EVENT } from '@/lib/session';
 
@@ -616,11 +618,17 @@ export default function App() {
                 <NavLink to="/oficina/asuntos">Volver a expedientes</NavLink>
               </div>
             ) : !asuntoIdRuta ? (
+              <>
+              {new URLSearchParams(location.search).get('cliente_id') && <ClienteSeleccionado
+                key={new URLSearchParams(location.search).get('cliente_id')!}
+                clienteId={new URLSearchParams(location.search).get('cliente_id')!}
+                canEdit={usuarioAutenticado.rol === 'administrador' || usuarioAutenticado.rol === 'auxiliar'} />}
               <ListaExpedientes clientes={clientesAPI || []} responsables={responsablesAPI || []} estados={estadosAPI || []}
                 onAbrir={() => {
                   setClienteInicialAperturaId(new URLSearchParams(location.search).get('cliente_id') || '');
                   setAperturaAbierta(true);
                 }} />
+              </>
             ) : clienteActivo ? (
               <>
                 <div className="toolbar">
@@ -630,6 +638,7 @@ export default function App() {
                     <span className="muted">{clienteActivo.email} · CC/NIT: {clienteActivo.identificacion}</span>
                   </div>
                   <div className="toolbar-actions">
+                    {(usuarioAutenticado.rol === 'administrador' || usuarioAutenticado.rol === 'auxiliar') && <EditarCliente key={clienteActivo.id} clienteId={clienteActivo.id} />}
                     <ResponsableAsignacion
                       id={`cliente-${clienteActivo.id}-responsable`}
                       label="Responsable del cliente"
@@ -682,6 +691,7 @@ export default function App() {
                             {casoActivo.radicadoOficial && <p className="muted small">Radicado oficial · {casoActivo.radicadoOficial}</p>}
                           </div>
                           <div className="case-overview-actions">
+                            {puedeDecidirCaso && <EditarAsunto key={casoActivo.id} asuntoId={casoActivo.id} />}
                             <ResponsableAsignacion
                               id={`asunto-${casoActivo.id}-responsable`}
                               label="Abogado del asunto"

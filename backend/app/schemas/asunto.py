@@ -1,6 +1,6 @@
 import uuid
 from datetime import date, datetime
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field, StringConstraints, model_validator
+from pydantic import AliasChoices, AwareDatetime, BaseModel, ConfigDict, Field, StringConstraints, model_validator
 from typing import Annotated, Literal, Optional, List
 from app.schemas.base import BaseSchemaResponse
 from app.schemas.novedad import NovedadResponse
@@ -63,6 +63,23 @@ class AsuntoAsignarResponsable(BaseModel):
 class AsuntoIncorporarGuia(BaseModel):
     model_config = ConfigDict(extra="forbid")
     ruta_codigo: RutaCodigo
+
+
+class AsuntoDatosUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    expected_updated_at: AwareDatetime
+    titulo: TituloAsunto | None = None
+    radicado_oficial: CodigoAsunto | None = None
+    fecha_apertura: date | None = None
+
+    @model_validator(mode="after")
+    def validate_changes(self):
+        changes = self.model_fields_set - {"expected_updated_at"}
+        if not changes:
+            raise ValueError("Debes indicar los datos que deseas corregir")
+        if any(getattr(self, field) is None for field in changes & {"titulo", "fecha_apertura"}):
+            raise ValueError("El título y la fecha de apertura son obligatorios")
+        return self
 
 
 class ClienteAsuntoResponse(BaseSchemaResponse):

@@ -21,6 +21,7 @@ const clientes = [
     asuntos_count: 1,
     rol: 'cliente',
     created_at: '2026-07-29T12:00:00Z',
+    updated_at: '2026-07-29T12:00:00Z',
   },
   {
     id: 'cliente-2',
@@ -35,6 +36,7 @@ const clientes = [
     asuntos_count: 2,
     rol: 'cliente',
     created_at: '2026-07-29T12:00:00Z',
+    updated_at: '2026-07-29T12:00:00Z',
   },
 ];
 

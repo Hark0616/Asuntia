@@ -36,6 +36,13 @@ export interface AsuntosFiltros {
   sin_responsable?: boolean;
 }
 
+export interface AsuntoDatosUpdatePayload {
+  expected_updated_at: string;
+  titulo?: string;
+  radicado_oficial?: string | null;
+  fecha_apertura?: string;
+}
+
 export interface AsuntoAPI {
   id: string;
   titulo: string;

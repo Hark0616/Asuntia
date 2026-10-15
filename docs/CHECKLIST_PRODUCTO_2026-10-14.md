@@ -523,3 +523,32 @@ citas independientes, auditoría y aceptación de producción/recuperación. La
 revisión de navegador cubre administración; los agentes verifican los demás
 perfiles mediante integración de API e inspección de UI. No sustituye aceptación
 con personas ni cierra G06, H03, A03 o los criterios de operación pendientes.
+
+## 15. Corrección de clientes y asuntos (2026-10-15)
+
+Avance de E01, A03, B04/B05/B07 y G04: administración y secretaría pueden corregir
+el perfil compartido del cliente, incluso sin asuntos. Administración y el abogado
+titular pueden corregir título, radicado oficial y fecha de apertura del expediente.
+Se conservan UUID, código interno, referencias, responsables y guía.
+
+Los comandos de edición exigen revisión, rechazan pantallas obsoletas con 409 y
+confirman los cambios en una transacción. Se validan duplicados, firma, recursos
+archivados, roles y campos protegidos. Correo/identificación se sincronizan con la
+identidad existente del portal; cambiar identidad de acceso revoca OTP y sesiones.
+Corregir contacto no activa ni retira el acceso al portal. Los borradores de guía
+siguen al radicado actual; las actuaciones completadas conservan su historia.
+
+Los formularios consultan al abrir, permiten vaciar datos opcionales y conservan
+captura/revisión al fallar. Recargar datos o descartar cambios requiere confirmación.
+Se utiliza diálogo nativo con foco contenido/restaurado y ayuda visible en su capa.
+El contrato detallado está en [Contratos del núcleo](CONTRATOS_NUCLEO.md#corrección-de-datos-existentes-2026-10-15).
+
+La edición no cierra por sí sola los criterios completos: permanecen pendientes
+bitácora protegida, reactivación, navegación SPA con borradores, citas y aceptación
+de despliegue/respaldos. No hay nuevos modelos, migraciones ni dependencias.
+
+| Verificación | Resultado y límite |
+| --- | --- |
+| Backend completo | 458 pruebas correctas y una omitida en 367,29 s por Redis local ausente. Se añaden 48 casos de edición; incluyen roles, 401/403/404/409/422, nulos, duplicados activos/archivados, concurrencia, rollback, sesión/OTP y conservación de actuaciones. |
+| Frontend | 160 pruebas correctas y build TypeScript/Vite correcto. Doce pruebas nuevas cubren edición, campos vacíos, caché, permisos, conflicto, recarga explícita, doble envío, consulta fallida y cierre/foco, incluida apertura con caché mientras la consulta sigue pendiente. |
+| Navegador con API real | Corrección y lectura posterior del nombre/teléfono del cliente y título/radicado del asunto sobre datos sintéticos propios. Código interno intacto, descarte con Escape, foco restaurado y formularios en escritorio/390 px sin desbordamiento horizontal del diálogo. Ayuda dentro de la capa modal y consola sin errores. Los registros de esta revisión se archivaron; no equivale a aceptación humana ni lector de pantalla. |
