@@ -1,6 +1,6 @@
 import uuid
 from typing import List
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.db import get_db
 from app.core.access import can_access_asunto
@@ -12,6 +12,7 @@ from app.schemas.asunto import (
     AsuntoResponse,
     AsuntoCreate,
     AsuntoUpdateEstado,
+    AsuntosPaginaResponse,
 )
 from app.schemas.flujo import AvanzarPasoRequest, GuardarPasoBorradorRequest
 from app.schemas.portal import AsuntoPortalResponse
@@ -24,6 +25,29 @@ from app.services.asunto_service import AsuntoService
 from app.services.asignacion_service import AsignacionService
 
 router = APIRouter()
+
+
+@router.get("/busqueda", response_model=AsuntosPaginaResponse)
+async def search_asuntos(
+    pagina: int = Query(default=1, ge=1),
+    por_pagina: int = Query(default=25, ge=1, le=100),
+    q: str = Query(default="", max_length=160),
+    cliente_id: uuid.UUID | None = None,
+    responsable_id: uuid.UUID | None = None,
+    estado_id: uuid.UUID | None = None,
+    sin_responsable: bool = False,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_office_user),
+):
+    """Busca resúmenes autorizados con orden estable y total de la consulta completa."""
+    if sin_responsable and responsable_id is not None:
+        raise DomainException(detail="Elige responsable o asuntos sin asignar", status_code=422)
+    items, total = await AsuntoRepository(db, current_user.firma_id).search(
+        pagina=pagina, por_pagina=por_pagina, q=q, cliente_id=cliente_id,
+        responsable_id=responsable_id, estado_id=estado_id, sin_responsable=sin_responsable,
+        abogado_scope=current_user.id if current_user.rol == "abogado" else None,
+    )
+    return AsuntosPaginaResponse(items=items, total=total, pagina=pagina, por_pagina=por_pagina)
 
 
 @router.get("", response_model=List[AsuntoResponse | AsuntoPortalResponse])

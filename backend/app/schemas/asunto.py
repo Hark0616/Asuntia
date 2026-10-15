@@ -73,6 +73,30 @@ class ClienteAsuntoResponse(BaseSchemaResponse):
     responsable_id: Optional[uuid.UUID] = None
 
 
+class AsuntoListaResponse(BaseSchemaResponse):
+    """Resumen de búsqueda: no carga documentos, pasos, tareas ni historia."""
+    id: uuid.UUID
+    titulo: str
+    codigo_interno: str
+    radicado_oficial: Optional[str] = None
+    fecha_apertura: date
+    cliente_id: uuid.UUID
+    cliente_nombre: str
+    abogado_id: Optional[uuid.UUID] = None
+    responsable_nombre: Optional[str] = None
+    estado_id: Optional[uuid.UUID] = None
+    estado_nombre: Optional[str] = None
+    estado_color: Optional[str] = None
+    etapa_actual: str
+
+
+class AsuntosPaginaResponse(BaseSchemaResponse):
+    items: List[AsuntoListaResponse]
+    total: int
+    pagina: int
+    por_pagina: int
+
+
 class AsuntoResponse(BaseSchemaResponse):
     id: uuid.UUID
     titulo: str

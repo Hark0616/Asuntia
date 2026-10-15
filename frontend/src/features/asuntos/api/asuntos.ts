@@ -1,7 +1,7 @@
 import { apiClient } from '@/lib/axios';
 import type { AsuntoPortalAPI } from '@/types/portal';
 import type { Novedad } from '@/types/api';
-import type { AsuntoAPI, RutaCodigo } from '@/types/asunto';
+import type { AsuntoAPI, AsuntosFiltros, AsuntosPaginaAPI, RutaCodigo } from '@/types/asunto';
 export type { AsuntoAPI } from '@/types/asunto';
 
 export interface EstadoProcesalAPI {
@@ -92,6 +92,11 @@ export interface AsuntoPasoAPI {
 
 export const fetchAsuntos = async (): Promise<AsuntoAPI[]> => {
   const response = await apiClient.get<AsuntoAPI[]>('/asuntos');
+  return response.data;
+};
+
+export const buscarAsuntosAPI = async (params: AsuntosFiltros): Promise<AsuntosPaginaAPI> => {
+  const response = await apiClient.get<AsuntosPaginaAPI>('/asuntos/busqueda', { params });
   return response.data;
 };
 

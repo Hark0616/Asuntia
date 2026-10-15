@@ -1,9 +1,11 @@
 import uuid
 from typing import Any, Optional, List
-from sqlalchemy import select
+from sqlalchemy import and_, func, or_, select, true
 from sqlalchemy.orm import joinedload, selectinload, with_loader_criteria
 from app.models.asunto import Asunto
 from app.models.cliente import Cliente
+from app.models.estado import EstadoProcesal
+from app.models.user import User
 from app.models.novedad import Novedad
 from app.models.tarea import Tarea, TareaEstado, TareaPrioridad, TareaTipo
 from app.repositories.base import BaseRepository
@@ -27,6 +29,64 @@ class AsuntoRepository(BaseRepository[Asunto]):
             selectinload(Asunto.pasos),
             with_loader_criteria(Novedad, criteria, include_aliases=True),
         )
+
+    async def search(
+        self, *, pagina: int, por_pagina: int, q: str = "",
+        cliente_id: uuid.UUID | None = None, responsable_id: uuid.UUID | None = None,
+        estado_id: uuid.UUID | None = None, sin_responsable: bool = False,
+        abogado_scope: uuid.UUID | None = None,
+    ) -> tuple[list[dict], int]:
+        """Una única consulta obtiene página y total bajo la misma instantánea."""
+        filtered = (
+            select(
+                Asunto.id, Asunto.titulo, Asunto.codigo_interno.label("codigo_interno"),
+                Asunto.radicado_oficial, Asunto.fecha_apertura, Asunto.cliente_id,
+                Cliente.nombre.label("cliente_nombre"), User.id.label("abogado_id"),
+                User.nombre.label("responsable_nombre"), EstadoProcesal.id.label("estado_id"),
+                EstadoProcesal.nombre.label("estado_nombre"), EstadoProcesal.color_tipo.label("estado_color"),
+                Asunto.etapa_actual, Asunto.created_at,
+            )
+            .join(Cliente, and_(
+                Cliente.id == Asunto.cliente_id, Cliente.firma_id == self.firma_id, Cliente.is_active.is_(True),
+            ))
+            .outerjoin(User, and_(
+                User.id == Asunto.abogado_id, User.firma_id == self.firma_id, User.is_active.is_(True),
+            ))
+            .outerjoin(EstadoProcesal, and_(
+                EstadoProcesal.id == Asunto.estado_id, EstadoProcesal.firma_id == self.firma_id,
+                EstadoProcesal.is_active.is_(True),
+            ))
+            .where(Asunto.firma_id == self.firma_id, Asunto.is_active.is_(True))
+        )
+        if abogado_scope is not None:
+            filtered = filtered.where(Asunto.abogado_id == abogado_scope)
+        if cliente_id is not None:
+            filtered = filtered.where(Asunto.cliente_id == cliente_id)
+        if responsable_id is not None:
+            filtered = filtered.where(Asunto.abogado_id == responsable_id)
+        if estado_id is not None:
+            filtered = filtered.where(Asunto.estado_id == estado_id, EstadoProcesal.id.is_not(None))
+        if sin_responsable:
+            filtered = filtered.where(Asunto.abogado_id.is_(None))
+        if q.strip():
+            filtered = filtered.where(or_(*[
+                column.icontains(q.strip(), autoescape=True) for column in (
+                    Asunto.titulo, Asunto.codigo_interno, Asunto.radicado_oficial,
+                    Cliente.nombre, Cliente.numero_documento,
+                )
+            ]))
+        candidates = filtered.cte("asuntos_filtrados")
+        page = (
+            select(candidates).order_by(candidates.c.created_at.desc(), candidates.c.id.desc())
+            .offset((pagina - 1) * por_pagina).limit(por_pagina).cte("pagina")
+        )
+        totals = select(func.count().label("total")).select_from(candidates).cte("totales")
+        result = await self.session.execute(
+            select(page, totals.c.total).select_from(totals.outerjoin(page, true()))
+            .order_by(page.c.created_at.desc(), page.c.id.desc())
+        )
+        rows = result.mappings().all()
+        return [dict(row) for row in rows if row["id"] is not None], rows[0]["total"]
 
     async def get_by_id(self, id: uuid.UUID, solo_publicas: bool = False) -> Optional[Asunto]:
         stmt = (

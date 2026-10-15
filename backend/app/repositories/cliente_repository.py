@@ -1,10 +1,11 @@
 import uuid
 from typing import Any, Optional
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
 from app.models.cliente import Cliente
+from app.models.asunto import Asunto
 from app.repositories.base import BaseRepository
 
 
@@ -12,10 +13,16 @@ class ClienteRepository(BaseRepository[Cliente]):
     def __init__(self, session, firma_id: uuid.UUID):
         super().__init__(Cliente, session, firma_id)
 
+    def _case_count_options(self):
+        # Los perfiles solo necesitan contar asuntos; la historia se consulta por expediente.
+        return selectinload(Cliente.asuntos.and_(
+            Asunto.firma_id == self.firma_id, Asunto.is_active.is_(True),
+        )).load_only(Asunto.id, Asunto.is_active).raiseload("*")
+
     async def get_by_id(self, id: uuid.UUID) -> Optional[Cliente]:
         stmt = (
             select(Cliente)
-            .options(selectinload(Cliente.asuntos))
+            .options(self._case_count_options())
             .where(Cliente.id == id)
             .where(Cliente.firma_id == self.firma_id)
             .where(Cliente.is_active == True)
@@ -23,24 +30,32 @@ class ClienteRepository(BaseRepository[Cliente]):
         result = await self.session.execute(stmt)
         return result.scalars().first()
 
-    async def list(self, skip: int = 0, limit: int = 200) -> list[Cliente]:
+    async def list(self, skip: int = 0, limit: int = 200, abogado_scope: uuid.UUID | None = None) -> list[dict]:
+        """El directorio cuenta asuntos autorizados sin cargar expedientes ni historias."""
+        cases_count = select(func.count()).select_from(Asunto).where(
+            Asunto.cliente_id == Cliente.id, Asunto.firma_id == self.firma_id, Asunto.is_active.is_(True),
+        )
+        if abogado_scope is not None:
+            cases_count = cases_count.where(Asunto.abogado_id == abogado_scope)
         stmt = (
-            select(Cliente)
-            .options(selectinload(Cliente.asuntos))
+            select(*Cliente.__table__.c, cases_count.correlate(Cliente).scalar_subquery().label("asuntos_count"))
             .where(Cliente.firma_id == self.firma_id)
             .where(Cliente.is_active == True)
-            .order_by(Cliente.nombre.asc())
+            .order_by(Cliente.nombre.asc(), Cliente.id.asc())
             .offset(skip)
             .limit(limit)
         )
         result = await self.session.execute(stmt)
-        return list(result.scalars().all())
+        return [
+            {**row, "cedula": row["numero_documento"], "portal_habilitado": row["portal_user_id"] is not None, "rol": "cliente"}
+            for row in result.mappings()
+        ]
 
     async def get_by_document(self, document: str) -> Optional[Cliente]:
         normalized = self.normalize_document(document)
         stmt = (
             select(Cliente)
-            .options(selectinload(Cliente.asuntos))
+            .options(self._case_count_options())
             .where(Cliente.firma_id == self.firma_id)
             .where(Cliente.numero_documento_normalizado == normalized)
             .where(Cliente.is_active == True)
@@ -53,7 +68,7 @@ class ClienteRepository(BaseRepository[Cliente]):
     ) -> Optional[Cliente]:
         stmt = (
             select(Cliente)
-            .options(selectinload(Cliente.asuntos))
+            .options(self._case_count_options())
             .where(Cliente.firma_id == self.firma_id)
             .where(Cliente.portal_user_id == portal_user_id)
             .where(Cliente.is_active == True)
