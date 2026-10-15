@@ -11,7 +11,7 @@ import pytest_asyncio
 
 
 PREVIOUS = '8d5db36e435d'
-CURRENT = 'f112d368f6d4'
+CURRENT = '4286c195fcc2'
 BACKEND = Path(__file__).resolve().parents[1]
 
 

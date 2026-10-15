@@ -164,3 +164,73 @@ La evidencia adicional está en `backend/tests/test_busqueda_asuntos.py`,
 `backend/tests/test_firma_acceso.py` y las pruebas de `ListaExpedientes`, acceso y
 navegación del frontend. `.github/workflows/quality.yml` ejecuta build, pruebas de
 ambas aplicaciones y migraciones reales en PostgreSQL 16 desde cada push o PR.
+
+## Autenticación, límites y recuperación
+
+Los presupuestos de autenticación viven en `auth_rate_limits`, separados de las
+identidades y expedientes. Cada clave es un HMAC del propósito y la identidad
+normalizada o IP; no guarda correo, documento ni dirección en texto. El UPSERT
+condicional de PostgreSQL concede cupos atómicamente entre procesos y conserva
+los límites al reiniciar la API. Incluye identidades inexistentes de la firma para
+que la respuesta de límite no confirme si una cuenta existe.
+
+La ventana predeterminada es de 15 minutos: ocho solicitudes de ingreso de oficina,
+tres de OTP, tres de recuperación y doce verificaciones por identidad. El límite
+por IP es de 120 solicitudes por propósito y firma. Admitir una solicitud consume
+presupuesto aunque sus credenciales sean correctas. La respuesta 429 informa
+`Retry-After`, expuesto mediante CORS y traducido por la interfaz al tiempo de
+espera. Se usa el peer que entrega el servidor ASGI; no se interpreta directamente
+`X-Forwarded-For`. El proxy de despliegue debe limitar tráfico antes de resolver
+la firma y configurar explícitamente sus proxies de confianza; C05 sigue abierto.
+
+Emitir y verificar OTP toma primero el bloqueo de firma y luego el del desafío.
+Solo existe un código activo por usuario tras una emisión. Cinco códigos errados
+agotan el desafío; consumirlo, vencerlo o renovar el código invalida los anteriores.
+Emisión, revocación y consumo se confirman como una sola transacción. En desarrollo
+se conserva el código local `12345`; staging y producción generan seis dígitos
+aleatorios. El vencimiento proviene de `OTP_TTL_MINUTES`, también usado por el
+correo y `expires_in_seconds` de la respuesta pública.
+
+`POST /auth/password/request` recibe firma y correo de oficina. La respuesta es
+igual para cuentas activas, ausentes, de portal o firmas desconocidas; no devuelve
+usuarios ni enlaces. Las solicitudes de acceso aplican el mismo mínimo temporal
+de respuesta, y el ingreso verifica un hash de contraseña sustituto cuando no hay
+cuenta. El correo individual se despacha después de enviar la respuesta HTTP.
+
+El enlace de recuperación usa un secreto aleatorio de 256 bits y UUID; solo el
+HMAC queda en `AuthChallenge` con propósito `office_password_reset`. Vence según
+`PASSWORD_RESET_TTL_MINUTES` (30 por defecto). Se construye desde `FRONTEND_URL`,
+nunca desde Host u Origin del request. El secreto está en el fragmento del enlace,
+se retira del historial al abrirlo y solo se envía al comando de confirmación.
+Renovar el enlace invalida el anterior.
+
+`POST /auth/password/confirm` valida firma, propósito, vigencia, intentos y cuenta
+de oficina activa. Confirma en una transacción la contraseña Argon2 y el consumo
+del enlace; revoca sesiones y otros enlaces de recuperación. No activa usuarios
+retirados ni abre una sesión. Elimina la cookie del navegador y la interfaz limpia
+su caché antes de volver al ingreso. El administrador que modifica roles o retira
+acceso invalida también los desafíos pendientes para que no sobrevivan a una
+reincorporación. Una notificación de cambio se manda sin incluir la contraseña.
+
+La política sigue los criterios de respuestas uniformes, tokens aleatorios con
+caducidad y un solo uso, y nuevo ingreso después del cambio de la
+[guía de recuperación de OWASP](https://cheatsheetseries.owasp.org/cheatsheets/Forgot_Password_Cheat_Sheet.html).
+La evidencia de esta implementación está en `test_auth_seguridad.py`,
+`test_auth_mail.py` y las pruebas de `RecuperarAcceso` y `App`.
+
+## Correo transaccional de acceso
+
+El transporte usa timeout, hasta dos intentos por defecto y TLS con validación de
+certificado (`starttls` o `ssl`) en producción. Usuario y contraseña SMTP se
+configuran juntos. Producción exige `FRONTEND_URL` con HTTPS. El vencimiento del
+correo y la API proviene de la misma configuración. Los fallos se registran con
+propósito, número de intento y categoría de error; nunca destinatarios, códigos,
+enlaces, contraseñas ni contenido de excepciones SMTP.
+
+Los correos individuales de autenticación usan `BackgroundTasks` y un thread para
+SMTP; no bloquean el event loop ni la respuesta. No es una cola durable: si el
+proceso termina antes del envío, el usuario debe solicitar otro enlace o código.
+Los envíos masivos siguen reservados a workers. C06 permanece parcial hasta
+configurar y verificar un proveedor real y su operación. Las pruebas comprueban
+entrega SMTP en un servidor local controlado, TLS previo al login, reintentos y
+logs sin secretos; no prueban recepción en bandejas de producción.

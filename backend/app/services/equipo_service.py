@@ -41,7 +41,7 @@ class EquipoService:
 
     async def _invitation(self, user, actor):
         token = secrets.token_urlsafe(32)
-        await self.challenges.stage_revoke_invitations(user.id)
+        await self.challenges.stage_revoke_all(user.id)
         challenge = await self.challenges.stage_invitation(
             user.id, AuthService._hash_code(token),
             datetime.now(timezone.utc) + timedelta(hours=24), actor.id)
@@ -109,7 +109,7 @@ class EquipoService:
         if deactivate:
             user.is_active = False
         user.updated_at = datetime.now(timezone.utc)
-        await self.challenges.stage_revoke_invitations(user.id)
+        await self.challenges.stage_revoke_all(user.id)
         await self.session.commit()
         return next(item for item in await self.list_members() if item.id == user.id)
 
@@ -130,5 +130,5 @@ class EquipoService:
         user.updated_at = datetime.now(timezone.utc)
         challenge.consumed_at = datetime.now(timezone.utc)
         challenge.is_active = False
-        await self.challenges.stage_revoke_invitations(user.id)
+        await self.challenges.stage_revoke_all(user.id)
         await self.session.commit()

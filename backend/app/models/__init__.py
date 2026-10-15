@@ -9,6 +9,7 @@ from app.models.novedad import Novedad
 from app.models.documento import DocumentoAsunto, TipoDocumental
 from app.models.firma_storage import FirmaStorageConfig
 from app.models.auth_challenge import AuthChallenge
+from app.models.auth_rate_limit import AuthRateLimit
 from app.models.tarea import Tarea, TareaEstado, TareaPrioridad, TareaTipo
 
 __all__ = [
@@ -25,6 +26,7 @@ __all__ = [
     "TipoDocumental",
     "FirmaStorageConfig",
     "AuthChallenge",
+    "AuthRateLimit",
     "Tarea",
     "TareaEstado",
     "TareaPrioridad",

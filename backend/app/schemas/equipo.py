@@ -5,7 +5,7 @@ from typing import Annotated, Literal
 from pydantic import AwareDatetime, BaseModel, ConfigDict, EmailStr, Field, StringConstraints, field_validator
 
 from app.schemas.base import BaseSchemaResponse
-from app.schemas.auth import FirmaSlug
+from app.schemas.auth import FirmaSlug, NewPassword
 
 OfficeRole = Literal["administrador", "abogado", "auxiliar"]
 RequiredName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]
@@ -73,11 +73,4 @@ class ActivarEquipoRequest(BaseModel):
     firma_slug: FirmaSlug
     invitacion_id: uuid.UUID
     token: str = Field(min_length=43, max_length=43)
-    password: str = Field(min_length=12, max_length=128)
-
-    @field_validator("password")
-    @classmethod
-    def nonblank_password(cls, value):
-        if not value.strip():
-            raise ValueError("La contraseña no puede estar vacía")
-        return value
+    password: NewPassword
