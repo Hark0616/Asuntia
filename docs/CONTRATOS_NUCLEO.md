@@ -56,6 +56,11 @@ de consultas normales y del portal. La reactivación no tiene todavía un comand
 público: debe definirse con B06 antes de ofrecerla en interfaz. La matriz completa
 de publicación, retiro y equipo sigue en A03; se conservan sus controles actuales.
 
+Al cambiar el responsable del asunto se transfiere su trabajo abierto, tanto si
+el titular saliente es abogado como administrador. Las tareas delegadas a otros
+miembros y las completadas o canceladas conservan sus responsables e historia.
+El recorrido de administración se verifica en `test_aceptacion_administracion.py`.
+
 El detalle por UUID aplica los mismos filtros de firma, archivo y rol que la
 consulta histórica por código. El portal nunca serializa el DTO interno.
 

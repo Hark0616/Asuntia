@@ -225,7 +225,7 @@ class TareaRepository(BaseRepository[Tarea]):
         self,
         asunto_id: uuid.UUID,
         responsable_id: uuid.UUID,
-        previous_lawyer_id: uuid.UUID | None = None,
+        previous_responsable_id: uuid.UUID | None = None,
     ) -> int:
         result = await self.session.execute(
             update(Tarea)
@@ -233,7 +233,7 @@ class TareaRepository(BaseRepository[Tarea]):
             .where(Tarea.firma_id == self.firma_id)
             .where(Tarea.is_active == True)
             .where(or_(Tarea.tipo == TareaTipo.COMPLETAR_PASO.value,
-                       Tarea.responsable_id == previous_lawyer_id) if previous_lawyer_id
+                       Tarea.responsable_id == previous_responsable_id) if previous_responsable_id
                    else Tarea.tipo == TareaTipo.COMPLETAR_PASO.value)
             .where(
                 Tarea.estado.in_(

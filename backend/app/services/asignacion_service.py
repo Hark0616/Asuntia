@@ -63,11 +63,13 @@ class AsignacionService:
         await self._require_responsable(responsable_id)
 
         previous = await UserRepository(self.session, self.firma_id).get_by_id(asunto.abogado_id)
-        previous_lawyer_id = previous.id if previous and previous.rol == "abogado" else None
+        previous_responsable_id = (
+            previous.id if previous and previous.rol in {"administrador", "abogado"} else None
+        )
         asunto_repo.stage_responsible(asunto, responsable_id)
         await TareaRepository(
             self.session, self.firma_id
-        ).reassign_open_for_asunto(asunto_id, responsable_id, previous_lawyer_id)
+        ).reassign_open_for_asunto(asunto_id, responsable_id, previous_responsable_id)
         await self.session.commit()
         updated = await asunto_repo.get_by_id(asunto_id)
         if updated is None:
