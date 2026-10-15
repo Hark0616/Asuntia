@@ -58,6 +58,8 @@ cd backend
 
 ### 3. Frontend
 
+Usa Node 24 (referencia en `frontend/.nvmrc`) para compilar y ejecutar las pruebas.
+
 ```powershell
 cd frontend
 npm install
@@ -65,6 +67,12 @@ npm run dev
 ```
 
 Aplicación: `http://localhost:5173`
+
+El ingreso requiere el identificador de la firma. Puede escribirse en el formulario,
+venir del enlace `/?firma=identificador` o preconfigurarse con `VITE_FIRMA_SLUG`
+en el entorno de Vite antes de compilar. Es configuración pública, no una credencial.
+La API exige `firma_slug` tanto para contraseña como para solicitar y verificar OTP;
+no asume una firma de demostración cuando falta el dato.
 
 ## Verificación
 

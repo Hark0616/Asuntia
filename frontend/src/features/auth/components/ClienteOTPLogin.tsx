@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
 import { ShieldCheck, Mail, ArrowRight, ExternalLink } from 'lucide-react';
-import { apiClient } from '@/lib/axios';
+import { solicitarOTPAPI, verificarOTPAPI } from '@/features/auth/api/auth';
 import type { User } from '@/types/api';
+import { FirmaAccesoField } from './FirmaAccesoField';
 
 interface ClienteOTPLoginProps {
   onSuccess: (user: User) => void;
+  firmaSlug: string;
+  onFirmaChange: (value: string) => void;
 }
 
 const formatCedulaInput = (val: string): string => {
@@ -13,7 +16,7 @@ const formatCedulaInput = (val: string): string => {
   return digits.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
 };
 
-export function ClienteOTPLogin({ onSuccess }: ClienteOTPLoginProps) {
+export function ClienteOTPLogin({ onSuccess, firmaSlug, onFirmaChange }: ClienteOTPLoginProps) {
   const isDevelopment = import.meta.env.DEV;
   const [step, setStep] = useState<'cedula' | 'otp'>('cedula');
   const [cedula, setCedula] = useState('');
@@ -27,13 +30,13 @@ export function ClienteOTPLogin({ onSuccess }: ClienteOTPLoginProps) {
 
   const handleSolicitarOTP = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!cedula.trim()) return;
+    if (loading || !cedula.trim() || !firmaSlug.trim()) return;
 
     setLoading(true);
     setError('');
 
     try {
-      await apiClient.post('/auth/otp/request', { cedula, firma_slug: 'demo' });
+      await solicitarOTPAPI(firmaSlug, cedula);
       setStep('otp');
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Error de verificación.');
@@ -44,18 +47,13 @@ export function ClienteOTPLogin({ onSuccess }: ClienteOTPLoginProps) {
 
   const handleVerificarOTP = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!code.trim()) return;
+    if (loading || !code.trim() || !firmaSlug.trim()) return;
 
     setLoading(true);
     setError('');
 
     try {
-      const response = await apiClient.post('/auth/otp/verify', {
-        cedula,
-        code,
-        firma_slug: 'demo',
-      });
-      onSuccess(response.data.user);
+      onSuccess(await verificarOTPAPI(firmaSlug, cedula, code));
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Código incorrecto.');
     } finally {
@@ -86,6 +84,7 @@ export function ClienteOTPLogin({ onSuccess }: ClienteOTPLoginProps) {
 
         {step === 'cedula' && (
           <form onSubmit={handleSolicitarOTP} className="stack">
+            <FirmaAccesoField value={firmaSlug} onChange={onFirmaChange} disabled={loading} />
             <div className="field">
               <label htmlFor="cedula" style={{ textAlign: 'left' }}>Cédula de ciudadanía</label>
               <input
@@ -144,6 +143,9 @@ export function ClienteOTPLogin({ onSuccess }: ClienteOTPLoginProps) {
               {loading ? 'Verificando...' : 'Ingresar'}
               <ShieldCheck size={16} />
             </button>
+            <button className="secondary-button" type="button" disabled={loading} onClick={() => {
+              setStep('cedula'); setCode(''); setError('');
+            }}>Cambiar firma o documento</button>
 
             {isDevelopment && (
               <div style={{ marginTop: '16px', borderTop: '1px dashed var(--line)', paddingTop: '12px' }}>

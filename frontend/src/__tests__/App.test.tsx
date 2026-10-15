@@ -9,6 +9,7 @@ import {
   crearNovedadAPI,
   actualizarEstadoAPI,
   fetchAsuntos,
+  buscarAsuntosAPI,
   fetchAsunto,
   incorporarGuiaAPI,
   fetchAsuntosPortalAPI,
@@ -22,6 +23,7 @@ import type { AsuntoPortalAPI } from '@/types/portal';
 
 vi.mock('@/features/asuntos/api/asuntos', () => ({
   fetchAsuntos: vi.fn(),
+  buscarAsuntosAPI: vi.fn(),
   fetchAsunto: vi.fn(),
   incorporarGuiaAPI: vi.fn(),
   fetchAsuntosPortalAPI: vi.fn(),
@@ -104,6 +106,7 @@ function prepareOffice(role: 'administrador' | 'auxiliar' | 'abogado' = 'adminis
   };
   vi.mocked(fetchAsuntos).mockResolvedValue([asunto]);
   vi.mocked(fetchAsunto).mockResolvedValue(asunto);
+  vi.mocked(buscarAsuntosAPI).mockResolvedValue({ items: [], total: 0, pagina: 1, por_pagina: 25 });
   return asunto;
 }
 
@@ -112,12 +115,25 @@ beforeEach(() => {
   vi.mocked(fetchCurrentUserAPI).mockResolvedValue(clientUser);
   vi.mocked(fetchAsuntosPortalAPI).mockResolvedValue([portalAsunto]);
   vi.mocked(fetchAsuntos).mockResolvedValue([]);
+  vi.mocked(buscarAsuntosAPI).mockResolvedValue({ items: [], total: 0, pagina: 1, por_pagina: 25 });
   vi.mocked(fetchClientesAPI).mockResolvedValue([]);
   vi.mocked(fetchEstadosAPI).mockResolvedValue([]);
   vi.mocked(fetchResponsablesAPI).mockResolvedValue([]);
 });
 
 describe('App: proyección autorizada y recuperación', () => {
+  it('conserva la firma del enlace al cambiar entre ingreso de oficina y cliente', async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetchCurrentUserAPI).mockRejectedValue({ response: { status: 401 } });
+    renderApp('/?firma=Oficina-Norte');
+    expect(await screen.findByLabelText('Firma')).toHaveValue('oficina-norte');
+    await user.clear(screen.getByLabelText('Firma'));
+    await user.type(screen.getByLabelText('Firma'), 'firma-elegida');
+    await user.click(screen.getByRole('button', { name: /Acceso Cliente/ }));
+    expect(screen.getByLabelText('Firma')).toHaveValue('firma-elegida');
+    expect(screen.getByLabelText('Cédula de ciudadanía')).toBeInTheDocument();
+  });
+
   it('abre un asunto por URL aunque las listas de asuntos y clientes estén vacías', async () => {
     const asunto = prepareOffice();
     vi.mocked(fetchAsunto).mockResolvedValue({
@@ -178,6 +194,7 @@ describe('App: proyección autorizada y recuperación', () => {
     expect(await screen.findByText('AS-2026-001')).toBeInTheDocument();
     expect(fetchAsuntosPortalAPI).toHaveBeenCalledTimes(1);
     expect(fetchAsuntos).not.toHaveBeenCalled();
+    expect(buscarAsuntosAPI).not.toHaveBeenCalled();
     expect(fetchClientesAPI).not.toHaveBeenCalled();
     expect(fetchEstadosAPI).not.toHaveBeenCalled();
     expect(fetchResponsablesAPI).not.toHaveBeenCalled();
@@ -218,7 +235,7 @@ describe('App: proyección autorizada y recuperación', () => {
 
   it('distingue el fallo de expedientes de un directorio vacío en oficina', async () => {
     prepareOffice();
-    vi.mocked(fetchAsuntos).mockRejectedValue(new Error('API no disponible'));
+    vi.mocked(buscarAsuntosAPI).mockRejectedValue(new Error('API no disponible'));
     renderApp('/oficina/asuntos');
 
     expect(await screen.findByText('No pudimos consultar los expedientes')).toBeInTheDocument();

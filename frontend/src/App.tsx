@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Navigate,
+  Link,
   NavLink,
   matchPath,
   useLocation,
@@ -15,7 +16,6 @@ import {
   UsersRound,
 } from 'lucide-react';
 import { 
-  fetchAsuntos, 
   fetchAsunto,
   incorporarGuiaAPI,
   fetchAsuntosPortalAPI,
@@ -28,14 +28,14 @@ import {
   actualizarEstadoAPI, 
   asignarResponsableClienteAPI,
   asignarResponsableAsuntoAPI,
-  AsuntoAPI, 
   EstadoProcesalAPI,
   AperturaAsuntoPayload,
 } from '@/features/asuntos/api/asuntos';
 import { ClienteOTPLogin } from '@/features/auth/components/ClienteOTPLogin';
+import { firmaInicial } from '@/features/auth/firmaAcceso';
 import { OficinaLogin } from '@/features/auth/components/OficinaLogin';
 import { fetchCurrentUserAPI, logoutAPI } from '@/features/auth/api/auth';
-import type { Novedad, User } from '@/types/api';
+import type { User } from '@/types/api';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { AperturaAsuntoModal } from '@/components/ui/AperturaAsuntoModal';
 import { DocumentosTab } from '@/features/documentos/components/DocumentosTab';
@@ -43,43 +43,12 @@ import { ConfiguracionAlmacenamiento } from '@/features/firma/components/Configu
 import { FlujoAsunto } from '@/features/asuntos/components/FlujoAsunto';
 import { ActividadExpediente } from '@/features/asuntos/components/ActividadExpediente';
 import { ResponsableAsignacion } from '@/features/asuntos/components/ResponsableAsignacion';
-import type { AsuntoPasoAPI } from '@/features/asuntos/api/asuntos';
 import { UserMenu } from '@/components/layout/UserMenu';
 import { MiTrabajo } from '@/features/tareas/components/MiTrabajo';
 import { TareasAsunto } from '@/features/tareas/components/TareasAsunto';
 import { PortalCliente } from '@/features/portal-cliente/components/PortalCliente';
+import { ListaExpedientes } from '@/features/asuntos/components/ListaExpedientes';
 import { formatAsuntosCount } from '@/lib/formatAsuntos';
-
-interface CasoData {
-  id: string;
-  codigo: string;
-  radicadoOficial: string | null;
-  rutaCodigo: string | null;
-  nombre: string;
-  responsable: string;
-  estadoBadge: string;
-  estadoTipo: 'warning' | 'neutral' | 'mint' | 'danger';
-  estadoId?: string;
-  estadoDescripcion?: string;
-  accionActual: string;
-  abogadoId?: string;
-  prioridad: 'alta' | 'normal';
-  novedades: Novedad[];
-  pasos: AsuntoPasoAPI[];
-  flujoEstado: 'activo' | 'completado' | null;
-}
-
-interface ClienteData {
-  id: string;
-  nombre: string;
-  contacto: string;
-  email: string;
-  identificacion: string;
-  responsableId?: string;
-  responsableNombre: string;
-  asuntosRegistrados?: number;
-  casos: CasoData[];
-}
 
 export default function App() {
   const queryClient = useQueryClient();
@@ -88,7 +57,7 @@ export default function App() {
   
   const [usuarioAutenticado, setUsuarioAutenticado] = useState<User | null | undefined>(undefined);
   const [view, setView] = useState<'cliente' | 'firma'>('firma');
-  const [clienteIdSeleccionado, setClienteIdSeleccionado] = useState<string>('');
+  const [firmaSlug, setFirmaSlug] = useState(() => firmaInicial(location.search, import.meta.env.VITE_FIRMA_SLUG));
   const [casoIdSeleccionado, setCasoIdSeleccionado] = useState<string>('');
   const [aperturaAbierta, setAperturaAbierta] = useState(false);
   const [clienteInicialAperturaId, setClienteInicialAperturaId] = useState('');
@@ -129,13 +98,6 @@ export default function App() {
   // Consultas API protegidas por la sesión y el rol.
   const authenticated = Boolean(usuarioAutenticado);
   const officeUser = authenticated && usuarioAutenticado?.rol !== 'cliente';
-  const asuntosQuery = useQuery({
-    queryKey: ['asuntos'],
-    queryFn: fetchAsuntos,
-    retry: 1,
-    enabled: officeUser,
-  });
-  const { data: asuntosAPI } = asuntosQuery;
   const asuntoIdRuta = asuntoRouteMatch?.params.asuntoId;
   const detalleQuery = useQuery({
     queryKey: ['asuntos', 'detalle', asuntoIdRuta],
@@ -178,7 +140,6 @@ export default function App() {
       queryClient.invalidateQueries({ queryKey: ['clientes'] });
       queryClient.invalidateQueries({ queryKey: ['asuntos'] });
       queryClient.invalidateQueries({ queryKey: ['tareas'] });
-      setClienteIdSeleccionado(newAsunto.cliente_id);
       setCasoIdSeleccionado(newAsunto.id);
       setAperturaAbierta(false);
       setClienteInicialAperturaId('');
@@ -199,7 +160,7 @@ export default function App() {
     mutationFn: ({ asuntoId, pasoCodigo, datos, expectedUpdatedAt }: { asuntoId: string; pasoCodigo: string; datos: Record<string, unknown>; expectedUpdatedAt?: string }) =>
       avanzarPasoAPI(asuntoId, { paso_codigo: pasoCodigo, datos, expected_updated_at: expectedUpdatedAt }),
     onSuccess: (asunto) => {
-      queryClient.setQueryData<AsuntoAPI[]>(['asuntos'], (current) => current?.map((item) => item.id === asunto.id ? asunto : item));
+      queryClient.setQueryData(['asuntos', 'detalle', asunto.id], asunto);
       queryClient.invalidateQueries({ queryKey: ['asuntos'] });
       queryClient.invalidateQueries({ queryKey: ['tareas'] });
     },
@@ -209,7 +170,7 @@ export default function App() {
     mutationFn: ({ asuntoId, pasoCodigo, datos, expectedUpdatedAt }: { asuntoId: string; pasoCodigo: string; datos: Record<string, unknown>; expectedUpdatedAt: string }) =>
       guardarBorradorPasoAPI(asuntoId, { paso_codigo: pasoCodigo, datos, expected_updated_at: expectedUpdatedAt }),
     onSuccess: (asunto) => {
-      queryClient.setQueryData<AsuntoAPI[]>(['asuntos'], (current) => current?.map((item) => item.id === asunto.id ? asunto : item));
+      queryClient.setQueryData(['asuntos', 'detalle', asunto.id], asunto);
       queryClient.invalidateQueries({ queryKey: ['asuntos'] });
     },
   });
@@ -233,6 +194,7 @@ export default function App() {
     }) => asignarResponsableClienteAPI(clienteId, responsableId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['clientes'] });
+      queryClient.invalidateQueries({ queryKey: ['asuntos', 'detalle'] });
     },
   });
 
@@ -250,73 +212,22 @@ export default function App() {
     },
   });
 
-  const asuntosDisponibles = detalle
-    ? [...(asuntosAPI || []).filter((asunto) => asunto.id !== detalle.id), detalle]
-    : (asuntosAPI || []);
-  const perfilesClientes: Array<{
-    id: string; nombre: string; email: string; identificacion: string;
-    responsable_id?: string; asuntos_count?: number;
-  }> = (clientesAPI || []).map((cli) => ({
-    id: cli.id, nombre: cli.nombre, email: cli.email,
-    identificacion: cli.numero_documento, responsable_id: cli.responsable_id,
-    asuntos_count: cli.asuntos_count,
+  const clientes = (clientesAPI || []).map((cli) => ({
+    id: cli.id, nombre: cli.nombre, asuntosRegistrados: cli.asuntos_count,
+    responsableNombre: (responsablesAPI || []).find((r) => r.id === cli.responsable_id)?.nombre || 'Sin asignar',
   }));
-  if (detalle && !perfilesClientes.some((cli) => cli.id === detalle.cliente_id)) {
-    perfilesClientes.push({
-      id: detalle.cliente.id, nombre: detalle.cliente.nombre, email: detalle.cliente.email,
-      responsable_id: detalle.cliente.responsable_id,
-      identificacion: detalle.cliente.numero_documento,
-    });
-  }
-  const clientes: ClienteData[] = perfilesClientes.map((cli) => {
-      const casosDelCliente = asuntosDisponibles.filter((as: AsuntoAPI) => as.cliente_id === cli.id);
-      const responsableCliente = (responsablesAPI || []).find(
-        (responsable) => responsable.id === cli.responsable_id,
-      );
-
-      return {
-        id: cli.id,
-        nombre: cli.nombre,
-        contacto: cli.nombre.split(' ')[0],
-        email: cli.email,
-        identificacion: cli.identificacion,
-        responsableId: cli.responsable_id,
-        responsableNombre: responsableCliente?.nombre || 'Sin asignar',
-        asuntosRegistrados: cli.asuntos_count,
-        casos: casosDelCliente.map((as: AsuntoAPI) => {
-          const responsableAsunto = (responsablesAPI || []).find(
-            (responsable) => responsable.id === as.abogado_id,
-          );
-          return {
-          id: as.id,
-          codigo: as.codigo_interno,
-          radicadoOficial: as.radicado_oficial,
-          rutaCodigo: as.ruta_codigo,
-          nombre: as.titulo,
-          responsable: responsableAsunto?.nombre || 'Sin asignar',
-          estadoBadge: as.estado?.nombre || 'Sin estado registrado',
-          estadoTipo: (as.estado?.color_tipo as any) || 'mint',
-          estadoId: as.estado?.id,
-          estadoDescripcion: as.estado?.descripcion,
-          accionActual: as.pasos.find((paso) => paso.estado === 'activo')?.titulo
-            || as.etapa_actual,
-          abogadoId: as.abogado_id,
-          prioridad: 'normal' as const,
-          pasos: as.pasos,
-          flujoEstado: as.flujo_estado,
-          novedades: as.novedades
-          };
-        })
-      };
-    });
-
-  // Selección activa
-  const clienteActivo = clientes.find(c => c.id === (asuntoIdRuta ? detalle?.cliente_id : clienteIdSeleccionado)) || null;
-  const casoActivo = clienteActivo
-    ? asuntoIdRuta
-      ? clienteActivo.casos.find(c => c.id === asuntoIdRuta) || null
-      : clienteActivo.casos.find(c => c.id === casoIdSeleccionado) || clienteActivo.casos[0] || null
-    : null;
+  const clienteActivo = detalle ? {
+    id: detalle.cliente.id, nombre: detalle.cliente.nombre, email: detalle.cliente.email,
+    identificacion: detalle.cliente.numero_documento, responsableId: detalle.cliente.responsable_id,
+  } : null;
+  const casoActivo = detalle ? {
+    id: detalle.id, nombre: detalle.titulo, codigo: detalle.codigo_interno,
+    radicadoOficial: detalle.radicado_oficial, rutaCodigo: detalle.ruta_codigo,
+    estadoId: detalle.estado?.id, estadoBadge: detalle.estado?.nombre || 'Sin estado registrado',
+    estadoTipo: detalle.estado?.color_tipo || 'neutral', estadoDescripcion: detalle.estado?.descripcion,
+    abogadoId: detalle.abogado_id, pasos: detalle.pasos, flujoEstado: detalle.flujo_estado,
+    novedades: detalle.novedades,
+  } : null;
   const puedeDecidirCaso = usuarioAutenticado?.rol === 'administrador'
     || (usuarioAutenticado?.rol === 'abogado' && casoActivo?.abogadoId === usuarioAutenticado.id);
 
@@ -325,16 +236,6 @@ export default function App() {
   React.useEffect(() => {
     setEstadoSeleccionadoId(casoActivo?.estadoId || '');
   }, [casoActivo?.id, casoActivo?.estadoId]);
-
-  React.useEffect(() => {
-    const asuntoId = asuntoRouteMatch?.params.asuntoId;
-    if (!asuntoId || !detalle) return;
-    const asunto = detalle;
-    if (asunto) {
-      setClienteIdSeleccionado(asunto.cliente_id);
-      setCasoIdSeleccionado(asunto.id);
-    }
-  }, [asuntoRouteMatch?.params.asuntoId, detalle]);
 
   React.useEffect(() => {
     if (!casoActivo || !['#paso-activo', '#tareas-expediente'].includes(location.hash)) return;
@@ -410,9 +311,9 @@ export default function App() {
         </header>
 
         {view === 'cliente' ? (
-          <ClienteOTPLogin onSuccess={handleAuthenticated} />
+          <ClienteOTPLogin onSuccess={handleAuthenticated} firmaSlug={firmaSlug} onFirmaChange={setFirmaSlug} />
         ) : (
-          <OficinaLogin onSuccess={handleAuthenticated} />
+          <OficinaLogin onSuccess={handleAuthenticated} firmaSlug={firmaSlug} onFirmaChange={setFirmaSlug} />
         )}
       </div>
     );
@@ -608,25 +509,17 @@ export default function App() {
                       <span className="muted small">Directorio no disponible.</span>
                     ) : clientes.length > 0 ? (
                       clientes.map(cli => (
-                        <NavLink
+                        <Link
                           key={cli.id}
-                          className={`client-entry ${clienteActivo && cli.id === clienteActivo.id ? 'active' : ''}`}
-                          to={cli.casos?.[0]
-                            ? `/oficina/asuntos/${cli.casos[0].id}`
-                            : '/oficina/asuntos'}
-                          onClick={() => {
-                            setClienteIdSeleccionado(cli.id);
-                            if (cli.casos && cli.casos.length > 0) {
-                              setCasoIdSeleccionado(cli.casos[0].id);
-                            }
-                          }}
+                          className={`client-entry ${cli.id === (clienteActivo?.id || new URLSearchParams(location.search).get('cliente_id')) ? 'active' : ''}`}
+                          to={`/oficina/asuntos?cliente_id=${cli.id}`}
                         >
                           <strong>{cli.nombre}</strong>
                           <span className="muted small">
                             {cli.asuntosRegistrados !== undefined && `${formatAsuntosCount(cli.asuntosRegistrados)} · `}
                             {cli.responsableNombre}
                           </span>
-                        </NavLink>
+                        </Link>
                       ))
                     ) : (
                       <div className="muted small" style={{ padding: '12px' }}>
@@ -640,24 +533,6 @@ export default function App() {
           </aside>
 
           <section className="main">
-            {seccionFirma === 'expedientes'
-              && (asuntosQuery.isError || clientesQuery.isError)
-              && asuntosAPI && clientesAPI && (
-                <div className="work-stale-notice" role="status">
-                  Mostrando la última información disponible.
-                  <button
-                    className="secondary-button"
-                    type="button"
-                    onClick={() => {
-                      asuntosQuery.refetch();
-                      clientesQuery.refetch();
-                    }}
-                    disabled={asuntosQuery.isFetching || clientesQuery.isFetching}
-                  >
-                    Reintentar
-                  </button>
-                </div>
-              )}
             {seccionFirma === 'config_almacenamiento' ? (
               <div className="settings-content">
                 <div className="toolbar settings-toolbar">
@@ -680,33 +555,17 @@ export default function App() {
                 <button className="secondary-button" onClick={() => detalleQuery.refetch()}>Reintentar</button>
                 <NavLink to="/oficina/asuntos">Volver a expedientes</NavLink>
               </div>
-            ) : !asuntoIdRuta && (asuntosQuery.isLoading || clientesQuery.isLoading) ? (
-              <div className="panel work-empty" role="status">
-                <span className="muted">Consultando expedientes…</span>
-              </div>
-            ) : !asuntoIdRuta && ((asuntosQuery.isError && !asuntosAPI)
-              || (clientesQuery.isError && !clientesAPI)) ? (
-              <div className="panel work-empty" role="alert">
-                <div>
-                  <h3>No pudimos consultar los expedientes</h3>
-                  <p className="muted small">Inténtalo de nuevo.</p>
-                </div>
-                <button
-                  className="secondary-button"
-                  type="button"
-                  onClick={() => {
-                    asuntosQuery.refetch();
-                    clientesQuery.refetch();
-                  }}
-                  disabled={asuntosQuery.isFetching || clientesQuery.isFetching}
-                >
-                  Reintentar
-                </button>
-              </div>
+            ) : !asuntoIdRuta ? (
+              <ListaExpedientes clientes={clientesAPI || []} responsables={responsablesAPI || []} estados={estadosAPI || []}
+                onAbrir={() => {
+                  setClienteInicialAperturaId(new URLSearchParams(location.search).get('cliente_id') || '');
+                  setAperturaAbierta(true);
+                }} />
             ) : clienteActivo ? (
               <>
                 <div className="toolbar">
                   <div>
+                    <NavLink to={{ pathname: '/oficina/asuntos', search: location.search }}>Volver a expedientes</NavLink>
                     <h2>{clienteActivo.nombre}</h2>
                     <span className="muted">{clienteActivo.email} · CC/NIT: {clienteActivo.identificacion}</span>
                   </div>
@@ -751,43 +610,7 @@ export default function App() {
                 </div>
 
                 <div className="workspace-flow">
-                  <section className="panel case-nav-panel">
-                    <div className="section-title">
-                      <h3>
-                        {usuarioAutenticado.rol === 'abogado'
-                          ? 'Asuntos a tu cargo'
-                          : 'Asuntos'} ({clienteActivo.casos ? clienteActivo.casos.length : 0})
-                      </h3>
-                    </div>
-                    <div className="case-list">
-                      {clienteActivo.casos && clienteActivo.casos.length > 0 ? (
-                        clienteActivo.casos.map(cs => (
-                          <NavLink
-                            key={cs.id}
-                            className={`case-card ${casoActivo && cs.id === casoActivo.id ? 'active' : ''}`}
-                            to={`/oficina/asuntos/${cs.id}`}
-                            onClick={() => setCasoIdSeleccionado(cs.id)}
-                          >
-                            <div className="case-card-header">
-                              <div>
-                                <strong>{cs.nombre}</strong>
-                                <span className="muted small">
-                                  {cs.codigo} · {cs.responsable}
-                                </span>
-                              </div>
-                            </div>
-                            <span className="case-card-current">
-                              Acción actual · {cs.accionActual}
-                            </span>
-                          </NavLink>
-                        ))
-                      ) : (
-                        <div className="muted small" style={{ padding: '16px' }}>
-                          Sin asuntos. Usa “Nuevo asunto” para abrir el primero.
-                        </div>
-                      )}
-                    </div>
-                  </section>
+                  <ListaExpedientes key={clienteActivo.id} clienteId={clienteActivo.id} asuntoActivoId={casoActivo?.id} />
 
                   {casoActivo ? (
                     <section>
@@ -950,30 +773,7 @@ export default function App() {
                 </div>
               </>
             ) : (
-              <div className="panel" style={{ padding: '48px 24px', textAlign: 'center' }}>
-                {clientes.length > 0 ? (
-                  <>
-                    <h3>Selecciona un cliente</h3>
-                    <p className="muted small">
-                      Elige un cliente en la barra lateral para consultar sus asuntos.
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <h3>No hay clientes registrados</h3>
-                    <button
-                      className="primary-button"
-                      style={{ margin: '16px auto 0' }}
-                      onClick={() => {
-                        setClienteInicialAperturaId('');
-                        setAperturaAbierta(true);
-                      }}
-                    >
-                      <Plus size={16} /> Registrar primer cliente
-                    </button>
-                  </>
-                )}
-              </div>
+              <p className="muted" role="status">Consultando expediente…</p>
             )}
           </section>
         </div>

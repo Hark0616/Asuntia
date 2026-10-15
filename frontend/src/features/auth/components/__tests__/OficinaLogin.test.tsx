@@ -19,7 +19,7 @@ const mockedLogin = vi.mocked(loginOficinaAPI);
 describe('OficinaLogin Component', () => {
   it('debe renderizar el formulario de login de la oficina', () => {
     const onSuccessMock = vi.fn();
-    render(<OficinaLogin onSuccess={onSuccessMock} />);
+    render(<OficinaLogin onSuccess={onSuccessMock} firmaSlug="firma-real" onFirmaChange={vi.fn()} />);
 
     expect(screen.getByText('Acceso a Oficina')).toBeInTheDocument();
     expect(screen.getByLabelText(/Correo Institucional/i)).toBeInTheDocument();
@@ -30,7 +30,7 @@ describe('OficinaLogin Component', () => {
 
   it('debe enviar el formulario de oficina y llamar onSuccess', async () => {
     const onSuccessMock = vi.fn();
-    render(<OficinaLogin onSuccess={onSuccessMock} />);
+    render(<OficinaLogin onSuccess={onSuccessMock} firmaSlug="firma-real" onFirmaChange={vi.fn()} />);
 
     fireEvent.change(screen.getByLabelText(/Correo Institucional/i), {
       target: { value: 'daniela.torres@asuntia.com' },
@@ -49,6 +49,7 @@ describe('OficinaLogin Component', () => {
       expect(mockedLogin).toHaveBeenCalledWith(
         'daniela.torres@asuntia.com',
         'admin123',
+        'firma-real',
       );
     });
   });

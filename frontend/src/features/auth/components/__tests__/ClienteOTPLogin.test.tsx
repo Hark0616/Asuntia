@@ -1,6 +1,7 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { ClienteOTPLogin } from '../ClienteOTPLogin';
+import { apiClient } from '@/lib/axios';
 
 // Mock de apiClient
 vi.mock('@/lib/axios', () => ({
@@ -28,7 +29,7 @@ vi.mock('@/lib/axios', () => ({
 describe('ClienteOTPLogin Component', () => {
   it('debe renderizar el paso 1 de cédula correctamente', () => {
     const onSuccessMock = vi.fn();
-    render(<ClienteOTPLogin onSuccess={onSuccessMock} />);
+    render(<ClienteOTPLogin onSuccess={onSuccessMock} firmaSlug="firma-real" onFirmaChange={vi.fn()} />);
 
     expect(screen.getByText('Consulta de Expediente')).toBeInTheDocument();
     expect(screen.getByLabelText(/Cédula de ciudadanía/i)).toBeInTheDocument();
@@ -38,7 +39,7 @@ describe('ClienteOTPLogin Component', () => {
 
   it('debe avanzar al paso 2 de verificación OTP tras solicitar el código', async () => {
     const onSuccessMock = vi.fn();
-    render(<ClienteOTPLogin onSuccess={onSuccessMock} />);
+    render(<ClienteOTPLogin onSuccess={onSuccessMock} firmaSlug="firma-real" onFirmaChange={vi.fn()} />);
 
     fireEvent.change(screen.getByLabelText(/Cédula de ciudadanía/i), {
       target: { value: '1094852140' },
@@ -50,12 +51,13 @@ describe('ClienteOTPLogin Component', () => {
     const otpInput = await screen.findByLabelText(/Código de seguridad/i);
     expect(otpInput).toBeInTheDocument();
     expect(otpInput).toHaveValue('');
+    expect(apiClient.post).toHaveBeenCalledWith('/auth/otp/request', { cedula: '1.094.852.140', firma_slug: 'firma-real' });
     expect(screen.queryByText(/Local: 12345/i)).not.toBeInTheDocument();
   });
 
   it('verifica el código introducido por el cliente sin valores prefijados', async () => {
     const onSuccessMock = vi.fn();
-    render(<ClienteOTPLogin onSuccess={onSuccessMock} />);
+    render(<ClienteOTPLogin onSuccess={onSuccessMock} firmaSlug="firma-real" onFirmaChange={vi.fn()} />);
     fireEvent.change(screen.getByLabelText(/Cédula de ciudadanía/i), {
       target: { value: '1094852140' },
     });
@@ -67,11 +69,12 @@ describe('ClienteOTPLogin Component', () => {
 
     await screen.findByRole('button', { name: /Ingresar/i });
     expect(onSuccessMock).toHaveBeenCalledWith({ nombre: 'Carlos Gómez', rol: 'cliente' });
+    expect(apiClient.post).toHaveBeenCalledWith('/auth/otp/verify', { cedula: '1.094.852.140', code: '12345', firma_slug: 'firma-real' });
   });
 
   it('[CASO BORDE / ERROR] debe mostrar mensaje de error cuando falla la solicitud', async () => {
     const onSuccessMock = vi.fn();
-    render(<ClienteOTPLogin onSuccess={onSuccessMock} />);
+    render(<ClienteOTPLogin onSuccess={onSuccessMock} firmaSlug="firma-real" onFirmaChange={vi.fn()} />);
 
     const cedulaInput = screen.getByLabelText(/Cédula de ciudadanía/i);
     fireEvent.change(cedulaInput, { target: { value: '00000000' } });

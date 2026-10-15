@@ -2,12 +2,15 @@ import React, { useState } from 'react';
 import { LogIn } from 'lucide-react';
 import { loginOficinaAPI } from '@/features/auth/api/auth';
 import type { User } from '@/types/api';
+import { FirmaAccesoField } from './FirmaAccesoField';
 
 interface OficinaLoginProps {
   onSuccess: (user: User) => void;
+  firmaSlug: string;
+  onFirmaChange: (value: string) => void;
 }
 
-export function OficinaLogin({ onSuccess }: OficinaLoginProps) {
+export function OficinaLogin({ onSuccess, firmaSlug, onFirmaChange }: OficinaLoginProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -15,10 +18,11 @@ export function OficinaLogin({ onSuccess }: OficinaLoginProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading || !firmaSlug.trim()) return;
     setLoading(true);
     setError('');
     try {
-      onSuccess(await loginOficinaAPI(email, password));
+      onSuccess(await loginOficinaAPI(email, password, firmaSlug));
     } catch (err: any) {
       setError(err.response?.data?.detail || 'No fue posible iniciar sesión.');
     } finally {
@@ -48,6 +52,7 @@ export function OficinaLogin({ onSuccess }: OficinaLoginProps) {
         )}
 
         <form onSubmit={handleSubmit} className="stack">
+          <FirmaAccesoField value={firmaSlug} onChange={onFirmaChange} disabled={loading} />
           <div className="field">
             <label htmlFor="email" style={{ textAlign: 'left' }}>Correo Institucional</label>
             <input

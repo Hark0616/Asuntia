@@ -1,4 +1,5 @@
 from sqlalchemy import select
+import uuid
 
 from app.models.firma import Firma
 
@@ -13,6 +14,12 @@ class FirmaRepository:
 
     def __init__(self, session):
         self.session = session
+
+    async def get_by_id(self, firma_id: uuid.UUID) -> Firma | None:
+        result = await self.session.execute(
+            select(Firma).where(Firma.id == firma_id, Firma.is_active.is_(True))
+        )
+        return result.scalars().first()
 
     async def get_by_subdominio(self, subdominio: str) -> Firma | None:
         stmt = (
